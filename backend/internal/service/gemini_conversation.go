@@ -122,7 +122,7 @@ func geminiConversationTextAnchor(item gjson.Result) (string, bool) {
 			onlyText = false
 			return false
 		}
-		text.WriteString(part.Get("text").String())
+		_, _ = text.WriteString(part.Get("text").String())
 		return true
 	})
 	return text.String(), onlyText

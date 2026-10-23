@@ -48,7 +48,7 @@ func emitFixtureAnswer(w http.ResponseWriter, text string) {
 func TestChatHistoryAgentReusesResultsInOneModelRequestWithoutReadingAnyOriginal(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	item, _ := historyAgentFixture()
 	item.Messages[2].Content = "沿用已有结果，告诉我第二张图的形状"
 	var calls atomic.Int32
@@ -75,7 +75,7 @@ func TestChatHistoryAgentReusesResultsInOneModelRequestWithoutReadingAnyOriginal
 func TestChatHistoryAgentModelChoosesAndBrowserSuppliesOnlyTheRequestedImage(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	item, images := historyAgentFixture()
 	job := item.Messages[3].ID
 	data := "data:image/png;base64," + base64.StdEncoding.EncodeToString([]byte("\x89PNG\r\n\x1a\nsecond-only"))
@@ -166,7 +166,9 @@ func TestChatHistoryAgentUnavailableOrForeignImagesDoNotReachPaidRecognition(t *
 					require.False(t, foreign)
 					value, ok := h.imageRequests.Load("42:" + item.Messages[3].ID)
 					require.True(t, ok)
-					value.(*chatImageMailbox).delivery <- chatImageDelivery{Unavailable: []string{images[0].ClientID}}
+					mailbox, mailboxOK := value.(*chatImageMailbox)
+					require.True(t, mailboxOK)
+					mailbox.delivery <- chatImageDelivery{Unavailable: []string{images[0].ClientID}}
 				}
 				if delta.Tool != nil {
 					require.Equal(t, "failed", delta.Tool.Status)
@@ -185,7 +187,7 @@ func TestChatHistoryAgentUnavailableOrForeignImagesDoNotReachPaidRecognition(t *
 func TestChatImageMailboxIsOwnedValidatedAndIdempotent(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	job := uuid.NewString()
 	image := chatImage{ClientID: uuid.NewString(), Name: "only.png", MediaType: "image/png"}
 	box := &chatImageMailbox{id: uuid.NewString(), images: []chatImage{image}, delivery: make(chan chatImageDelivery, 1)}

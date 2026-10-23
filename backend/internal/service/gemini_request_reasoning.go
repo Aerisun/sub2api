@@ -181,12 +181,12 @@ func applyGeminiRequestReasoning(outbound, original []byte, model string) ([]byt
 	switch geminiEffectiveReasoningEffort(control.Effort) {
 	case "", "none", "minimal", "low", "medium", "high", "auto":
 	default:
-		return nil, fmt.Errorf("Gemini reasoning_effort %q is unsupported; use auto, minimal, low, medium, high, xhigh or max (xhigh/max map to high; none only on models supporting disabled thinking)", control.Effort)
+		return nil, fmt.Errorf("unsupported Gemini reasoning_effort %q; use auto, minimal, low, medium, high, xhigh or max (xhigh/max map to high; none only on models supporting disabled thinking)", control.Effort)
 	}
 	if bytes.Equal(outbound, original) && control.Native != nil && !control.CompatibilityControls &&
 		control.Effort != "xhigh" && control.Effort != "max" &&
 		control.Effort != "auto" &&
-		!(control.Budget != nil && control.Effort != "") {
+		(control.Budget == nil || control.Effort == "") {
 		// Native settings retain their exact spelling and upstream defaults.
 		// Only compatibility effort aliases require rewriting these controls.
 		return outbound, nil

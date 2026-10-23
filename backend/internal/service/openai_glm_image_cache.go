@@ -67,7 +67,7 @@ func glmVisionDescriptionCacheKey(c *gin.Context, account *Account, imageURL str
 }
 
 func (cache *glmVisionDescriptionCache) removeLocked(element *list.Element) {
-	entry := element.Value.(*glmVisionDescriptionEntry)
+	entry, _ := element.Value.(*glmVisionDescriptionEntry)
 	delete(cache.entries, entry.key)
 	cache.bytes -= entry.bytes
 	cache.lru.Remove(element)
@@ -78,7 +78,7 @@ func (cache *glmVisionDescriptionCache) getLocked(key string, now time.Time) (st
 	if element == nil {
 		return "", false
 	}
-	entry := element.Value.(*glmVisionDescriptionEntry)
+	entry, _ := element.Value.(*glmVisionDescriptionEntry)
 	if !now.Before(entry.expires) {
 		cache.removeLocked(element)
 		return "", false
@@ -112,7 +112,8 @@ func (cache *glmVisionDescriptionCache) putLocked(key, description string, now t
 	// as lookup, so old conversations cannot occupy the bounded cache forever.
 	for element := cache.lru.Back(); element != nil; {
 		previous := element.Prev()
-		if !now.Before(element.Value.(*glmVisionDescriptionEntry).expires) {
+		entry, _ := element.Value.(*glmVisionDescriptionEntry)
+		if !now.Before(entry.expires) {
 			cache.removeLocked(element)
 		}
 		element = previous

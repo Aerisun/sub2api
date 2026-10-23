@@ -75,7 +75,7 @@ func (h *ChatHistoryHandler) Generate(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	// Serialize starts for an account and bound background work before entering the gateway.
 	if _, err = tx.ExecContext(c.Request.Context(), `SELECT pg_advisory_xact_lock($1)`, uid); err != nil {
 		response.ErrorFrom(c, err)
@@ -227,7 +227,8 @@ func (h *ChatHistoryHandler) StopGeneration(c *gin.Context) {
 	h.mu.Unlock()
 	var progress []chatLiveSnapshot
 	if value, ok := h.liveTools.Load(fmt.Sprintf("%d:%s", uid, jobID)); ok {
-		snapshot, _ := value.(*chatToolLive).snapshot()
+		live, _ := value.(*chatToolLive) // The private map stores live tool pointers.
+		snapshot, _ := live.snapshot()
 		progress = append(progress, snapshot)
 	}
 	if cancel != nil {
@@ -248,7 +249,7 @@ func (h *ChatHistoryHandler) stopChatGeneration(ctx context.Context, uid int64, 
 	if err != nil {
 		return false, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock($1)`, uid); err != nil {
 		return false, err
 	}
@@ -522,8 +523,8 @@ loop:
 			}
 			// Append without copying the full response for every token. Builder
 			// snapshots remain immutable because only new suffixes are written.
-			contentBuffer.WriteString(delta.Content)
-			reasoningBuffer.WriteString(delta.Reasoning)
+			_, _ = contentBuffer.WriteString(delta.Content)
+			_, _ = reasoningBuffer.WriteString(delta.Reasoning)
 			content, reasoning = contentBuffer.String(), reasoningBuffer.String()
 			dirty = true
 			if delta.Tool != nil || delta.ImageRequest != nil || delta.Content != "" || delta.Reasoning != "" {
@@ -561,7 +562,7 @@ loop:
 	if err != nil {
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	// Serialize finalization with stopping and starting the next turn. A late
 	// worker must never overwrite a stopped transcript or a newer user message.
 	if _, err = tx.ExecContext(saveCtx, `SELECT pg_advisory_xact_lock($1)`, uid); err != nil {
@@ -663,7 +664,7 @@ func (h *ChatHistoryHandler) GenerationEvents(c *gin.Context) {
 		var toolChanged <-chan struct{}
 		previousLiveVersion := liveVersion
 		if value, ok := h.liveTools.Load(fmt.Sprintf("%d:%s", uid, c.Param("id"))); ok && g.Status == "running" {
-			live = value.(*chatToolLive)
+			live, _ = value.(*chatToolLive)
 			snapshot, changed := live.snapshot()
 			imageRequest = snapshot.imageRequest
 			toolChanged = changed

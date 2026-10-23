@@ -37,7 +37,7 @@ func TestImageRecognitionRejectsMultipleImagesBeforeForwarding(t *testing.T) {
 func TestChatRecognitionTransientImagesNeverNeedImageStorage(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	image := chatImage{ClientID: uuid.NewString(), Name: "local.png", MediaType: "image/png"}
 	url := "data:image/png;base64," + base64.StdEncoding.EncodeToString([]byte("\x89PNG\r\n\x1a\nimage"))
 	require.NoError(t, validateChatImageInputs([]chatImage{image}, map[string]string{image.ClientID: url}))
@@ -81,7 +81,7 @@ func TestChatRecognitionTransientImagesNeverNeedImageStorage(t *testing.T) {
 func TestChatBrowserOnlyHistoryDoesNotRequireOriginalImageOnAnotherDevice(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "/api/v1/chat/completions", r.URL.Path)
 		body, _ := io.ReadAll(r.Body)
@@ -122,7 +122,7 @@ func TestChatNativeVisionCatalogueIncludesOnlyVerifiedNativeModels(t *testing.T)
 func TestChatNonVisionImagesUseIndependentSingleImageToolsBeforeTextModel(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	images := []chatImage{{AssetID: uuid.NewString(), Name: "first.png"}, {AssetID: uuid.NewString(), Name: "second.png"}}
 	for _, image := range images {
 		mock.ExpectQuery("SELECT media_type,content").WithArgs(int64(42), image.AssetID).WillReturnRows(sqlmock.NewRows([]string{"media_type", "content"}).AddRow("image/png", []byte(image.Name)))
@@ -154,10 +154,15 @@ func TestChatNonVisionImagesUseIndependentSingleImageToolsBeforeTextModel(t *tes
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
 		require.Equal(t, "glm-5.3", payload["model"])
 		require.Equal(t, "max", payload["reasoning_effort"])
-		messages := payload["messages"].([]any)
-		require.Equal(t, "system", messages[0].(map[string]any)["role"])
-		require.Equal(t, chatCurrentVisionInstruction, messages[0].(map[string]any)["content"])
-		content := messages[1].(map[string]any)["content"]
+		messages, messagesOK := payload["messages"].([]any)
+		require.True(t, messagesOK)
+		system, systemOK := messages[0].(map[string]any)
+		require.True(t, systemOK)
+		current, currentOK := messages[1].(map[string]any)
+		require.True(t, currentOK)
+		require.Equal(t, "system", system["role"])
+		require.Equal(t, chatCurrentVisionInstruction, system["content"])
+		content := current["content"]
 		require.Equal(t, "比较两张图\n\n[图片识别结果]\n图片 1：\n红色三角形。\n\n图片 2：\n蓝色圆形。", content)
 		w.Header().Set("Content-Type", "text/event-stream")
 		_, _ = io.WriteString(w, "data: {\"choices\":[{\"delta\":{\"content\":\"形状和颜色都不同\"}}]}\n\ndata: [DONE]\n\n")
@@ -202,7 +207,7 @@ func TestChatImageToolFailureNeverSendsImagesOrStartsTextModel(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			db, mock, err := sqlmock.New()
 			require.NoError(t, err)
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 			asset := uuid.NewString()
 			mock.ExpectQuery("SELECT media_type,content").WithArgs(int64(42), asset).WillReturnRows(sqlmock.NewRows([]string{"media_type", "content"}).AddRow("image/png", []byte("image")))
 			var calls atomic.Int32
@@ -228,7 +233,7 @@ func TestChatImageToolFailureNeverSendsImagesOrStartsTextModel(t *testing.T) {
 func TestChatImageToolHistorySurvivesModelSwitchWithoutReadingOrChargingAgain(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	image := chatImage{AssetID: uuid.NewString()}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "/api/v1/chat/completions", r.URL.Path)
@@ -283,7 +288,7 @@ func TestChatImageToolFollowupDoesNotRetryFailedOrStoppedHistoricalRecognition(t
 		t.Run(previousError, func(t *testing.T) {
 			db, mock, err := sqlmock.New()
 			require.NoError(t, err)
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				require.Equal(t, "/api/v1/chat/completions", r.URL.Path)
 				raw, _ := io.ReadAll(r.Body)

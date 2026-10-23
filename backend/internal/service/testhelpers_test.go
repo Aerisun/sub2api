@@ -1,7 +1,6 @@
-package service
+//go:build unit
 
-// testPtrFloat64 returns a pointer to the given float64 value.
-func testPtrFloat64(v float64) *float64 { return &v }
+package service
 
 // testPtrInt returns a pointer to the given int value.
 func testPtrInt(v int) *int { return &v }

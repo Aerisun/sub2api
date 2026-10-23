@@ -69,7 +69,7 @@ func readChatRecognitionResponse(response *http.Response, local service.Internal
 				if partial.Len()+len(update.Delta) > outputLimit {
 					return invalid
 				}
-				partial.WriteString(update.Delta)
+				_, _ = partial.WriteString(update.Delta)
 				current := local
 				current.Delta = update.Delta
 				if !emit(chatDelta{Tool: &current}) {

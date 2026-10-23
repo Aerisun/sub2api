@@ -16,7 +16,11 @@ func chatImageAgentProxy() gin.HandlerFunc {
 
 func chatImageAgentProxyTo(target *url.URL) gin.HandlerFunc {
 	proxy := httputil.NewSingleHostReverseProxy(target)
-	transport := http.DefaultTransport.(*http.Transport).Clone()
+	standard, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		standard = &http.Transport{}
+	}
+	transport := standard.Clone()
 	transport.Proxy = nil
 	proxy.Transport = transport
 	proxy.FlushInterval = -1

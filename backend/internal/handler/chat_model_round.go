@@ -52,7 +52,7 @@ func (h *ChatHistoryHandler) chatModelRound(ctx context.Context, item chatRecord
 	if err != nil {
 		return result, err
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusOK {
 		raw, _ := io.ReadAll(io.LimitReader(response.Body, 8192))
 		var failure struct {
@@ -139,8 +139,8 @@ func (h *ChatHistoryHandler) chatModelRound(ctx context.Context, item chatRecord
 			if content.Len()+reasoning.Len()+len(delta.Content)+len(thought) > 8*1024*1024 {
 				return result, errors.New("回复已达到长度上限")
 			}
-			content.WriteString(delta.Content)
-			reasoning.WriteString(thought)
+			_, _ = content.WriteString(delta.Content)
+			_, _ = reasoning.WriteString(thought)
 			if delta.Content != "" || thought != "" {
 				if !emit(chatDelta{Content: delta.Content, Reasoning: thought}) {
 					return result, ctx.Err()

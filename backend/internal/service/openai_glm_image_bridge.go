@@ -307,7 +307,7 @@ func (s *OpenAIGatewayService) describeGLMImageAttempt(ctx context.Context, acco
 	}
 	vision, err := s.accountRepo.GetByID(ctx, visionID)
 	if err != nil || vision == nil || !vision.IsSchedulable() ||
-		!(vision.Platform == PlatformOpenAI && vision.Type == AccountTypeAPIKey || vision.Platform == PlatformAntigravity && vision.Type == AccountTypeOAuth) {
+		((vision.Platform != PlatformOpenAI || vision.Type != AccountTypeAPIKey) && (vision.Platform != PlatformAntigravity || vision.Type != AccountTypeOAuth)) {
 		return "", glmVisionUsage{}, fmt.Errorf("GLM vision account is unavailable")
 	}
 	// An API-key helper is dispatched directly to its provider, never recursively
@@ -401,7 +401,7 @@ func (s *OpenAIGatewayService) describeGLMImageAttempt(ctx context.Context, acco
 	if err != nil {
 		return "", glmVisionUsage{}, fmt.Errorf("GLM image analysis request failed")
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 400 {
 		return "", glmVisionUsage{}, fmt.Errorf("GLM image analysis returned HTTP %d", resp.StatusCode)
 	}
@@ -446,7 +446,7 @@ func glmVisionReasoningEffort(account *Account) string {
 
 func (s *OpenAIGatewayService) describeGLMImageWithNative(ctx context.Context, vision *Account, model, imageURL string) (string, glmVisionUsage, error) {
 	gemini := model == "gemini-3.8-flash"
-	if !(strings.HasPrefix(model, "claude-sonnet-") || gemini) || s.glmVisionClaudeForwarder == nil || s.glmVisionClaudeBilling == nil {
+	if (!strings.HasPrefix(model, "claude-sonnet-") && !gemini) || s.glmVisionClaudeForwarder == nil || s.glmVisionClaudeBilling == nil {
 		return "", glmVisionUsage{}, fmt.Errorf("GLM native image service is unavailable")
 	}
 	// The native Claude converter accepts inline images. Resolve public URLs

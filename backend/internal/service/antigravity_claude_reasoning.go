@@ -68,7 +68,7 @@ func applyAntigravityClaudeReasoning(req *antigravity.ClaudeRequest, original []
 	case "xhigh", "max":
 		budget = 32768
 	default:
-		return fmt.Errorf("Claude reasoning effort %q is unsupported", control.Effort)
+		return fmt.Errorf("unsupported Claude reasoning effort %q", control.Effort)
 	}
 	req.Thinking = &antigravity.ThinkingConfig{Type: "enabled", BudgetTokens: budget}
 	return nil

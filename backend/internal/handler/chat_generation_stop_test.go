@@ -19,7 +19,7 @@ func TestChatStopPersistsOrphanedCheckpointAndCancelsOwnedWorker(t *testing.T) {
 		t.Run(fmt.Sprintf("live=%t", live), func(t *testing.T) {
 			db, mock, err := sqlmock.New()
 			require.NoError(t, err)
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 			job, chat := uuid.NewString(), uuid.NewString()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -49,7 +49,7 @@ func TestChatStopIsAccountScopedAndIdempotent(t *testing.T) {
 		t.Run(status, func(t *testing.T) {
 			db, mock, err := sqlmock.New()
 			require.NoError(t, err)
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 			job := uuid.NewString()
 			mock.ExpectBegin()
 			mock.ExpectExec("SELECT pg_advisory_xact_lock").WithArgs(int64(42)).WillReturnResult(sqlmock.NewResult(0, 1))
@@ -71,7 +71,7 @@ func TestChatStopIsAccountScopedAndIdempotent(t *testing.T) {
 func TestChatWorkerCannotRestartStoppedGeneration(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	job := uuid.NewString()
 	mock.ExpectQuery("SELECT EXISTS").WithArgs(int64(42), job).WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
 	ctx, cancel := context.WithCancel(context.Background())

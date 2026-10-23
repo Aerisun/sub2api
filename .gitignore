@@ -202,3 +202,13 @@ __pycache__/
 *.age
 *.tar.gz
 *.dump
+
+# Current CPU scheduler regressions belong to their components.
+!/inference/embedding/tests/
+!/inference/embedding/tests/**
+!/inference/reranker/tests/
+!/inference/reranker/tests/**
+
+# Keep bytecode out of the explicitly included test directories.
+__pycache__/
+*.py[cod]

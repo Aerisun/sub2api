@@ -37,14 +37,14 @@ func TestChatGenerationBaseRetryKeepsEarlierTurns(t *testing.T) {
 func TestChatGenerationBaseAcceptsAdvancedVersionWithoutSaveBarrier(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	txErr := func() error {
 		mock.ExpectBegin()
 		tx, err := db.Begin()
 		if err != nil {
 			return err
 		}
-		defer tx.Rollback()
+		defer func() { _ = tx.Rollback() }()
 		chatID := uuid.NewString()
 		previous := []chatMessage{{ID: "u1", Role: "user"}, {ID: "a1", Role: "assistant", Content: "saved answer"}}
 		mock.ExpectQuery("SELECT messages,version,deleted_at").WithArgs(int64(42), chatID).WillReturnRows(sqlmock.NewRows([]string{"messages", "version", "deleted_at"}).AddRow(mustChatJSON(previous), 9, nil))
@@ -62,11 +62,11 @@ func TestChatGenerationBaseAcceptsAdvancedVersionWithoutSaveBarrier(t *testing.T
 func TestChatGenerationBaseCannotResurrectDeletedConversation(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	mock.ExpectBegin()
 	tx, err := db.Begin()
 	require.NoError(t, err)
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	id := uuid.NewString()
 	mock.ExpectQuery("SELECT messages,version,deleted_at").WithArgs(int64(42), id).WillReturnRows(sqlmock.NewRows([]string{"messages", "version", "deleted_at"}).AddRow([]byte("[]"), 2, time.Now()))
 	err = (&ChatHistoryHandler{db: db}).prepareChatGeneration(context.Background(), tx, 42, &chatRecord{ID: id}, &chatGenerationBase{}, false)
@@ -79,7 +79,7 @@ func TestChatGenerationBaseCannotResurrectDeletedConversation(t *testing.T) {
 func TestChatGenerationReaderExpiresLostWorkerByOwnerAndJob(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	id := uuid.NewString()
 	mock.ExpectExec("UPDATE chat_generations SET status='failed'").WithArgs(int64(42), id).WillReturnResult(sqlmock.NewResult(0, 1))
 	require.NoError(t, (&ChatHistoryHandler{db: db}).expireChatGeneration(context.Background(), 42, id))

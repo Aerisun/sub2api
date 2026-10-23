@@ -152,7 +152,7 @@ func (h *ChatHistoryHandler) recognizeChatImages(ctx context.Context, images []c
 	if err != nil {
 		return fail(errors.New("识图工具连接中断，请稍后重试"))
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	result, err := readChatRecognitionResponse(response, event, emit)
 	if err != nil {
 		return fail(err)

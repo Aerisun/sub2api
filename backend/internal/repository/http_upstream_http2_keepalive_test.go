@@ -38,6 +38,8 @@ func requireHTTP2Configured(t *testing.T, tr *http.Transport, msg string) {
 // http2.Transport 默认 ReadIdleTimeout=0（不发健康 PING），无法检测这种死连接。
 // 必须显式启用主动 PING 探测，让死连接被提前剔除，而不是只靠 ResponseHeaderTimeout
 // 事后兜底。
+//
+//nolint:staticcheck // Verify the compatibility transport retains its measured PING budgets.
 func TestEnableHTTP2KeepAlive_EnablesPingHealthCheck(t *testing.T) {
 	for _, tc := range []struct {
 		mode            string

@@ -28,7 +28,9 @@ func TestChatRecognitionStreamsRealDeltasBeforeFinalResult(t *testing.T) {
 		require.NotContains(t, body, "images")
 		w.Header().Set("Content-Type", "text/event-stream")
 		fmt.Fprint(w, "event: aerisun.tool\r\ndata: {\"type\":\"tool_call\",\"id\":\"remote\",\"name\":\"image_recognition\",\"status\":\"running\",\"delta\":\"红色\"}\r\n\r\n")
-		w.(http.Flusher).Flush()
+		flusher, ok := w.(http.Flusher)
+		require.True(t, ok)
+		flusher.Flush()
 		select {
 		case <-release:
 		case <-r.Context().Done():
@@ -64,7 +66,8 @@ func TestChatRecognitionStreamsRealDeltasBeforeFinalResult(t *testing.T) {
 	require.Equal(t, "红色", first.Delta)
 	require.Equal(t, initial.ID, first.ID)
 	select {
-	case <-done:
+	case completionErr := <-done:
+		t.Logf("server shutdown completed: %v", completionErr)
 		close(release)
 		t.Fatal("recognition finished before fixture released")
 	default:

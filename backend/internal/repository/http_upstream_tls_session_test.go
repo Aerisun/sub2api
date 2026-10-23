@@ -68,10 +68,12 @@ func TestOpenAIHTTP2RetainsWarmConnectionWithoutExtendingOtherProfiles(t *testin
 				IdleConnTimeoutSeconds: 1,
 				OpenAIHTTP2:            config.GatewayOpenAIHTTP2Config{Enabled: true, IdleConnTimeoutSeconds: 3},
 			}}
-			s := NewHTTPUpstream(cfg).(*httpUpstreamService)
+			s, ok := NewHTTPUpstream(cfg).(*httpUpstreamService)
+			require.True(t, ok)
 			entry, err := s.getClientEntry("", 1, 1, tc.profile, false, false)
 			require.NoError(t, err)
-			transport := entry.client.Transport.(*http.Transport)
+			transport, ok := entry.client.Transport.(*http.Transport)
+			require.True(t, ok)
 			t.Cleanup(transport.CloseIdleConnections)
 			roots := x509.NewCertPool()
 			roots.AddCert(server.Certificate())

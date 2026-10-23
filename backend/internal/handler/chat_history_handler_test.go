@@ -31,7 +31,7 @@ func historyTestContext(method, path, body string) (*gin.Context, *httptest.Resp
 func TestChatHistoryImageIsAccountScoped(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	asset := uuid.NewString()
 	c, w := historyTestContext("GET", "/images/"+asset, "")
 	c.Params = gin.Params{{Key: "id", Value: asset}}
@@ -51,7 +51,7 @@ func TestChatHistoryRejectsRawImageAndOversizedReferences(t *testing.T) {
 func TestChatHistoryRetriesDoNotStartAnotherGeneration(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	chatID, jobID := uuid.NewString(), uuid.NewString()
 	item := chatRecord{Title: "验证", Model: "qwen", Messages: []chatMessage{{Role: "user", Content: "hi"}, {ID: jobID, Role: "assistant"}}}
 	body, _ := json.Marshal(map[string]any{"chat": item, "requestID": jobID})
@@ -68,7 +68,7 @@ func TestChatHistoryRetriesDoNotStartAnotherGeneration(t *testing.T) {
 func TestChatHistoryModelStreamUsesOwnedAssetsAndRegularBillingRoute(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	asset := uuid.NewString()
 	chatID := uuid.NewString()
 	png := []byte("image bytes")
@@ -97,7 +97,7 @@ func TestChatHistoryModelStreamUsesOwnedAssetsAndRegularBillingRoute(t *testing.
 func TestChatHistoryGenerationOffsetsAreExplicitIntegerPositions(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	jobID := uuid.NewString()
 	c, w := historyTestContext("GET", "/generations/"+jobID+"?content_offset=2&reasoning_offset=1", "")
 	c.Params = gin.Params{{Key: "id", Value: jobID}}
@@ -111,7 +111,7 @@ func TestChatHistoryGenerationOffsetsAreExplicitIntegerPositions(t *testing.T) {
 func TestChatHistoryDeleteChecksRunningJobInsideTheGenerationLock(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	chatID := uuid.NewString()
 	c, w := historyTestContext("DELETE", "/conversations/"+chatID, "")
 	c.Params = gin.Params{{Key: "id", Value: chatID}}
@@ -127,7 +127,7 @@ func TestChatHistoryDeleteChecksRunningJobInsideTheGenerationLock(t *testing.T) 
 func TestChatHistoryFollowupNeverLoadsOldImagesAndReusesToolDescription(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		raw, _ := io.ReadAll(r.Body)
 		require.NotContains(t, string(raw), "image_url")
@@ -153,7 +153,7 @@ func TestChatHistoryFollowupNeverLoadsOldImagesAndReusesToolDescription(t *testi
 func TestChatHistoryNativeVisionKeepsImagePrefixAcrossFollowups(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	asset := uuid.NewString()
 	var requests []struct {
 		Messages []json.RawMessage `json:"messages"`

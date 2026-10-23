@@ -82,7 +82,7 @@ func chatHistoryResultContext(tool service.InternalToolEvent, known map[string]s
 
 func (h *ChatHistoryHandler) runChatImageAgent(ctx context.Context, uid int64, item chatRecord, payload map[string]any, references []chatImageReference, remaining int, auth string, emit func(chatDelta) bool) error {
 	if len(references) > 0 && remaining > 0 {
-		messages := payload["messages"].([]map[string]any)
+		messages, _ := payload["messages"].([]map[string]any)
 		// Keep dynamic metadata at the current turn, away from the cached prefix.
 		at := len(messages) - 1
 		contextMessage := map[string]any{"role": "user", "content": chatImageReferenceContext(references)}
@@ -116,7 +116,8 @@ func (h *ChatHistoryHandler) runChatImageAgent(ctx context.Context, uid int64, i
 	if first.Reasoning != "" {
 		assistant["reasoning_content"] = first.Reasoning
 	}
-	messages := append(payload["messages"].([]map[string]any), assistant)
+	messages, _ := payload["messages"].([]map[string]any)
+	messages = append(messages, assistant)
 	for _, call := range first.Calls {
 		messages = append(messages, map[string]any{"role": "tool", "tool_call_id": call.ID, "content": string(mustChatJSON(output))})
 	}

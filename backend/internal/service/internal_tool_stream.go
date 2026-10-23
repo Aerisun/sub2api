@@ -119,7 +119,7 @@ func readGLMVisionStream(source io.Reader, emit func(string)) ([]byte, error) {
 		}
 		part := gjson.Get(data, "choices.0.delta.content").String()
 		if part != "" {
-			text.WriteString(part)
+			_, _ = text.WriteString(part)
 			if emit != nil {
 				emit(part)
 			}

@@ -33,9 +33,10 @@ func TestAntigravityGeminiDefaultReasoningAcrossProtocols(t *testing.T) {
 				svc := newAntigravityCompatService(config.GatewayConfig{MaxLineSize: defaultMaxLineSize}, upstream)
 				account := geminiDefaultReasoningAccount()
 				body := map[string]any{"model": model, "max_tokens": 8192, "messages": []any{map[string]any{"role": "user", "content": "hello"}}}
-				if protocol == "responses" {
+				switch protocol {
+				case "responses":
 					body = map[string]any{"model": model, "max_output_tokens": 8192, "input": "hello"}
-				} else if protocol == "native" {
+				case "native":
 					body = map[string]any{"contents": []any{map[string]any{"role": "user", "parts": []any{map[string]any{"text": "hello"}}}}, "generationConfig": map[string]any{"maxOutputTokens": 8192}}
 				}
 				raw, err := json.Marshal(body)

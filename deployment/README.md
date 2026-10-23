@@ -59,7 +59,7 @@ python3 -m ops.checks.image_recognition_concurrency --concurrency 64 --waves 2 -
 
 这些是明确的真实付费调用，临时测试用户和密钥会在结束后删除。识图检查同时覆盖 REST、SSE、MCP 和通用工具调用，逐个验证图片内容、完成状态、用量和扣费。内部允许短暂排队，接收上限 64，供应商执行上限 16。
 
-离线回归测试在各组件中维护；不保留根目录的一次性测试脚本。后端使用 Go 1.27，前端使用 Node 24 和 pnpm 9。先安装 `chat-ui/` 与 `frontend/` 中锁定的依赖，再执行 `make build-frontend`。Docker 构建也会从源码编译独立对话界面；生成资源不提交 Git。
+离线回归测试在各组件中维护；不保留根目录的一次性测试脚本。后端使用 Go 1.27.3，前端使用 Node 24 和 pnpm 9。先安装 `chat-ui/` 与 `frontend/` 中锁定的依赖，再执行 `make build-frontend`。Docker 构建也会从源码编译独立对话界面；生成资源不提交 Git。
 
 ## 加密备份与恢复
 
@@ -76,9 +76,9 @@ python3 -m ops.backup verify backups/具体备份.tar.gz.age --restore-database
 
 灾难恢复步骤：
 
-1. 在空目录解密、解包快照，保留 `database.dump`、`redis.rdb` 和 `manifest.json`；将 `project/` 作为新的 `sub2api` 项目目录。先校验下载文件的 SHA-256。
-2. 使用另存的解密文件解密：`age -d -i identity.agekey -o snapshot.tar.gz 备份.tar.gz.age`。只处理自己的、已验证的快照。
-3. 运行 `python3 -m ops.install`，重新生成当前路径对应的服务配置。由私有 `runtime.env` 中的用户和密码初始化空 PostgreSQL，使用 `pg_restore --no-owner --no-privileges --exit-on-error` 恢复业务库。
+1. 校验下载文件的 SHA-256，使用另存的解密文件解密：`age -d -i identity.agekey -o snapshot.tar.gz 备份.tar.gz.age`。只处理自己的、已验证的快照。
+2. 在空目录使用 `tar --no-same-owner` 解包，保留 `database.dump`、`redis.rdb` 和 `manifest.json`；将 `project/` 作为新的 `sub2api` 项目目录。
+3. 运行 `python3 -m ops.install`，重新生成当前路径对应的服务配置。系统 Python 版本不同时，先通过 `python3 -m pip install --upgrade --target runtime/python-site -r requirements-aerisun.txt` 重建 Python 依赖。由私有 `runtime.env` 中的用户和密码初始化空 PostgreSQL，使用 `pg_restore --no-owner --no-privileges --exit-on-error` 恢复业务库。
 4. Redis 停止时，将 `redis.rdb` 安装到其私有配置指定的数据目录；保留原有认证与配额状态。
 5. 先启动数据库、Redis、三个出口及推理连接，再启动池、图片工具、网关、Nginx、隧道和监控定时器。先检查 `ops.services status`，再执行小规模真实调用。
 
@@ -87,3 +87,5 @@ CPU 推理目前运行在私有 SSH 配置指定的远端主机，8091/8101 经�
 ## 保持目录干净
 
 只在源码目录维护当前实现。验证结果写入 `var/reports/`，日志写入 `var/log/`，临时构建写入 `var/build/`。旧脚本、浏览器录制、源码副本和失效补丁在新快照恢复验证后删除。运行 `python3 -m ops.maintenance --apply` 执行既有的缓存与日志保留策略。
+
+当前源码的 Go/HTTP 依赖已使用修复版本构建和检查。线上 Go 网关二进制作为本次公网验收的运行版本原样归档，具体 SHA-256 保留在验收记录中；本次已经部署的变更包括网络恢复、识图调度隔离、目录与配置迁移、前端依赖修复。

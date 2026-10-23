@@ -19,11 +19,12 @@ func TestGeminiUnifiedReasoningProtocolControls(t *testing.T) {
 		require.NoError(t, err)
 		var body map[string]any
 		require.NoError(t, json.Unmarshal(out, &body))
-		request := body["request"].(map[string]any)
-		config := request["generationConfig"].(map[string]any)
+		request := geminiReasoningJSONMap(t, body["request"])
+		config := geminiReasoningJSONMap(t, request["generationConfig"])
+		thinking := geminiReasoningJSONMap(t, config["thinkingConfig"])
 		require.Equal(t, float64(2048), config["maxOutputTokens"])
-		require.Equal(t, "low", config["thinkingConfig"].(map[string]any)["thinkingLevel"])
-		require.Equal(t, true, config["thinkingConfig"].(map[string]any)["includeThoughts"])
+		require.Equal(t, "low", thinking["thinkingLevel"])
+		require.Equal(t, true, thinking["includeThoughts"])
 		require.Len(t, request["contents"], 1)
 	}
 }
@@ -45,9 +46,9 @@ func TestGeminiUnifiedReasoningPreservesBudgetAndDisable(t *testing.T) {
 		require.NoError(t, err)
 		var body map[string]any
 		require.NoError(t, json.Unmarshal(out, &body))
-		config := body["generationConfig"].(map[string]any)
+		config := geminiReasoningJSONMap(t, body["generationConfig"])
 		require.Equal(t, 0.25, config["temperature"])
-		thinking := config["thinkingConfig"].(map[string]any)
+		thinking := geminiReasoningJSONMap(t, config["thinkingConfig"])
 		if tc.level == "none" {
 			require.NotContains(t, thinking, "thinkingBudget")
 		} else {
@@ -95,9 +96,9 @@ func TestGeminiClaudeCodeExtendedEffort(t *testing.T) {
 					require.NoError(t, err)
 					var body map[string]any
 					require.NoError(t, json.Unmarshal(out, &body))
-					config := body["generationConfig"].(map[string]any)
+					config := geminiReasoningJSONMap(t, body["generationConfig"])
 					require.Equal(t, float64(32768), config["maxOutputTokens"])
-					thinking := config["thinkingConfig"].(map[string]any)
+					thinking := geminiReasoningJSONMap(t, config["thinkingConfig"])
 					if model == "gemini-2.5-flash" {
 						require.Equal(t, float64(24576), thinking["thinkingBudget"])
 					} else {
@@ -121,7 +122,7 @@ func TestGeminiClaudeCodeExtendedEffort(t *testing.T) {
 			require.NoError(t, err)
 			var body map[string]any
 			require.NoError(t, json.Unmarshal(out, &body))
-			thinking := body["generationConfig"].(map[string]any)["thinkingConfig"].(map[string]any)
+			thinking := geminiReasoningJSONMap(t, geminiReasoningJSONMap(t, body["generationConfig"])["thinkingConfig"])
 			require.Equal(t, tc.budget, thinking["thinkingBudget"])
 			require.NotContains(t, thinking, "thinkingLevel")
 		}
@@ -134,7 +135,7 @@ func TestGeminiNativeThinkingOffKeepsAntigravityWorkaround(t *testing.T) {
 	require.NoError(t, err)
 	var request map[string]any
 	require.NoError(t, json.Unmarshal(out, &request))
-	thinking := request["generationConfig"].(map[string]any)["thinkingConfig"].(map[string]any)
+	thinking := geminiReasoningJSONMap(t, geminiReasoningJSONMap(t, request["generationConfig"])["thinkingConfig"])
 	require.NotContains(t, thinking, "thinkingBudget")
 	require.Equal(t, false, thinking["includeThoughts"])
 }
@@ -146,4 +147,11 @@ func TestGeminiUnifiedReasoningClaudeCodeOff(t *testing.T) {
 	require.Equal(t, "low", geminiRequestedThinkingLevel(geminiClaudeReasoningBody(on)))
 	extension := []byte(`{"reasoning_effort":"low","output_config":{"effort":"high"}}`)
 	require.Equal(t, "low", geminiRequestedThinkingLevel(geminiClaudeReasoningBody(extension)))
+}
+
+func geminiReasoningJSONMap(t *testing.T, value any) map[string]any {
+	t.Helper()
+	object, ok := value.(map[string]any)
+	require.True(t, ok)
+	return object
 }

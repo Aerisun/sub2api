@@ -96,7 +96,7 @@ func (h *ChatHistoryHandler) List(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := make([]chatRecord, 0)
 	for rows.Next() {
 		var item chatRecord
@@ -213,7 +213,7 @@ func (h *ChatHistoryHandler) Put(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	if err = h.saveChatTx(c.Request.Context(), tx, uid, &item); err != nil {
 		chatSaveError(c, err)
 		return
@@ -295,7 +295,7 @@ func (h *ChatHistoryHandler) Delete(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	// Use the same account lock as Generate so another browser cannot start a
 	// billed worker between the active-job check and the deletion commit.
 	if _, err = tx.ExecContext(c.Request.Context(), `SELECT pg_advisory_xact_lock($1)`, uid); err != nil {

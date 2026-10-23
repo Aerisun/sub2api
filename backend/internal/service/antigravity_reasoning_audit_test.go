@@ -23,12 +23,13 @@ func TestAntigravityClaudeEffortReachesUpstreamAcrossProtocols(t *testing.T) {
 				t.Run(model+"/"+protocol+"/"+effort, func(t *testing.T) {
 					body := map[string]any{"model": model, "max_tokens": 64000,
 						"messages": []any{map[string]any{"role": "user", "content": "hello"}}}
-					if protocol == "messages" {
+					switch protocol {
+					case "messages":
 						body["thinking"] = map[string]any{"type": "adaptive"}
 						body["output_config"] = map[string]any{"effort": effort}
-					} else if protocol == "responses" {
+					case "responses":
 						body = map[string]any{"model": model, "input": "hello", "max_output_tokens": 64000, "reasoning": map[string]any{"effort": effort}}
-					} else {
+					default:
 						body["reasoning_effort"] = effort
 					}
 					raw, err := json.Marshal(body)
@@ -65,7 +66,7 @@ func TestAntigravityClaudeEffortReachesUpstreamAcrossProtocols(t *testing.T) {
 
 func TestAntigravityReasoningBudgetsAndOffRemainAuthoritative(t *testing.T) {
 	account := geminiDefaultReasoningAccount()
-	account.Credentials["gemini_reasoning_models"].(map[string]any)["gemini-3.8-flash"].(map[string]any)["medium"] = "gemini-3.8-flash-medium"
+	geminiReasoningTestVariant(t, account, "gemini-3.8-flash")["medium"] = "gemini-3.8-flash-medium"
 	for _, body := range []string{
 		`{"thinking":{"type":"enabled","budget_tokens":1024},"output_config":{"effort":"max"}}`,
 		`{"generationConfig":{"thinkingConfig":{"thinkingBudget":1024,"thinkingLevel":"high","includeThoughts":false}}}`,
@@ -141,7 +142,7 @@ func TestAntigravityCapacityRetriesAreBoundedAndDeduplicated(t *testing.T) {
 		modelCapacityExhaustedMu.Unlock()
 	})
 	started = time.Now()
-	result = svc.handleSmartRetry(params, response(), body, "https://example.invalid", 0, []string{"https://example.invalid"})
+	_ = svc.handleSmartRetry(params, response(), body, "https://example.invalid", 0, []string{"https://example.invalid"})
 	require.Equal(t, 503, result.resp.StatusCode)
 	require.Equal(t, 3, upstream.callCount)
 	require.Less(t, time.Since(started), 4*time.Second)
@@ -150,7 +151,7 @@ func TestAntigravityCapacityRetriesAreBoundedAndDeduplicated(t *testing.T) {
 	require.True(t, time.Now().Before(modelCapacityExhaustedUntil[model]))
 	modelCapacityExhaustedMu.RUnlock()
 	started = time.Now()
-	result = svc.handleSmartRetry(params, response(), body, "https://example.invalid", 0, []string{"https://example.invalid"})
+	_ = svc.handleSmartRetry(params, response(), body, "https://example.invalid", 0, []string{"https://example.invalid"})
 	require.Less(t, time.Since(started), 100*time.Millisecond)
 	require.Equal(t, 3, upstream.callCount, "the cooldown must prevent another retry burst")
 }
@@ -159,8 +160,8 @@ func TestAntigravitySignatureRepairKeepsThinkingOffInRetry(t *testing.T) {
 	for _, model := range []string{"claude-opus-4-6-thinking", "gemini-3.8-flash", "gemini-2.5-flash"} {
 		t.Run(model, func(t *testing.T) {
 			account := geminiDefaultReasoningAccount()
-			account.Credentials["model_mapping"].(map[string]any)["claude-opus-4-6-thinking"] = "claude-opus-4-6-thinking"
-			account.Credentials["gemini_reasoning_models"].(map[string]any)["gemini-2.5-flash"].(map[string]any)["high"] = "gemini-2.5-flash-thinking"
+			geminiReasoningTestMapping(t, account)["claude-opus-4-6-thinking"] = "claude-opus-4-6-thinking"
+			geminiReasoningTestVariant(t, account, "gemini-2.5-flash")["high"] = "gemini-2.5-flash-thinking"
 			upstream := &queuedHTTPUpstreamStub{responses: []*http.Response{
 				{StatusCode: 400, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{"error":{"message":"Invalid thought signature"}}`))},
 				antigravityCompatSuccessResponse(),
@@ -190,4 +191,19 @@ func TestAntigravitySignatureRepairKeepsThinkingOffInRetry(t *testing.T) {
 			}
 		})
 	}
+}
+
+func geminiReasoningTestMapping(t *testing.T, account *Account) map[string]any {
+	t.Helper()
+	mapping, ok := account.Credentials["model_mapping"].(map[string]any)
+	require.True(t, ok)
+	return mapping
+}
+func geminiReasoningTestVariant(t *testing.T, account *Account, model string) map[string]any {
+	t.Helper()
+	models, ok := account.Credentials["gemini_reasoning_models"].(map[string]any)
+	require.True(t, ok)
+	variant, ok := models[model].(map[string]any)
+	require.True(t, ok)
+	return variant
 }

@@ -82,7 +82,9 @@ func TestChatTwelveIndependentImageCallsStreamTogetherAndRetainOrder(t *testing.
 		progress := map[string]any{"type": "tool_call", "id": "remote-" + input.Image, "name": "image_recognition", "status": "running", "delta": input.Image}
 		raw, _ := json.Marshal(progress)
 		fmt.Fprintf(w, "event: aerisun.tool\ndata: %s\n\n", raw)
-		w.(http.Flusher).Flush()
+		flusher, ok := w.(http.Flusher)
+		require.True(t, ok)
+		flusher.Flush()
 		select {
 		case <-release:
 		case <-r.Context().Done():
@@ -165,7 +167,7 @@ func TestChatTwelveIndependentImageCallsStreamTogetherAndRetainOrder(t *testing.
 func TestChatLegacyHistorySelectionDoesNotForceAPaidRecognition(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	selected := chatImage{ClientID: uuid.NewString(), Name: "selected.png"}
 	other := chatImage{ClientID: uuid.NewString(), Name: "other.png"}
 	var calls atomic.Int32

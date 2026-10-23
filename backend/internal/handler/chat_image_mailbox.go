@@ -55,7 +55,7 @@ func (h *ChatHistoryHandler) ImageInputs(c *gin.Context) {
 		response.BadRequest(c, "图片读取响应格式无效")
 		return
 	}
-	mailbox := value.(*chatImageMailbox)
+	mailbox, _ := value.(*chatImageMailbox) // The private map publishes mailbox pointers only.
 	if body.RequestID != mailbox.id {
 		response.BadRequest(c, "图片读取请求不匹配")
 		return

@@ -18,6 +18,12 @@ module.exports = {
     "plugin:vue/vue3-essential",
     "plugin:@typescript-eslint/recommended",
   ],
+  overrides: [
+    {
+      files: ["public/client-streaming/*.cjs"],
+      rules: { "@typescript-eslint/no-var-requires": "off" },
+    },
+  ],
   rules: {
     "no-constant-condition": "off",
     "no-mixed-spaces-and-tabs": "off",
