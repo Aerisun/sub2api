@@ -116,12 +116,12 @@ backend/.installed
 # ===================
 # 其他
 # ===================
-tests
+/tests/
 !deploy/tests/
 !deploy/tests/**
 CLAUDE.md
 .claude
-scripts
+/scripts/
 !backend/scripts/
 !backend/scripts/resolve-version.sh
 .code-review-state
@@ -203,11 +203,9 @@ __pycache__/
 *.tar.gz
 *.dump
 
-# Current CPU scheduler regressions belong to their components.
-!/inference/embedding/tests/
-!/inference/embedding/tests/**
-!/inference/reranker/tests/
-!/inference/reranker/tests/**
+# Component scripts and tests are source; only top-level scratch directories are ignored.
+!/inference/embedding/config.example.env
+!/inference/embedding/config.pool.example.env
 
 # Keep bytecode out of the explicitly included test directories.
 __pycache__/
