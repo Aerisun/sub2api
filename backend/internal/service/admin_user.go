@@ -118,6 +118,9 @@ func normalizeUserRole(role, fallback string) (string, error) {
 }
 
 func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInput) (*User, error) {
+	if input.OpenAIConcurrency < 0 {
+		return nil, fmt.Errorf("OpenAI concurrency must be nonnegative")
+	}
 	balance := 0.0
 	if input.Balance != nil {
 		balance = *input.Balance
@@ -132,15 +135,16 @@ func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInpu
 	}
 
 	user := &User{
-		Email:         input.Email,
-		Username:      input.Username,
-		Notes:         input.Notes,
-		Role:          role,
-		Balance:       balance,
-		Concurrency:   input.Concurrency,
-		RPMLimit:      input.RPMLimit,
-		Status:        StatusActive,
-		AllowedGroups: input.AllowedGroups,
+		Email:             input.Email,
+		Username:          input.Username,
+		Notes:             input.Notes,
+		Role:              role,
+		Balance:           balance,
+		Concurrency:       input.Concurrency,
+		OpenAIConcurrency: input.OpenAIConcurrency,
+		RPMLimit:          input.RPMLimit,
+		Status:            StatusActive,
+		AllowedGroups:     input.AllowedGroups,
 
 		RestrictPublicGroups: input.RestrictPublicGroups,
 	}
@@ -214,6 +218,7 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		return nil, errors.New("cannot disable admin user")
 	}
 
+	oldOpenAIConcurrency := user.OpenAIConcurrency
 	oldConcurrency := user.Concurrency
 	oldStatus := user.Status
 	oldRole := user.Role
@@ -266,6 +271,13 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		fields.Role = true
 	}
 
+	if input.OpenAIConcurrency != nil {
+		if *input.OpenAIConcurrency < 0 {
+			return nil, infraerrors.BadRequest("INVALID_OPENAI_CONCURRENCY", "openai_concurrency must be non-negative")
+		}
+		user.OpenAIConcurrency = *input.OpenAIConcurrency
+		fields.OpenAIConcurrency = true
+	}
 	if input.Concurrency != nil {
 		user.Concurrency = *input.Concurrency
 		fields.Concurrency = true
@@ -307,7 +319,7 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 	if s.authCacheInvalidator != nil {
 		// RPMLimit 直接参与 billing_cache_service.checkRPM 的三级级联，
 		// allowed_groups 参与 API Key 专属分组授权判断；不失效缓存会让修改在一个 L2 TTL 内失去效果。
-		if user.Concurrency != oldConcurrency || user.Status != oldStatus || user.Role != oldRole || user.RPMLimit != oldRPMLimit || user.RestrictPublicGroups != oldRestrictPublicGroups || !sameInt64Set(user.AllowedGroups, oldAllowedGroups) {
+		if user.OpenAIConcurrency != oldOpenAIConcurrency || user.Concurrency != oldConcurrency || user.Status != oldStatus || user.Role != oldRole || user.RPMLimit != oldRPMLimit || user.RestrictPublicGroups != oldRestrictPublicGroups || !sameInt64Set(user.AllowedGroups, oldAllowedGroups) {
 			s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, user.ID)
 		}
 	}
@@ -481,8 +493,15 @@ func (s *adminServiceImpl) BatchUpdateConcurrency(ctx context.Context, userIDs [
 }
 
 func (s *adminServiceImpl) BatchUpdateLimits(ctx context.Context, userIDs []int64, concurrency, rpmLimit *int) (int, error) {
-	if concurrency == nil && rpmLimit == nil {
-		return 0, fmt.Errorf("at least one of concurrency or rpm_limit is required")
+	return s.BatchUpdateLimitsWithOpenAI(ctx, userIDs, concurrency, nil, rpmLimit)
+}
+
+func (s *adminServiceImpl) BatchUpdateLimitsWithOpenAI(ctx context.Context, userIDs []int64, concurrency, openAIConcurrency, rpmLimit *int) (int, error) {
+	if openAIConcurrency != nil && *openAIConcurrency < 0 {
+		return 0, infraerrors.BadRequest("INVALID_OPENAI_CONCURRENCY", "openai_concurrency must be non-negative")
+	}
+	if concurrency == nil && openAIConcurrency == nil && rpmLimit == nil {
+		return 0, fmt.Errorf("at least one of concurrency, openai_concurrency or rpm_limit is required")
 	}
 
 	cleaned := make([]int64, 0, len(userIDs))
@@ -501,7 +520,17 @@ func (s *adminServiceImpl) BatchUpdateLimits(ctx context.Context, userIDs []int6
 		return 0, nil
 	}
 
-	affected, err := s.userRepo.BatchUpdateLimits(ctx, cleaned, concurrency, rpmLimit)
+	var affected int
+	var err error
+	if openAIConcurrency == nil {
+		affected, err = s.userRepo.BatchUpdateLimits(ctx, cleaned, concurrency, rpmLimit)
+	} else if repo, ok := s.userRepo.(interface {
+		BatchUpdateLimitsWithOpenAI(context.Context, []int64, *int, *int, *int) (int, error)
+	}); ok {
+		affected, err = repo.BatchUpdateLimitsWithOpenAI(ctx, cleaned, concurrency, openAIConcurrency, rpmLimit)
+	} else {
+		return 0, fmt.Errorf("OpenAI concurrency updates unavailable")
+	}
 	if err != nil {
 		return 0, err
 	}

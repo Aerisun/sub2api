@@ -1,0 +1,32 @@
+{
+  "port": 8095,
+  "models": [
+    "deepseek/deepseek-v4.1-flash-1017",
+    "qwen/qwen3.8-flash-next",
+    "qwen/qwen3.8-max",
+    "moonshotai/kimi-k3",
+    "moonshotai/kimi-k3-free",
+    "deepseek/deepseek-v4.1-flash"
+  ],
+  "capacity": 9,
+  "per_key": 1,
+  "model_capacity": 3,
+  "global_rpm": 0,
+  "model_rpm": 4,
+  "queue_seconds": 0.15,
+  "affinity_ttl": 3600,
+  "state_path": "@ROOT@/data/qiniu-pool-rate-state.json",
+  "routes": {
+    "moonshotai/kimi-k3": [
+      {
+        "model": "moonshotai/kimi-k3",
+        "weight": 1
+      },
+      {
+        "model": "moonshotai/kimi-k3-free",
+        "weight": 1
+      }
+    ]
+  },
+  "runtime_state_path": "/run/user/1005/sub2api-pool-state/qiniu.json"
+}

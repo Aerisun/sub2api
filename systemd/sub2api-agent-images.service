@@ -1,0 +1,17 @@
+[Unit]
+Description=Aerisun server-managed image tools for Claude Gemini and GLM
+After=network-online.target sub2api.service sub2api-image-hub.service
+Wants=network-online.target sub2api-image-hub.service
+
+[Service]
+WorkingDirectory=@ROOT@
+ExecStart=/usr/bin/python3 -m image_hub.agent_server
+Environment=AGENT_IMAGE_BRIDGE_ENABLED=1
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

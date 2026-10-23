@@ -33,7 +33,8 @@ func (s *OpenAIGatewayService) forwardAnthropicViaRawChatCompletions(
 	account *Account,
 	body []byte,
 	defaultMappedModel string,
-) (*OpenAIForwardResult, error) {
+) (result *OpenAIForwardResult, err error) {
+	defer func() { attachGLMVisionUsage(c, result) }()
 	startTime := time.Now()
 
 	// 1. Parse Anthropic request
@@ -72,8 +73,16 @@ func (s *OpenAIGatewayService) forwardAnthropicViaRawChatCompletions(
 	if err != nil {
 		return nil, fmt.Errorf("marshal chat completions request: %w", err)
 	}
+	if thinkingBody, changed := ApplyGLMMessagesThinking(chatBody, body, upstreamModel); changed {
+		chatBody = thinkingBody
+	}
 	if normalizedBody, normalized := NormalizeGLMOpenAIReasoningEffort(chatBody, upstreamModel); normalized {
 		chatBody = normalizedBody
+	}
+	chatBody, err = prepareDomesticChatControls(chatBody, body, upstreamModel, "messages", account)
+	if err != nil {
+		writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		return nil, err
 	}
 	if account.Platform == PlatformOpenAI {
 		policyBody, changed, policyErr := ApplyOpenAIReasoningEffortPolicyFromContext(ctx, chatBody)
@@ -128,6 +137,8 @@ func (s *OpenAIGatewayService) forwardAnthropicViaRawChatCompletions(
 	}
 
 	// 5. Convert response
+	upstreamModel = resolvePoolUpstreamModel(account, resp.Header, upstreamModel)
+	SetOpsUpstreamModel(c, upstreamModel)
 	if clientStream {
 		return s.streamChatCompletionsAsAnthropic(c, resp, originalModel, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
 	}

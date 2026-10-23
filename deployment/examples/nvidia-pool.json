@@ -1,0 +1,42 @@
+{
+  "port": 8096,
+  "models": [
+    "z-ai/glm-5.3",
+    "deepseek-ai/deepseek-v4.1-flash",
+    "nvidia/nemotron-3.5-lightning-30b-a3b",
+    "nvidia/nemotron-3.5-super-vl-120b-a12b",
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+  ],
+  "capacity": 64,
+  "per_key": 3,
+  "model_capacity": 64,
+  "key_rpm": 40,
+  "global_rpm": 0,
+  "model_rpm": 0,
+  "queue_seconds": 5,
+  "affinity_ttl": 3600,
+  "state_path": "@ROOT@/data/nvidia-pool-state.json",
+  "proxy": "http://127.0.0.1:17896",
+  "read_timeout": 12,
+  "first_event_seconds": 12,
+  "require_semantic_first_event": true,
+  "unavailable_models": {
+    "z-ai/glm-5.3": "NVIDIA NVCF 504 / errored verified by standard and direct function endpoints",
+    "deepseek-ai/deepseek-v4.1-flash": "NVIDIA NVCF 504 / errored verified by standard and direct function endpoints"
+  },
+  "vision_capacity": 48,
+  "model_capacities": {
+    "nvidia/nemotron-3.5-super-vl-120b-a12b": 48,
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning": 48
+  },
+  "max_attempts": 3,
+  "pre_output_timeout": 40,
+  "response_timeout": 300,
+  "proxy_route_state_file": "@ROOT@/data/nvidia-egress-route.json",
+  "runtime_state_path": "/run/user/1005/sub2api-pool-state/nvidia.json",
+  "gateway_proxy_id": 5,
+  "vision_pre_output_timeout": 55,
+  "vision_first_event_seconds": 30,
+  "vision_read_timeout": 30,
+  "image_asset_origin": "https://aerisun.top/sub2api/_vision-assets/"
+}

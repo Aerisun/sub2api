@@ -1733,7 +1733,8 @@ func TestAnthropicToResponsesResponse_NoCacheTokens(t *testing.T) {
 	assert.Equal(t, 100, out.Usage.InputTokens)
 	assert.Equal(t, 50, out.Usage.OutputTokens)
 	assert.Equal(t, 150, out.Usage.TotalTokens)
-	assert.Nil(t, out.Usage.InputTokensDetails)
+	require.NotNil(t, out.Usage.InputTokensDetails)
+	assert.Zero(t, out.Usage.InputTokensDetails.CachedTokens)
 }
 
 func TestAnthropicEventToResponses_CacheTokensRoundTripFromMessageStart(t *testing.T) {

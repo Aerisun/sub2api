@@ -159,6 +159,14 @@ var auditBodyOmittedRoutes = map[string]struct{}{
 	"POST /api/v1/admin/prompt-audit/events/delete-by-filter":   {},
 }
 
+// Image bytes are transient inputs, never management audit payloads. Keep the
+// operation/status/latency entry without copying any original image to storage.
+var auditImageBodyOmittedRoutes = map[string]struct{}{
+	"POST /api/v1/user/chat/conversations/:id/generations": {},
+	"POST /api/v1/user/chat/generations/:id/image-inputs":  {},
+	"POST /api/v1/user/chat/images":                        {},
+}
+
 // NewAuditLogMiddleware 创建审计中间件。
 // 记录范围：变更类请求（POST/PUT/PATCH/DELETE）+ 白名单内的敏感 GET 读取。
 // 挂载位置：admin / user / admin-payment 组挂在各自认证中间件之后（只审计已认证请求，
@@ -190,7 +198,9 @@ func NewAuditLogMiddleware(auditService *service.AuditLogService) AuditLogMiddle
 		// 只读取脱敏解析上限内的字节，超出部分与已读部分拼接回填，
 		// 避免大体积导入请求被完整复制进内存两次。
 		var bodyRedacted string
-		if _, omit := auditBodyOmittedRoutes[routeKey]; omit {
+		if _, omit := auditImageBodyOmittedRoutes[routeKey]; omit {
+			bodyRedacted = "<image input omitted>"
+		} else if _, omit := auditBodyOmittedRoutes[routeKey]; omit {
 			bodyRedacted = "<credential-bearing body omitted>"
 		} else if c.Request.Body != nil && c.Request.Method != "GET" {
 			orig := c.Request.Body

@@ -37,6 +37,39 @@ func TestHandleOpenAITransientError_BlocksOnlyRequestedModel(t *testing.T) {
 	require.False(t, svc.isOpenAIAccountModelRuntimeBlocked(account, "gpt-5.6-terra"))
 }
 
+func TestHandleOpenAITransientError_LocalManagedPoolKeepsHealthyMembersSchedulable(t *testing.T) {
+	for _, status := range []int{429, 500, 502, 503, 504} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			svc := &OpenAIGatewayService{}
+			svc.rateLimitService = NewRateLimitService(transientCooldownAccountRepo{}, nil, &config.Config{}, nil, nil)
+			account := &Account{ID: 66, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
+				Credentials: map[string]any{"base_url": "http://127.0.0.1:8096", "pool_mode": true,
+					"pool_manages_transient_errors": true, "pool_mode_retry_count": 0,
+					"pool_mode_retry_status_codes": []any{}}}
+			for range 4 {
+				require.False(t, svc.handleOpenAIAccountUpstreamError(context.Background(), account, status,
+					http.Header{"Retry-After": {"3"}}, []byte(`{"error":{"message":"temporary pool error"}}`), "glm-flash"))
+			}
+			require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
+			require.False(t, svc.isOpenAIAccountModelRuntimeBlocked(account, "glm-flash"))
+			require.Equal(t, 0, account.GetPoolModeRetryCount(), "delegation must not enable replay")
+		})
+	}
+}
+
+func TestManagedPoolTransientErrors_RequiresExplicitLocalPoolOptIn(t *testing.T) {
+	for _, base := range []string{"https://provider.example", "http://provider.example", "http://127.0.0.1:8096"} {
+		account := &Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
+			Credentials: map[string]any{"base_url": base, "pool_mode": true}}
+		require.False(t, poolManagesTransientErrors(account))
+		account.Credentials["pool_manages_transient_errors"] = true
+		require.Equal(t, base == "http://127.0.0.1:8096", poolManagesTransientErrors(account))
+		require.Equal(t, base != "http://127.0.0.1:8096", isOpenAIAPIKeyHealthBreakerAccount(account))
+		account.Credentials["pool_mode"] = false
+		require.False(t, poolManagesTransientErrors(account))
+	}
+}
+
 func TestHandleOpenAITransientError_TransientStatusesUseModelScope(t *testing.T) {
 	for _, statusCode := range []int{http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout, 520, 521, 522, 523, 524} {
 		t.Run(http.StatusText(statusCode), func(t *testing.T) {

@@ -1,0 +1,10 @@
+[Unit]
+Description=Publish only healthy NVIDIA model routes into Da Yi Tong
+After=sub2api.service sub2api-nvidia-pool.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=@ROOT@
+ExecStart=/usr/bin/python3 -m ops.nvidia_routes
+UMask=0077
+NoNewPrivileges=true

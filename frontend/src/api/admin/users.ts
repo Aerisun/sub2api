@@ -48,6 +48,7 @@ export interface BatchUpdateUserLimitsRequest {
   user_ids: number[]
   all?: boolean
   concurrency?: number
+  openai_concurrency?: number
   rpm_limit?: number
 }
 
@@ -135,6 +136,7 @@ export async function create(userData: {
   role?: 'admin' | 'user'
   balance?: number
   concurrency?: number
+  openai_concurrency?: number
   rpm_limit?: number
   allowed_groups?: number[] | null
 }): Promise<AdminUser> {

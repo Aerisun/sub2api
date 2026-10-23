@@ -1,0 +1,19 @@
+[Unit]
+Description=NVIDIA selected models with proxied credential balancing
+After=network-online.target sub2api-nvidia-egress.service
+Wants=sub2api-nvidia-egress.service
+
+[Service]
+WorkingDirectory=@ROOT@
+ExecStart=/usr/bin/python3 -m nvidia_pool.server
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=20
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=default.target

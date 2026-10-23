@@ -48,6 +48,17 @@ func TestFilterHeadersAllowsReasoningIncludedByDefault(t *testing.T) {
 	}
 }
 
+func TestCacheStatusPassesByDefaultAndHonorsExplicitRemoval(t *testing.T) {
+	src := http.Header{"Cache-Status": {"AerisunEmbedding; hit"}}
+	if got := FilterHeaders(src, nil).Get("Cache-Status"); got != "AerisunEmbedding; hit" {
+		t.Fatalf("cache status was removed: %q", got)
+	}
+	filter := CompileHeaderFilter(config.ResponseHeaderConfig{Enabled: true, ForceRemove: []string{"cache-status"}})
+	if got := FilterHeaders(src, filter).Get("Cache-Status"); got != "" {
+		t.Fatalf("explicit removal ignored: %q", got)
+	}
+}
+
 func TestFilterHeadersForceRemoveOverridesReasoningIncluded(t *testing.T) {
 	src := http.Header{}
 	src.Set("X-Reasoning-Included", "1")

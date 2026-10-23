@@ -1,0 +1,17 @@
+[Unit]
+Description=Dedicated Sub2API Claude and Gemini outbound route
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Environment=SAFE_PATHS=@ROOT@/deployment/private/egress
+ExecStart=@ROOT@/bin/mihomo -d @ROOT@/deployment/private/egress/mihomo-sub2api -f @ROOT@/deployment/private/egress/mihomo-sub2api/config.yaml
+ExecStartPost=/usr/bin/python3 -m image_hub.egress_ready
+WorkingDirectory=@ROOT@
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

@@ -1524,12 +1524,38 @@ func ApplyThinkingEnabledFallback(effort *string, body []byte, mappedModel strin
 	return DefaultEffortForThinkingEnabled(mappedModel)
 }
 
-// NormalizeGLMOpenAIReasoningEffort rewrites OpenAI Chat Completions
-// reasoning_effort values to the GLM native scale used by z.ai: high/max.
-// It only applies to glm-* mapped models and leaves all other providers untouched.
+// NormalizeGLMOpenAIReasoningEffort preserves the client scale for GLM 5.2/5.3.
+// GLM 5.2 requires reasoning_effort=none as well as thinking.type=disabled to
+// turn reasoning off. Older GLM models retain their existing high/max mapping.
 func NormalizeGLMOpenAIReasoningEffort(body []byte, mappedModel string) ([]byte, bool) {
 	if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(mappedModel)), "glm-") {
 		return body, false
+	}
+	if isGLMClientThinkingModel(mappedModel) {
+		if !strings.EqualFold(strings.TrimSpace(mappedModel), "glm-5.2") {
+			return body, false
+		}
+		disabled := strings.EqualFold(gjson.GetBytes(body, "thinking.type").String(), "disabled") ||
+			strings.EqualFold(gjson.GetBytes(body, "reasoning_effort").String(), "none") ||
+			strings.EqualFold(gjson.GetBytes(body, "reasoning.effort").String(), "none")
+		if !disabled {
+			return body, false
+		}
+		modified, err := sjson.SetBytes(body, "thinking.type", "disabled")
+		if err != nil {
+			return body, false
+		}
+		modified, err = sjson.SetBytes(modified, "reasoning_effort", "none")
+		if err != nil {
+			return body, false
+		}
+		if gjson.GetBytes(body, "reasoning.effort").Exists() {
+			modified, err = sjson.SetBytes(modified, "reasoning.effort", "none")
+			if err != nil {
+				return body, false
+			}
+		}
+		return modified, string(modified) != string(body)
 	}
 
 	path := "reasoning.effort"
@@ -1555,6 +1581,69 @@ func NormalizeGLMOpenAIReasoningEffort(body []byte, mappedModel string) ([]byte,
 		return body, false
 	}
 	return modified, true
+}
+
+func isGLMClientThinkingModel(model string) bool {
+	model = strings.ToLower(strings.TrimSpace(model))
+	return model == "glm-5.2" || model == "glm-5.3"
+}
+
+// ApplyGLMMessagesThinking translates Claude Code's explicit thinking controls
+// after the Anthropic-to-Chat conversion, whose generic types omit thinking.
+// Keep budget fields and native effort values; adaptive means enabled for GLM.
+// Claude Code omits thinking when it is off, matching Anthropic's off default.
+func ApplyGLMMessagesThinking(chatBody, messagesBody []byte, mappedModel string) ([]byte, bool) {
+	if !isGLMClientThinkingModel(mappedModel) {
+		return chatBody, false
+	}
+	modified := chatBody
+	if thinking := gjson.GetBytes(messagesBody, "thinking"); thinking.IsObject() {
+		updated, err := sjson.SetRawBytes(modified, "thinking", []byte(thinking.Raw))
+		if err != nil {
+			return chatBody, false
+		}
+		modified = updated
+		if strings.EqualFold(gjson.GetBytes(modified, "thinking.type").String(), "adaptive") {
+			updated, err = sjson.SetBytes(modified, "thinking.type", "enabled")
+			if err != nil {
+				return chatBody, false
+			}
+			modified = updated
+		}
+	} else if !thinking.Exists() || thinking.Type == gjson.Null {
+		updated, err := sjson.SetBytes(modified, "thinking.type", "disabled")
+		if err != nil {
+			return chatBody, false
+		}
+		modified = updated
+	}
+	effortSet := false
+	for _, path := range []string{"output_config.effort", "reasoning_effort", "reasoning.effort"} {
+		effort := gjson.GetBytes(messagesBody, path)
+		if effort.Type != gjson.String || strings.TrimSpace(effort.String()) == "" {
+			continue
+		}
+		updated, err := sjson.SetBytes(modified, "reasoning_effort", effort.String())
+		if err != nil {
+			return chatBody, false
+		}
+		modified = updated
+		effortSet = true
+		break
+	}
+	if !effortSet {
+		// The generic bridge injects medium when omitted. GLM should receive
+		// the client's preference only, leaving its own default in effect.
+		updated, err := sjson.DeleteBytes(modified, "reasoning_effort")
+		if err != nil {
+			return chatBody, false
+		}
+		modified = updated
+	}
+	if normalized, changed := NormalizeGLMOpenAIReasoningEffort(modified, mappedModel); changed {
+		modified = normalized
+	}
+	return modified, string(modified) != string(chatBody)
 }
 
 func normalizeEffortToken(raw string) string {

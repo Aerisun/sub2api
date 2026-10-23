@@ -100,6 +100,11 @@ func Concurrency(v int) predicate.User {
 	return predicate.User(sql.FieldEQ(FieldConcurrency, v))
 }
 
+// OpenaiConcurrency applies equality check predicate on the "openai_concurrency" field. It's identical to OpenaiConcurrencyEQ.
+func OpenaiConcurrency(v int) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldOpenaiConcurrency, v))
+}
+
 // Status applies equality check predicate on the "status" field. It's identical to StatusEQ.
 func Status(v string) predicate.User {
 	return predicate.User(sql.FieldEQ(FieldStatus, v))
@@ -623,6 +628,46 @@ func ConcurrencyLT(v int) predicate.User {
 // ConcurrencyLTE applies the LTE predicate on the "concurrency" field.
 func ConcurrencyLTE(v int) predicate.User {
 	return predicate.User(sql.FieldLTE(FieldConcurrency, v))
+}
+
+// OpenaiConcurrencyEQ applies the EQ predicate on the "openai_concurrency" field.
+func OpenaiConcurrencyEQ(v int) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldOpenaiConcurrency, v))
+}
+
+// OpenaiConcurrencyNEQ applies the NEQ predicate on the "openai_concurrency" field.
+func OpenaiConcurrencyNEQ(v int) predicate.User {
+	return predicate.User(sql.FieldNEQ(FieldOpenaiConcurrency, v))
+}
+
+// OpenaiConcurrencyIn applies the In predicate on the "openai_concurrency" field.
+func OpenaiConcurrencyIn(vs ...int) predicate.User {
+	return predicate.User(sql.FieldIn(FieldOpenaiConcurrency, vs...))
+}
+
+// OpenaiConcurrencyNotIn applies the NotIn predicate on the "openai_concurrency" field.
+func OpenaiConcurrencyNotIn(vs ...int) predicate.User {
+	return predicate.User(sql.FieldNotIn(FieldOpenaiConcurrency, vs...))
+}
+
+// OpenaiConcurrencyGT applies the GT predicate on the "openai_concurrency" field.
+func OpenaiConcurrencyGT(v int) predicate.User {
+	return predicate.User(sql.FieldGT(FieldOpenaiConcurrency, v))
+}
+
+// OpenaiConcurrencyGTE applies the GTE predicate on the "openai_concurrency" field.
+func OpenaiConcurrencyGTE(v int) predicate.User {
+	return predicate.User(sql.FieldGTE(FieldOpenaiConcurrency, v))
+}
+
+// OpenaiConcurrencyLT applies the LT predicate on the "openai_concurrency" field.
+func OpenaiConcurrencyLT(v int) predicate.User {
+	return predicate.User(sql.FieldLT(FieldOpenaiConcurrency, v))
+}
+
+// OpenaiConcurrencyLTE applies the LTE predicate on the "openai_concurrency" field.
+func OpenaiConcurrencyLTE(v int) predicate.User {
+	return predicate.User(sql.FieldLTE(FieldOpenaiConcurrency, v))
 }
 
 // StatusEQ applies the EQ predicate on the "status" field.

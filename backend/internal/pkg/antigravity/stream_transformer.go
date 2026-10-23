@@ -57,14 +57,10 @@ func (p *StreamingProcessor) SetUsageMapHook(fn UsageMapHook) {
 
 func usageToMap(u ClaudeUsage) map[string]any {
 	m := map[string]any{
-		"input_tokens":  u.InputTokens,
-		"output_tokens": u.OutputTokens,
-	}
-	if u.CacheCreationInputTokens > 0 {
-		m["cache_creation_input_tokens"] = u.CacheCreationInputTokens
-	}
-	if u.CacheReadInputTokens > 0 {
-		m["cache_read_input_tokens"] = u.CacheReadInputTokens
+		"input_tokens":                u.InputTokens,
+		"output_tokens":               u.OutputTokens,
+		"cache_creation_input_tokens": u.CacheCreationInputTokens,
+		"cache_read_input_tokens":     u.CacheReadInputTokens,
 	}
 	if u.ImageOutputTokens > 0 {
 		m["image_output_tokens"] = u.ImageOutputTokens
@@ -87,14 +83,20 @@ func (p *StreamingProcessor) ProcessLine(line string) []byte {
 	// 解包 v1internal 响应
 	var v1Resp V1InternalResponse
 	if err := json.Unmarshal([]byte(data), &v1Resp); err != nil {
-		// 尝试直接解析为 GeminiResponse
+		return nil
+	}
+	if len(v1Resp.Response.Candidates) == 0 && v1Resp.Response.UsageMetadata == nil {
+		// A direct Gemini chunk also unmarshals into the envelope without an
+		// error. Decode its candidates so early thought deltas are not dropped.
 		var directResp GeminiResponse
 		if err2 := json.Unmarshal([]byte(data), &directResp); err2 != nil {
 			return nil
 		}
-		v1Resp.Response = directResp
-		v1Resp.ResponseID = directResp.ResponseID
-		v1Resp.ModelVersion = directResp.ModelVersion
+		if len(directResp.Candidates) > 0 || directResp.UsageMetadata != nil {
+			v1Resp.Response = directResp
+			v1Resp.ResponseID = directResp.ResponseID
+			v1Resp.ModelVersion = directResp.ModelVersion
+		}
 	}
 
 	geminiResp := &v1Resp.Response

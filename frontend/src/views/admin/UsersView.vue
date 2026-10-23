@@ -580,6 +580,12 @@
             />
           </template>
 
+          <template #cell-openai_concurrency="{ row }">
+            <div :title="t('admin.users.form.openaiConcurrencyHint')">
+              <UserConcurrencyCell :current="row.current_openai_concurrency ?? 0" :max="row.openai_concurrency > 0 ? (row.concurrency > 0 ? Math.min(row.concurrency, row.openai_concurrency) : row.openai_concurrency) : row.concurrency" />
+              <span v-if="!row.openai_concurrency" class="text-xs text-gray-500">{{ t('admin.users.form.followGlobal') }}</span>
+            </div>
+          </template>
           <template #cell-status="{ value }">
             <div class="flex items-center gap-1.5">
               <span
@@ -898,6 +904,7 @@ const allColumns = computed<Column[]>(() => [
   { key: 'usage_gemini', label: t('admin.users.columns.usageGemini'), sortable: false },
   { key: 'usage_antigravity', label: t('admin.users.columns.usageAntigravity'), sortable: false },
   { key: 'concurrency', label: t('admin.users.columns.concurrency'), sortable: true },
+  { key: 'openai_concurrency', label: t('admin.users.form.openaiConcurrency') },
   { key: 'status', label: t('admin.users.columns.status'), sortable: true },
   { key: 'last_active_at', label: t('admin.users.columns.lastActive'), sortable: true },
   { key: 'last_used_at', label: t('admin.users.columns.lastUsed'), sortable: true },

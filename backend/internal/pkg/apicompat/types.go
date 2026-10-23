@@ -106,9 +106,10 @@ func (b AnthropicContentBlock) MarshalJSON() ([]byte, error) {
 
 // AnthropicImageSource describes the source data for an image content block.
 type AnthropicImageSource struct {
-	Type      string `json:"type"` // "base64"
+	Type      string `json:"type"` // "base64" or "url"
 	MediaType string `json:"media_type"`
 	Data      string `json:"data"`
+	URL       string `json:"url,omitempty"`
 }
 
 // AnthropicTool describes a tool available to the model.
@@ -587,7 +588,7 @@ func (u *ResponsesUsage) UnmarshalJSON(data []byte) error {
 
 // ResponsesInputTokensDetails breaks down input token usage.
 type ResponsesInputTokensDetails struct {
-	CachedTokens        int `json:"cached_tokens,omitempty"`
+	CachedTokens        int `json:"cached_tokens"`
 	AudioTokens         int `json:"audio_tokens,omitempty"`
 	CacheCreationTokens int `json:"cache_creation_tokens,omitempty"`
 	CacheWriteTokens    int `json:"cache_write_tokens,omitempty"`

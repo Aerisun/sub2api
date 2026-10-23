@@ -56,6 +56,9 @@ func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) erro
 		SetRateLimit5h(key.RateLimit5h).
 		SetRateLimit1d(key.RateLimit1d).
 		SetRateLimit7d(key.RateLimit7d)
+	if len(key.AllowedModels) > 0 {
+		builder.SetAllowedModels(key.AllowedModels)
+	}
 
 	if len(key.IPWhitelist) > 0 {
 		builder.SetIPWhitelist(key.IPWhitelist)
@@ -138,6 +141,7 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 			apikey.FieldStatus,
 			apikey.FieldIPWhitelist,
 			apikey.FieldIPBlacklist,
+			apikey.FieldAllowedModels,
 			apikey.FieldQuota,
 			apikey.FieldQuotaUsed,
 			apikey.FieldExpiresAt,
@@ -154,6 +158,7 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 				user.FieldRole,
 				user.FieldBalance,
 				user.FieldConcurrency,
+				user.FieldOpenaiConcurrency,
 				user.FieldBalanceNotifyEnabled,
 				user.FieldRestrictPublicGroups,
 				user.FieldBalanceNotifyThresholdType,
@@ -317,6 +322,13 @@ func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey, fiel
 	}
 
 	// IP 限制字段
+	if fields.AllowedModels {
+		if len(key.AllowedModels) > 0 {
+			builder.SetAllowedModels(key.AllowedModels)
+		} else {
+			builder.ClearAllowedModels()
+		}
+	}
 	if fields.IPRules {
 		if len(key.IPWhitelist) > 0 {
 			builder.SetIPWhitelist(key.IPWhitelist)
@@ -433,7 +445,7 @@ func (r *apiKeyRepository) deleteWithTombstone(ctx context.Context, exec *dbent.
 }
 
 func (r *apiKeyRepository) apiKeyListByUserIDQuery(userID int64, filters service.APIKeyListFilters) *dbent.APIKeyQuery {
-	q := r.activeQuery().Where(apikey.UserIDEQ(userID))
+	q := r.activeQuery().Where(apikey.UserIDEQ(userID), apikey.Not(apikey.KeyHasPrefix(service.ChatKeyPrefix)))
 
 	if filters.Search != "" {
 		q = q.Where(apikey.Or(
@@ -686,7 +698,7 @@ func apiKeyListOrder(params pagination.PaginationParams) []func(*entsql.Selector
 
 // SearchAPIKeys searches API keys by user ID and/or keyword (name)
 func (r *apiKeyRepository) SearchAPIKeys(ctx context.Context, userID int64, keyword string, limit int) ([]service.APIKey, error) {
-	q := r.activeQuery()
+	q := r.activeQuery().Where(apikey.Not(apikey.KeyHasPrefix(service.ChatKeyPrefix)))
 	if userID > 0 {
 		q = q.Where(apikey.UserIDEQ(userID))
 	}
@@ -880,6 +892,7 @@ func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {
 		Status:        m.Status,
 		IPWhitelist:   m.IPWhitelist,
 		IPBlacklist:   m.IPBlacklist,
+		AllowedModels: m.AllowedModels,
 		LastUsedAt:    m.LastUsedAt,
 		CreatedAt:     m.CreatedAt,
 		UpdatedAt:     m.UpdatedAt,
@@ -928,6 +941,7 @@ func userEntityToService(u *dbent.User) *service.User {
 		Balance:                    u.Balance,
 		FrozenBalance:              u.FrozenBalance,
 		Concurrency:                u.Concurrency,
+		OpenAIConcurrency:          u.OpenaiConcurrency,
 		Status:                     u.Status,
 		SignupSource:               u.SignupSource,
 		LastLoginAt:                u.LastLoginAt,

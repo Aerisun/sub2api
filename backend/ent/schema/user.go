@@ -54,6 +54,8 @@ func (User) Fields() []ent.Field {
 			Default(0),
 		field.Int("concurrency").
 			Default(5),
+		// Additional OpenAI-platform cap; zero leaves only the global cap.
+		field.Int("openai_concurrency").Default(0).Min(0),
 		field.String("status").
 			MaxLen(20).
 			Default(domain.StatusActive),

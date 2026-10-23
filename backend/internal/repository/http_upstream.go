@@ -720,6 +720,11 @@ func (s *httpUpstreamService) getClientEntry(proxyURL string, accountID int64, a
 	protocolMode := s.resolveProtocolMode(profile, proxyKey, parsedProxy)
 	settings := s.resolvePoolSettings(isolation, accountConcurrency)
 	settings = s.applyProfilePoolSettings(settings, profile)
+	if protocolMode == upstreamProtocolModeOpenAIH2 && s.cfg != nil && s.cfg.Gateway.OpenAIHTTP2.IdleConnTimeoutSeconds > 0 {
+		// H2 PING probes remain enabled. HTTP/1.1 and fallback transports retain
+		// their existing shorter idle limit, including native Gemini traffic.
+		settings.idleConnTimeout = time.Duration(s.cfg.Gateway.OpenAIHTTP2.IdleConnTimeoutSeconds) * time.Second
+	}
 	// 构建缓存键（根据隔离策略不同）
 	cacheKey := buildCacheKey(isolation, proxyKey, accountID, protocolMode)
 	// 构建连接池配置键（用于检测配置变更）
@@ -1375,7 +1380,10 @@ func newUpstreamDialer() *net.Dialer {
 //   - ResponseHeaderTimeout: 等待响应头超时（不影响流式传输）
 func buildUpstreamTransport(settings poolSettings, proxyURL *url.URL, protocolMode string) (*http.Transport, error) {
 	transport := &http.Transport{
-		DialContext:           newUpstreamDialer().DialContext,
+		DialContext: newUpstreamDialer().DialContext,
+		// Preserve verified TLS sessions when a provider closes an idle socket.
+		// Each account/proxy transport retains its own bounded cache.
+		TLSClientConfig:       &tls.Config{ClientSessionCache: tls.NewLRUClientSessionCache(64)},
 		TLSHandshakeTimeout:   defaultUpstreamTLSHandshakeTimeout,
 		MaxIdleConns:          settings.maxIdleConns,
 		MaxIdleConnsPerHost:   settings.maxIdleConnsPerHost,

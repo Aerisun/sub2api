@@ -140,6 +140,7 @@ var (
 		local ttl = tonumber(ARGV[3])
 		local leaseID = ARGV[4]
 		local replacing = tonumber(ARGV[5])
+        local openAIMax = tonumber(ARGV[6])
 		local now = tonumber(redis.call('TIME')[1])
 		local liveExpireBefore = now - ttl
 		redis.call('ZREMRANGEBYSCORE', accountLive, '-inf', liveExpireBefore)
@@ -154,6 +155,12 @@ var (
 		if replacing == 1 then allowance = 1 end
 		if accountMax > 0 and accountCount >= accountMax + allowance then return 0 end
 		if userMax > 0 and userCount >= userMax + allowance then return 0 end
+        redis.call('ZREMRANGEBYSCORE', KEYS[6], '-inf', now-tonumber(ARGV[7]))
+        redis.call('ZREMRANGEBYSCORE', KEYS[7], '-inf', liveExpireBefore)
+        local openAICount = redis.call('ZCARD', KEYS[6]) + redis.call('ZCARD', KEYS[7])
+        if openAIMax > 0 and openAICount >= openAIMax + allowance then return 0 end
+        redis.call('ZADD', KEYS[7], now, leaseID)
+        redis.call('EXPIRE', KEYS[7], ttl)
 		redis.call('ZADD', accountLive, now, leaseID)
 		redis.call('ZADD', userLive, now, leaseID)
 		redis.call('ZADD', apiLive, now, leaseID)
@@ -169,9 +176,10 @@ var (
 		local leaseID = ARGV[2]
 		local now = tonumber(redis.call('TIME')[1])
 		local expireBefore = now - ttl
-		for _, key in ipairs(KEYS) do
+		for i, key in ipairs(KEYS) do
 			redis.call('ZREMRANGEBYSCORE', key, '-inf', expireBefore)
-			if redis.call('ZSCORE', key, leaseID) == false then return 0 end
+			-- Existing leases from an older process gain the new provider index.
+			if i <= 3 and redis.call('ZSCORE', key, leaseID) == false then return 0 end
 		end
 		for _, key in ipairs(KEYS) do
 			redis.call('ZADD', key, now, leaseID)
@@ -629,27 +637,12 @@ func runScriptInt64Pair(ctx context.Context, rdb *redis.Client, script *redis.Sc
 // Account slot operations
 
 func (c *concurrencyCache) AcquireAccountSlot(ctx context.Context, accountID int64, maxConcurrency int, requestID string) (bool, error) {
-	key := accountSlotKey(accountID)
-	// 时间戳在 Lua 脚本内使用 Redis TIME 命令获取，确保多实例时钟一致
-	result, now, err := runScriptInt64Pair(ctx, c.rdb, acquireScript, []string{key, liveAccountSlotKey(accountID)}, maxConcurrency, c.slotTTLSeconds, requestID)
-	if err != nil {
-		return false, err
-	}
-	if result == 1 {
-		// 成功占槽后标记活跃账号，后台清理即可从索引定位候选账号。
-		c.touchActiveIndexAt(ctx, accountActiveIndexKey, accountID, now+int64(c.slotTTLSeconds))
-	}
-	return result == 1, nil
+	result, err := acquireIndexedSlotScript.Run(ctx, c.rdb, []string{accountSlotKey(accountID), liveAccountSlotKey(accountID), accountActiveIndexKey}, maxConcurrency, c.slotTTLSeconds, requestID, accountID).Int()
+	return result == 1, err
 }
 
 func (c *concurrencyCache) ReleaseAccountSlot(ctx context.Context, accountID int64, requestID string) error {
-	key := accountSlotKey(accountID)
-	if err := c.rdb.ZRem(ctx, key, requestID).Err(); err != nil {
-		return err
-	}
-	// 释放后用真实负载刷新索引；若没有槽位和等待计数，会移除索引 member。
-	c.refreshAccountActiveIndex(ctx, accountID)
-	return nil
+	return releaseIndexedSlotScript.Run(ctx, c.rdb, []string{accountSlotKey(accountID), liveAccountSlotKey(accountID), accountWaitKey(accountID), accountActiveIndexKey}, requestID, accountID, c.slotTTLSeconds, c.waitQueueTTLSeconds).Err()
 }
 
 func (c *concurrencyCache) GetAccountConcurrency(ctx context.Context, accountID int64) (int, error) {
@@ -707,7 +700,12 @@ func (c *concurrencyCache) GetAccountConcurrencyBatch(ctx context.Context, accou
 
 func (c *concurrencyCache) AcquireUserSlot(ctx context.Context, userID int64, maxConcurrency int, requestID string) (bool, error) {
 	key := userSlotKey(userID)
-	// 时间戳在 Lua 脚本内使用 Redis TIME 命令获取，确保多实例时钟一致
+	if limit, openAI := service.UserOpenAIConcurrencyFromContext(ctx); openAI {
+		result, _, err := runScriptInt64Pair(ctx, c.rdb, acquireOpenAIUserSlotScript,
+			[]string{key, liveUserSlotKey(userID), openAIUserSlotKey(userID), liveOpenAIUserSlotKey(userID), userActiveIndexKey},
+			maxConcurrency, limit, c.slotTTLSeconds, requestID, userID)
+		return result == 1, err
+	}
 	result, now, err := runScriptInt64Pair(ctx, c.rdb, acquireScript, []string{key, liveUserSlotKey(userID)}, maxConcurrency, c.slotTTLSeconds, requestID)
 	if err != nil {
 		return false, err
@@ -720,13 +718,9 @@ func (c *concurrencyCache) AcquireUserSlot(ctx context.Context, userID int64, ma
 }
 
 func (c *concurrencyCache) ReleaseUserSlot(ctx context.Context, userID int64, requestID string) error {
-	key := userSlotKey(userID)
-	if err := c.rdb.ZRem(ctx, key, requestID).Err(); err != nil {
-		return err
-	}
-	// 释放后按 Redis 中剩余负载修正索引状态。
-	c.refreshUserActiveIndex(ctx, userID)
-	return nil
+	return releaseUserSlotsScript.Run(ctx, c.rdb,
+		[]string{userSlotKey(userID), openAIUserSlotKey(userID), liveUserSlotKey(userID), waitQueueKey(userID), userActiveIndexKey},
+		requestID, userID, c.slotTTLSeconds).Err()
 }
 
 func (c *concurrencyCache) GetUserConcurrency(ctx context.Context, userID int64) (int, error) {
@@ -805,6 +799,7 @@ func (c *concurrencyCache) AcquireLiveLease(
 	if c == nil || c.rdb == nil || accountID <= 0 || userID <= 0 || apiKeyID <= 0 || leaseID == "" {
 		return false, nil
 	}
+	openAIMax, _ := service.UserOpenAIConcurrencyFromContext(ctx)
 	replacing := 0
 	if replacingRegularSlots {
 		replacing = 1
@@ -814,8 +809,8 @@ func (c *concurrencyCache) AcquireLiveLease(
 		liveAccountSlotKey(accountID),
 		userSlotKey(userID),
 		liveUserSlotKey(userID),
-		liveAPIKeySlotKey(apiKeyID),
-	}, accountMax, userMax, liveLeaseTTLSeconds, leaseID, replacing).Int()
+		liveAPIKeySlotKey(apiKeyID), openAIUserSlotKey(userID), liveOpenAIUserSlotKey(userID),
+	}, accountMax, userMax, liveLeaseTTLSeconds, leaseID, replacing, openAIMax, c.slotTTLSeconds).Int()
 	return result == 1, err
 }
 
@@ -826,7 +821,7 @@ func (c *concurrencyCache) RefreshLiveLease(ctx context.Context, accountID, user
 	result, err := refreshLiveLeaseScript.Run(ctx, c.rdb, []string{
 		liveAccountSlotKey(accountID),
 		liveUserSlotKey(userID),
-		liveAPIKeySlotKey(apiKeyID),
+		liveAPIKeySlotKey(apiKeyID), liveOpenAIUserSlotKey(userID),
 	}, liveLeaseTTLSeconds, leaseID).Int()
 	return result == 1, err
 }
@@ -839,6 +834,7 @@ func (c *concurrencyCache) ReleaseLiveLease(ctx context.Context, accountID, user
 	pipe.ZRem(ctx, liveAccountSlotKey(accountID), leaseID)
 	pipe.ZRem(ctx, liveUserSlotKey(userID), leaseID)
 	pipe.ZRem(ctx, liveAPIKeySlotKey(apiKeyID), leaseID)
+	pipe.ZRem(ctx, liveOpenAIUserSlotKey(userID), leaseID)
 	_, err := pipe.Exec(ctx)
 	return err
 }
@@ -1167,7 +1163,19 @@ func (c *concurrencyCache) CleanupStaleProcessSlots(ctx context.Context, activeR
 	if err != nil {
 		return err
 	}
-	return c.cleanupStaleProcessSlotsForIndex(ctx, userSlotIndex, userMembers, activeRequestPrefix, now)
+	if err := c.cleanupStaleProcessSlotsForIndex(ctx, userSlotIndex, userMembers, activeRequestPrefix, now); err != nil {
+		return err
+	}
+	for _, member := range userMembers {
+		id, parseErr := strconv.ParseInt(member, 10, 64)
+		if parseErr != nil || id <= 0 {
+			continue
+		}
+		if _, _, err := runScriptInt64Pair(ctx, c.rdb, startupCleanupSlotScript, []string{openAIUserSlotKey(id)}, activeRequestPrefix, c.slotTTLSeconds); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // sweepLegacyWaitKeysOnce 一次性清扫活跃索引机制上线前遗留的等待计数键。

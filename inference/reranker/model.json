@@ -1,0 +1,11 @@
+{
+  "model": "Qwen/Qwen3-Reranker-4B",
+  "gguf_repository": "Voodisss/Qwen3-Reranker-4B-GGUF-llama_cpp",
+  "revision": "1b452c803342e73ac3644551b727dfd51a09fd5b",
+  "filename": "Qwen3-Reranker-4B.Q8_0.gguf",
+  "size": 4279678912,
+  "sha256": "102ac400d68f02877c2fdfecf0732872652298448352b6faf28ec7f8dca8c913",
+  "url": "https://huggingface.co/Voodisss/Qwen3-Reranker-4B-GGUF-llama_cpp/resolve/1b452c803342e73ac3644551b727dfd51a09fd5b/Qwen3-Reranker-4B.Q8_0.gguf",
+  "runtime_release": "b11223",
+  "runtime_sha256": "9ce07ebd35ccdbae598ef34d21607564c4a21956cf075409f82e4f4fe871ea5e"
+}

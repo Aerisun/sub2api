@@ -1,0 +1,15 @@
+[Unit]
+Description=Private link to embedding and rerank retained on vcl-qiyu-main
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=/usr/bin/ssh -F @ROOT@/deployment/private/ssh/config -N -T -o BatchMode=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -L 127.0.0.1:8091:127.0.0.1:8091 -L 127.0.0.1:8101:127.0.0.1:8101 -R 127.0.0.1:18083:127.0.0.1:8081 wenbo@vcl-qiyu-main
+Restart=always
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

@@ -159,6 +159,32 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	if result == nil {
 		return errors.New("openai usage result is nil")
 	}
+	for _, vision := range result.GLMVisionUsage {
+		if vision.ClaudeResult != nil {
+			if s.glmVisionClaudeBilling == nil {
+				return errors.New("GLM Claude vision billing is unavailable")
+			}
+			if err := s.glmVisionClaudeBilling.RecordUsage(ctx, &RecordUsageInput{
+				Result: vision.ClaudeResult, APIKey: input.APIKey, User: input.User,
+				Account: vision.Account, Subscription: input.Subscription, PricingAt: input.PricingAt,
+				InboundEndpoint: input.InboundEndpoint, UpstreamEndpoint: "/v1internal:streamGenerateContent",
+				UserAgent: input.UserAgent, IPAddress: input.IPAddress, SessionID: input.SessionID,
+				RequestPayloadHash: input.RequestPayloadHash, APIKeyService: input.APIKeyService,
+				QuotaPlatform: PlatformAntigravity, ChannelUsageFields: ChannelUsageFields{OriginalModel: vision.ClaudeResult.Model},
+			}); err != nil {
+				return fmt.Errorf("record GLM Claude image analysis usage: %w", err)
+			}
+			continue
+		}
+		auxiliary := *input
+		auxiliary.Result = vision.Result
+		auxiliary.Account = vision.Account
+		auxiliary.UpstreamEndpoint = "/v1/chat/completions"
+		auxiliary.ChannelUsageFields = ChannelUsageFields{OriginalModel: vision.Result.Model}
+		if err := s.RecordUsage(ctx, &auxiliary); err != nil {
+			return fmt.Errorf("record GLM image analysis usage: %w", err)
+		}
+	}
 	if s.rateLimitService != nil && input.Account != nil && input.Account.Platform == PlatformOpenAI {
 		s.rateLimitService.ResetOpenAI403Counter(ctx, input.Account.ID)
 	}
@@ -231,6 +257,9 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		result.Model,
 	)
 	billingModels = s.filterCNProviderBillingModelCandidates(ctx, account, apiKey, billingModels)
+	if result.ImageRecognition {
+		billingModels = []string{ToolImageRecognition}
+	}
 	serviceTier := ""
 	if result.ServiceTier != nil {
 		serviceTier = strings.TrimSpace(*result.ServiceTier)
@@ -274,7 +303,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		input.BillingModelSource,
 		result.UpstreamResponseModel,
 		result.UpstreamResponseModelConflict,
-		result.ImageCount > 0 || result.VideoCount > 0 || result.WebSearchCalls > 0 ||
+		result.ImageRecognition || result.ImageCount > 0 || result.VideoCount > 0 || result.WebSearchCalls > 0 ||
 			result.AudioUsage != nil || result.SearchCount > 0,
 	); responseModel != "" && !strings.EqualFold(responseModel, baselineBillingModel) {
 		if identified, responseChannelPriced := s.hasIdentifiedOpenAIResponsePricing(ctx, responseModel, apiKey); identified {
@@ -405,6 +434,11 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		ImageSizeBreakdown:       imageSizeBreakdown,
 		NativeCompactionV2:       input.NativeCompactionV2,
 	}
+	if result.ImageRecognition {
+		usageLog.Model = ToolImageRecognition
+		usageLog.RequestedModel = ToolImageRecognition
+		usageLog.ImageCount = result.ImageRecognitionCount
+	}
 	isVideoUsage := isGrokVideoUsageResult(result, billingModels)
 	if isVideoUsage {
 		usageLog.VideoCount = result.VideoCount
@@ -425,7 +459,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	}
 	if isVideoUsage && (cost == nil || cost.BillingMode != string(BillingModeToken)) {
 		usageLog.RateMultiplier = videoMultiplier
-	} else if result.ImageCount > 0 && (cost == nil || cost.BillingMode != string(BillingModeToken)) {
+	} else if (result.ImageCount > 0 || result.ImageRecognition) && (cost == nil || cost.BillingMode != string(BillingModeToken)) {
 		usageLog.RateMultiplier = imageMultiplier
 	} else {
 		usageLog.RateMultiplier = multiplier
@@ -569,6 +603,9 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 	pricingAt time.Time,
 ) (*CostBreakdown, error) {
 	billingModel := firstUsageBillingModel(billingModels)
+	if result != nil && result.ImageRecognition {
+		return imageRecognitionCost(apiKey, result.ImageRecognitionCount, imageMultiplier), nil
+	}
 	if result != nil && result.WebSearchCalls > 0 {
 		// Codex alpha/search 网页搜索按次计费：上游不返回 usage/token 字段，单价只取
 		// 分组覆盖价（nil 时默认 0.01 = 官方 $10/1000 次），不参与渠道级模型定价。

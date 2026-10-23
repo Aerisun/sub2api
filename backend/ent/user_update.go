@@ -171,6 +171,27 @@ func (_u *UserUpdate) AddConcurrency(v int) *UserUpdate {
 	return _u
 }
 
+// SetOpenaiConcurrency sets the "openai_concurrency" field.
+func (_u *UserUpdate) SetOpenaiConcurrency(v int) *UserUpdate {
+	_u.mutation.ResetOpenaiConcurrency()
+	_u.mutation.SetOpenaiConcurrency(v)
+	return _u
+}
+
+// SetNillableOpenaiConcurrency sets the "openai_concurrency" field if the given value is not nil.
+func (_u *UserUpdate) SetNillableOpenaiConcurrency(v *int) *UserUpdate {
+	if v != nil {
+		_u.SetOpenaiConcurrency(*v)
+	}
+	return _u
+}
+
+// AddOpenaiConcurrency adds value to the "openai_concurrency" field.
+func (_u *UserUpdate) AddOpenaiConcurrency(v int) *UserUpdate {
+	_u.mutation.AddOpenaiConcurrency(v)
+	return _u
+}
+
 // SetStatus sets the "status" field.
 func (_u *UserUpdate) SetStatus(v string) *UserUpdate {
 	_u.mutation.SetStatus(v)
@@ -978,6 +999,11 @@ func (_u *UserUpdate) check() error {
 			return &ValidationError{Name: "role", err: fmt.Errorf(`ent: validator failed for field "User.role": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.OpenaiConcurrency(); ok {
+		if err := user.OpenaiConcurrencyValidator(v); err != nil {
+			return &ValidationError{Name: "openai_concurrency", err: fmt.Errorf(`ent: validator failed for field "User.openai_concurrency": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := user.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "User.status": %w`, err)}
@@ -1043,6 +1069,12 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.AddedConcurrency(); ok {
 		_spec.AddField(user.FieldConcurrency, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.OpenaiConcurrency(); ok {
+		_spec.SetField(user.FieldOpenaiConcurrency, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedOpenaiConcurrency(); ok {
+		_spec.AddField(user.FieldOpenaiConcurrency, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(user.FieldStatus, field.TypeString, value)
@@ -1861,6 +1893,27 @@ func (_u *UserUpdateOne) SetNillableConcurrency(v *int) *UserUpdateOne {
 // AddConcurrency adds value to the "concurrency" field.
 func (_u *UserUpdateOne) AddConcurrency(v int) *UserUpdateOne {
 	_u.mutation.AddConcurrency(v)
+	return _u
+}
+
+// SetOpenaiConcurrency sets the "openai_concurrency" field.
+func (_u *UserUpdateOne) SetOpenaiConcurrency(v int) *UserUpdateOne {
+	_u.mutation.ResetOpenaiConcurrency()
+	_u.mutation.SetOpenaiConcurrency(v)
+	return _u
+}
+
+// SetNillableOpenaiConcurrency sets the "openai_concurrency" field if the given value is not nil.
+func (_u *UserUpdateOne) SetNillableOpenaiConcurrency(v *int) *UserUpdateOne {
+	if v != nil {
+		_u.SetOpenaiConcurrency(*v)
+	}
+	return _u
+}
+
+// AddOpenaiConcurrency adds value to the "openai_concurrency" field.
+func (_u *UserUpdateOne) AddOpenaiConcurrency(v int) *UserUpdateOne {
+	_u.mutation.AddOpenaiConcurrency(v)
 	return _u
 }
 
@@ -2684,6 +2737,11 @@ func (_u *UserUpdateOne) check() error {
 			return &ValidationError{Name: "role", err: fmt.Errorf(`ent: validator failed for field "User.role": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.OpenaiConcurrency(); ok {
+		if err := user.OpenaiConcurrencyValidator(v); err != nil {
+			return &ValidationError{Name: "openai_concurrency", err: fmt.Errorf(`ent: validator failed for field "User.openai_concurrency": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := user.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "User.status": %w`, err)}
@@ -2766,6 +2824,12 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 	}
 	if value, ok := _u.mutation.AddedConcurrency(); ok {
 		_spec.AddField(user.FieldConcurrency, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.OpenaiConcurrency(); ok {
+		_spec.SetField(user.FieldOpenaiConcurrency, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedOpenaiConcurrency(); ok {
+		_spec.AddField(user.FieldOpenaiConcurrency, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(user.FieldStatus, field.TypeString, value)

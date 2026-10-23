@@ -1,0 +1,47 @@
+{
+  "name": "sub2api-chat",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build"
+  },
+  "dependencies": {
+    "@radix-ui/react-use-controllable-state": "^1.3.0",
+    "@streamdown/cjk": "^1.0.4",
+    "@streamdown/code": "^2.0.0",
+    "@streamdown/math": "^1.0.3",
+    "@streamdown/mermaid": "^1.0.3",
+    "ai": "^7.0.143",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
+    "cn": "^0.5.0",
+    "katex": "^0.19.0",
+    "lucide-react": "^0.468.0",
+    "motion": "^14.3.0",
+    "nanoid": "^6.0.2",
+    "radix-ui": "^1.8.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
+    "rehype-highlight": "^7.0.2",
+    "rehype-katex": "^7.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "shiki": "4.5.0",
+    "streamdown": "^2.7.1",
+    "tailwind-merge": "^3.3.0",
+    "use-stick-to-bottom": "^1.1.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "~5.6.0",
+    "vite": "^7.1.0"
+  }
+}

@@ -34,6 +34,16 @@ RUN --mount=type=cache,id=sub2api-pnpm-store,target=/root/.local/share/pnpm/stor
     if [ -n "${NPM_CONFIG_REGISTRY}" ]; then pnpm config set registry "${NPM_CONFIG_REGISTRY}"; fi && \
     pnpm install --frozen-lockfile --prefer-offline
 
+# The separately maintained chat client is a generated public asset.
+# Build it from source so no compiled chunks need to be committed.
+WORKDIR /app/chat-ui
+COPY chat-ui/package.json chat-ui/pnpm-lock.yaml ./
+RUN --mount=type=cache,id=sub2api-pnpm-store,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile --prefer-offline
+COPY chat-ui/ ./
+RUN pnpm run build
+WORKDIR /app/frontend
+
 # Copy frontend source and build.
 # LegalDocumentView.vue (admin-compliance gate) build-time imports
 # ../../../../docs/legal/*.md?raw, so docs/legal/ must sit beside frontend/

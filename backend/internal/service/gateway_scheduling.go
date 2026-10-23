@@ -109,7 +109,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 		"session", shortSessionHash(sessionHash),
 		"excluded_ids", excludedIDsList)
 
-	cfg := s.schedulingConfig()
+	cfg := geminiSchedulingConfig(s.schedulingConfig(), requestedModel)
 
 	// 检查 Claude Code 客户端限制（可能会替换 groupID 为降级分组）
 	group, groupID, err := s.checkClaudeCodeRestriction(ctx, groupID)
@@ -388,7 +388,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 
 							if stickyCacheMissReason == "" {
 								waitingCount, _ := s.concurrencyService.GetAccountWaitingCount(ctx, stickyAccountID)
-								if waitingCount < cfg.StickySessionMaxWaiting {
+								if waitingCount < cfg.StickySessionMaxWaiting && geminiStickyShouldWait(requestedModel, len(routingCandidates)) {
 									// 会话数量限制检查（等待计划也需要占用会话配额）
 									if !s.checkAndRegisterSession(ctx, stickyAccount, sessionHash) {
 										stickyCacheMissReason = "session_limit"
@@ -441,7 +441,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 					MaxConcurrency: acc.EffectiveLoadFactor(),
 				})
 			}
-			routingLoadMap, _ := s.concurrencyService.GetAccountsLoadBatch(ctx, routingLoads)
+			routingLoadMap, _ := s.gatewaySchedulingLoads(ctx, routingLoads, requestedModel)
 
 			// 3. 按负载感知排序
 			var routingAvailable []accountWithLoad
@@ -465,6 +465,9 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 					if a.loadInfo.LoadRate != b.loadInfo.LoadRate {
 						return a.loadInfo.LoadRate < b.loadInfo.LoadRate
 					}
+					if strings.HasPrefix(strings.ToLower(requestedModel), "gemini-") && sessionHash != "" {
+						return geminiConversationAccountScore(sessionHash, a.account) < geminiConversationAccountScore(sessionHash, b.account)
+					}
 					switch {
 					case a.account.LastUsedAt == nil && b.account.LastUsedAt != nil:
 						return true
@@ -476,7 +479,9 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 						return a.account.LastUsedAt.Before(*b.account.LastUsedAt)
 					}
 				})
-				shuffleWithinSortGroups(routingAvailable)
+				if !strings.HasPrefix(strings.ToLower(requestedModel), "gemini-") || sessionHash == "" {
+					shuffleWithinSortGroups(routingAvailable)
+				}
 
 				// 4. 尝试获取槽位
 				for _, item := range routingAvailable {
@@ -595,7 +600,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 					}
 
 					waitingCount, _ := s.concurrencyService.GetAccountWaitingCount(ctx, accountID)
-					if waitingCount < cfg.StickySessionMaxWaiting {
+					if waitingCount < cfg.StickySessionMaxWaiting && geminiStickyShouldWait(requestedModel, len(accounts)) {
 						// 会话数量限制检查（等待计划也需要占用会话配额）
 						if !s.checkAndRegisterSession(ctx, account, sessionHash) {
 							// 会话限制已满，继续到 Layer 2
@@ -713,7 +718,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 		})
 	}
 
-	loadMap, err := s.concurrencyService.GetAccountsLoadBatch(ctx, accountLoads)
+	loadMap, err := s.gatewaySchedulingLoads(ctx, accountLoads, requestedModel)
 	if err != nil {
 		if result, ok, legacyErr := s.tryAcquireByLegacyOrder(ctx, candidates, groupID, sessionHash, preferOAuth); legacyErr != nil {
 			return nil, legacyErr
@@ -747,6 +752,9 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 			candidates = filterByMinLoadRate(candidates)
 			// 4. LRU 选择最久未用的账号
 			selected := selectByLRU(candidates, preferOAuth)
+			if strings.HasPrefix(strings.ToLower(requestedModel), "gemini-") && sessionHash != "" {
+				selected = selectGeminiConversationAccount(candidates, sessionHash, preferOAuth)
+			}
 			if selected == nil {
 				break
 			}

@@ -1,0 +1,17 @@
+[Unit]
+Description=Qualify subscription changes for Gemini and Codex before live promotion
+After=network-online.target sub2api.service sub2api-gemini-egress.service sub2api-codex-egress.service
+Wants=network-online.target sub2api-gemini-egress.service sub2api-codex-egress.service
+
+[Service]
+Type=simple
+WorkingDirectory=@ROOT@
+ExecStart=/usr/bin/python3 -m image_hub.proxy_qualifier
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=70
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

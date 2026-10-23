@@ -1,0 +1,16 @@
+[Unit]
+Description=Sub2API Redis 8
+After=network.target
+
+[Service]
+WorkingDirectory=@ROOT@
+ExecStart=@ROOT@/bin/redis-server @ROOT@/deployment/private/config/redis.conf
+Environment=TZ=Asia/Shanghai
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=60
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

@@ -559,6 +559,11 @@ func shouldClearStickySession(account *Account, requestedModel string) bool {
 	if account == nil {
 		return false
 	}
+	// A fallback GLM session must return to the preferred channel on its next
+	// request rather than keeping a slower provider pinned for the whole chat.
+	if account.Platform == PlatformOpenAI && isGLMClientThinkingModel(requestedModel) && account.getExtraBool("glm_fallback_disable_sticky") {
+		return true
+	}
 	if !account.IsSchedulable() {
 		return true
 	}

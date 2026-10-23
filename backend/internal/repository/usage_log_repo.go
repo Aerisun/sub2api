@@ -8,6 +8,7 @@ import (
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	gocache "github.com/patrickmn/go-cache"
 )
@@ -139,9 +140,10 @@ func appendUsageLogModelQueryFilter(query string, args []any, model string, sour
 }
 
 type usageLogRepository struct {
-	client *dbent.Client
-	sql    sqlExecutor
-	db     *sql.DB
+	client            *dbent.Client
+	sql               sqlExecutor
+	db                *sql.DB
+	excludedAPIKeyIDs map[int64]struct{}
 
 	createBatchOnce     sync.Once
 	createBatchCh       chan usageLogCreateRequest
@@ -150,8 +152,22 @@ type usageLogRepository struct {
 	bestEffortRecent    *gocache.Cache
 }
 
-func NewUsageLogRepository(client *dbent.Client, sqlDB *sql.DB) service.UsageLogRepository {
-	return newUsageLogRepositoryWithSQL(client, sqlDB)
+func NewUsageLogRepository(client *dbent.Client, sqlDB *sql.DB, cfg *config.Config) service.UsageLogRepository {
+	repo := newUsageLogRepositoryWithSQL(client, sqlDB)
+	if cfg != nil {
+		repo.excludedAPIKeyIDs = make(map[int64]struct{}, len(cfg.Gateway.UsageRecord.ExcludedAPIKeyIDs))
+		for _, id := range cfg.Gateway.UsageRecord.ExcludedAPIKeyIDs {
+			if id > 0 {
+				repo.excludedAPIKeyIDs[id] = struct{}{}
+			}
+		}
+	}
+	return repo
+}
+
+func (r *usageLogRepository) excludesAPIKey(id int64) bool {
+	_, excluded := r.excludedAPIKeyIDs[id]
+	return excluded
 }
 
 func newUsageLogRepositoryWithSQL(client *dbent.Client, sqlq sqlExecutor) *usageLogRepository {

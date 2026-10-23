@@ -49,10 +49,12 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 	}
 
 	originalModel := claudeReq.Model
+	reasoningBody := geminiClaudeReasoningBody(body)
+	forwardedReasoningBody := reasoningBody
 	mappedModel := s.getMappedModelForThinkingLevel(
 		account,
 		claudeReq.Model,
-		geminiThinkingLevelFromClaudeThinking(claudeReq.Thinking),
+		geminiRequestedThinkingLevel(reasoningBody),
 	)
 	if mappedModel == "" {
 		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalFeatureGate)
@@ -62,6 +64,9 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 	thinkingEnabled := claudeReq.Thinking != nil && (claudeReq.Thinking.Type == "enabled" || claudeReq.Thinking.Type == "adaptive")
 	mappedModel = applyThinkingModelSuffix(mappedModel, thinkingEnabled)
 	billingModel := mappedModel
+	if err := applyAntigravityClaudeReasoning(&claudeReq, reasoningBody, mappedModel); err != nil {
+		return nil, s.writeClaudeError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+	}
 
 	// 获取 access_token
 	if s.tokenProvider == nil {
@@ -94,8 +99,17 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 
 	// 转换 Claude 请求为 Gemini 格式
 	geminiBody, err := antigravity.TransformClaudeToGeminiWithOptions(&claudeReq, projectID, mappedModel, transformOpts)
+	if err == nil {
+		geminiBody, err = applyAntigravityGeminiRequestReasoning(geminiBody, reasoningBody, originalModel, account)
+	}
+	if err == nil {
+		geminiBody, err = applyAntigravityClaudeThinkingOff(geminiBody, reasoningBody, mappedModel)
+	}
+	if err == nil {
+		geminiBody, err = applyAntigravityClientToolChoice(geminiBody, body, mappedModel)
+	}
 	if err != nil {
-		return nil, s.writeClaudeError(c, http.StatusBadRequest, "invalid_request_error", "Invalid request")
+		return nil, s.writeClaudeError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 	}
 
 	// Antigravity 上游只支持流式请求，统一使用 streamGenerateContent
@@ -185,7 +199,21 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 
 				logger.LegacyPrintf("service.antigravity_gateway", "Antigravity account %d: detected signature-related 400, retrying once (%s)", account.ID, stage.name)
 
-				retryGeminiBody, txErr := antigravity.TransformClaudeToGeminiWithOptions(&retryClaudeReq, projectID, mappedModel, s.getClaudeTransformOptions(ctx))
+				offBody := []byte(`{"thinking":{"type":"disabled"}}`)
+				retryModel := mappedModel
+				if strings.HasPrefix(originalModel, "gemini-") {
+					retryModel = s.getMappedModelForThinkingLevel(account, originalModel, "none")
+				}
+				retryGeminiBody, txErr := antigravity.TransformClaudeToGeminiWithOptions(&retryClaudeReq, projectID, retryModel, s.getClaudeTransformOptions(ctx))
+				if txErr == nil {
+					retryGeminiBody, txErr = applyGeminiRequestReasoning(retryGeminiBody, offBody, originalModel)
+				}
+				if txErr == nil {
+					retryGeminiBody, txErr = applyAntigravityClaudeThinkingOff(retryGeminiBody, offBody, retryModel)
+				}
+				if txErr == nil {
+					retryGeminiBody, txErr = applyAntigravityClientToolChoice(retryGeminiBody, body, retryModel)
+				}
 				if txErr != nil {
 					continue
 				}
@@ -227,6 +255,8 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 					_ = resp.Body.Close()
 					resp = retryResp
 					respBody = nil
+					billingModel = retryModel
+					forwardedReasoningBody = offBody
 					break
 				}
 
@@ -466,7 +496,7 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 		firstTokenMs = streamRes.firstTokenMs
 	}
 
-	return &ForwardResult{
+	resultForward := &ForwardResult{
 		RequestID:                     requestID,
 		UpstreamHeaders:               resp.Header,
 		Usage:                         *usage,
@@ -478,7 +508,13 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 		Duration:                      time.Since(startTime),
 		FirstTokenMs:                  firstTokenMs,
 		ClientDisconnect:              clientDisconnect,
-	}, nil
+		ReasoningEffort:               antigravityGeminiReasoningMetadata(forwardedReasoningBody, account, originalModel),
+		RequestedReasoningEffort:      geminiClientReasoningMetadata(reasoningBody),
+	}
+	if strings.HasPrefix(originalModel, "claude-") {
+		resultForward.ReasoningEffort = antigravityClaudeReasoningMetadata(forwardedReasoningBody)
+	}
+	return resultForward, nil
 }
 
 func isSignatureRelatedError(respBody []byte) bool {

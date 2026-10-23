@@ -229,6 +229,12 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/chat',
+    name: 'Chat',
+    component: () => import('@/views/user/ChatView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: false, title: '对话聊天', titleKey: 'nav.chat' }
+  },
+  {
     path: '/usage',
     name: 'Usage',
     component: () => import('@/views/user/UsageView.vue'),
@@ -799,6 +805,21 @@ router.beforeEach(async (to, _from, next) => {
     ...(authStore.isAdmin ? adminSettingsStore.customMenuItems : []),
   ]
   document.title = resolveRouteDocumentTitle(to, appStore.siteName, customMenuItems)
+
+  // A disabled channels page resolves to the site's model catalog, including old links.
+  if (to.path === '/available-channels') {
+    if (!appStore.publicSettingsLoaded) {
+      try {
+        await appStore.fetchPublicSettings()
+      } catch (error) {
+        console.warn('Failed to load public settings in route guard', error)
+      }
+    }
+    if (appStore.cachedPublicSettings?.available_channels_enabled === false) {
+      next({ path: '/model-plaza', query: { embedded: '1' } })
+      return
+    }
+  }
 
   // Check if route requires authentication
   const requiresAuth = to.meta.requiresAuth !== false // Default to true

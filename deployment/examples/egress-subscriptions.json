@@ -1,0 +1,17 @@
+{
+  "primary_file": "@ROOT@/secrets/network/legacy-primary.yaml",
+  "primary_cache_file": "@ROOT@/secrets/network/primary-last-good.yaml",
+  "sources": [
+    {
+      "name": "reserve",
+      "url_file": "@ROOT@/secrets/network/additional-subscription-url.txt",
+      "cache_file": "@ROOT@/secrets/network/additional-subscription.yaml"
+    }
+  ],
+  "fetch_proxies": [
+    null,
+    "http://127.0.0.1:17896"
+  ],
+  "output_file": "@ROOT@/secrets/network/combined-candidates.yaml",
+  "state_file": "@ROOT@/data/egress-subscriptions-state.json"
+}

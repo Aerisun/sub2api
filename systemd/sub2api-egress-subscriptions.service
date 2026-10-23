@@ -1,0 +1,13 @@
+[Unit]
+Description=Refresh private egress subscriptions without promoting untested routes
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=@ROOT@
+Environment=PYTHONPATH=@ROOT@/runtime/python-site:@ROOT@
+ExecStart=/usr/bin/python3 -m image_hub.egress_subscriptions
+TimeoutStartSec=45
+UMask=0077
+NoNewPrivileges=true

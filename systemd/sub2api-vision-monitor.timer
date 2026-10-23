@@ -1,0 +1,11 @@
+[Unit]
+Description=Check and recover NVIDIA vision backends
+
+[Timer]
+OnBootSec=10
+OnUnitInactiveSec=30
+AccuracySec=1
+Unit=sub2api-vision-monitor.service
+
+[Install]
+WantedBy=timers.target

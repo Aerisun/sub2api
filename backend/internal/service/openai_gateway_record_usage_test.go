@@ -3225,6 +3225,43 @@ func TestGroupBillsOpenAIFastAtStandardRequiresOpenAIAccount(t *testing.T) {
 	))
 }
 
+func TestOpenAIGatewayServiceRecordUsage_ModelImageCardsOverrideGenericGroupTiers(t *testing.T) {
+	for model, prices := range map[string][]float64{
+		"gpt-image-2":            {.10, .20, .35},
+		"gpt-image-2.5-flare":    {.15, .30, .50},
+		"gpt-image-2.5-sunburst": {.20, .40, .70},
+	} {
+		for index, tier := range []string{"1K", "2K", "4K"} {
+			t.Run(model+"/"+tier, func(t *testing.T) {
+				usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+				svc := newOpenAIRecordUsageServiceForTest(usageRepo, &openAIRecordUsageUserRepoStub{}, &openAIRecordUsageSubRepoStub{}, nil)
+				svc.resolver = NewModelPricingResolver(nil, svc.billingService)
+				groupID := int64(77)
+				card := ChannelModelPricing{Platform: PlatformOpenAI, Models: []string{model},
+					BillingMode: BillingModeImage, PerRequestPrice: testPtrFloat64(prices[0])}
+				for i, label := range []string{"1K", "2K", "4K"} {
+					card.Intervals = append(card.Intervals, PricingInterval{TierLabel: label, PerRequestPrice: testPtrFloat64(prices[i]), SortOrder: i})
+				}
+				err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
+					Result: &OpenAIForwardResult{RequestID: "model-image-card", Model: model, ImageCount: 2,
+						ImageSize: tier, ImageOutputSize: []string{"1024x1024", "2048x2048", "4096x4096"}[index], Duration: time.Second},
+					APIKey: &APIKey{ID: 1077, GroupID: &groupID, Group: &Group{
+						ID: groupID, Platform: PlatformComposite, Status: StatusActive, Hydrated: true, RateMultiplier: 1,
+						ImagePrice1K: testPtrFloat64(.067), ImagePrice2K: testPtrFloat64(.101), ImagePrice4K: testPtrFloat64(.151),
+						ModelPricing: []ChannelModelPricing{card},
+					}},
+					User: &User{ID: 2077}, Account: &Account{ID: 3077, Platform: PlatformOpenAI, Type: AccountTypeOAuth},
+				})
+				require.NoError(t, err)
+				require.NotNil(t, usageRepo.lastLog)
+				require.Equal(t, 2, usageRepo.lastLog.ImageCount)
+				require.InDelta(t, 2*prices[index], usageRepo.lastLog.ActualCost, 1e-12,
+					"charge actual image count at this model's resolution price, ahead of generic group prices")
+			})
+		}
+	}
+}
+
 func TestOpenAIGatewayServiceRecordUsage_ServiceTierNeverRaisedByUpstreamResponse(t *testing.T) {
 	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
 	userRepo := &openAIRecordUsageUserRepoStub{}

@@ -30,7 +30,7 @@ func TestGeminiUsageMapping_NoCacheCreationTokens(t *testing.T) {
 		p := NewStreamingProcessor("gemini-3.1-pro-preview")
 		out := p.ProcessLine(`data: {"response":` + geminiBody + `}`)
 		require.True(t, strings.Contains(string(out), `"message_start"`))
-		require.NotContains(t, string(out), `"cache_creation_input_tokens"`, "message_start 的 usage 不应携带缓存写入分项")
+		require.Contains(t, string(out), `"cache_creation_input_tokens":0`, "Gemini does not report cache creation tokens; never invent a cache write")
 		_, usage := p.Finish()
 		require.NotNil(t, usage)
 		require.Equal(t, 70, usage.InputTokens)

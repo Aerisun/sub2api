@@ -88,7 +88,7 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 
 	// 裸模型名（gemini-3.8-flash）按 thinkingConfig 解析到 -low/-medium/-high 变体；
 	// 裸名有显式映射时保持原行为。
-	mappedModel := s.getMappedModelForThinkingLevel(account, originalModel, geminiThinkingLevelFromBody(body))
+	mappedModel := s.getMappedModelForThinkingLevel(account, originalModel, geminiRequestedThinkingLevel(body))
 	if mappedModel != "" && mappedModel != originalModel {
 		logger.LegacyPrintf("service.antigravity_gateway", "%s mapped Gemini model %s to %s", prefix, originalModel, mappedModel)
 	}
@@ -123,7 +123,11 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 	}
 
 	// Antigravity 上游要求必须包含身份提示词，注入到请求中
-	injectedBody, err := injectIdentityPatchToGeminiRequest(body)
+	normalizedBody, err := applyAntigravityGeminiRequestReasoning(body, body, originalModel, account)
+	if err != nil {
+		return nil, s.writeGoogleError(c, http.StatusBadRequest, err.Error())
+	}
+	injectedBody, err := injectIdentityPatchToGeminiRequest(normalizedBody)
 	if err != nil {
 		return nil, s.writeGoogleError(c, http.StatusBadRequest, "Invalid request body")
 	}
@@ -465,7 +469,8 @@ handleSuccess:
 		UpstreamResponseModel:         observedUpstreamResponseModel(c),
 		UpstreamResponseModelConflict: observedUpstreamResponseModelConflict(c),
 		Stream:                        stream,
-		ReasoningEffort:               extractGeminiReasoningEffortFromBody(injectedBody),
+		ReasoningEffort:               extractGeminiReasoningEffortFromBody(normalizedBody),
+		RequestedReasoningEffort:      geminiClientReasoningMetadata(body),
 		Duration:                      time.Since(startTime),
 		FirstTokenMs:                  firstTokenMs,
 		ClientDisconnect:              clientDisconnect,

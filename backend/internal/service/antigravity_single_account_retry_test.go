@@ -53,10 +53,10 @@ func TestIsSingleAccountRetry_False_WrongType(t *testing.T) {
 func TestSingleAccountRetryConstants(t *testing.T) {
 	require.Equal(t, 3, antigravitySingleAccountSmartRetryMaxAttempts,
 		"单账号原地重试最多 3 次")
-	require.Equal(t, 15*time.Second, antigravitySingleAccountSmartRetryMaxWait,
-		"单次最大等待 15s")
-	require.Equal(t, 30*time.Second, antigravitySingleAccountSmartRetryTotalMaxWait,
-		"总累计等待不超过 30s")
+	require.Equal(t, 2*time.Second, antigravitySingleAccountSmartRetryMaxWait,
+		"单次最大等待 2s")
+	require.Equal(t, 6*time.Second, antigravitySingleAccountSmartRetryTotalMaxWait,
+		"总累计等待不超过 6s")
 }
 
 // ---------------------------------------------------------------------------

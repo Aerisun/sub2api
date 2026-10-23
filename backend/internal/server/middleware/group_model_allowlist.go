@@ -1,11 +1,13 @@
 package middleware
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/requestmodel"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -32,11 +34,34 @@ import (
 func GroupModelAllowlist() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		apiKey, ok := GetAPIKeyFromContext(c)
-		if !ok || apiKey == nil || apiKey.Group == nil || !apiKey.Group.ModelAllowlistEnabled() {
+		if ok && apiKey != nil && c.Request != nil && c.Request.Method == http.MethodPost {
+			apiKey = apiKey.WithToolEndpointPermissions(c.Request.URL.Path)
+		}
+		// The private task worker discovers image permission through this native
+		// catalogue. Public ingress replaces provider image IDs with the tool ID.
+		if ok && apiKey != nil && c.Request != nil && c.Request.Method == http.MethodGet &&
+			(strings.HasPrefix(c.Request.URL.Path, "/v1/models") || strings.HasPrefix(c.Request.URL.Path, "/models")) {
+			apiKey = apiKey.WithToolEndpointPermissions("/v1/images/generations")
+		}
+		if ok && apiKey != nil {
+			apiKey = apiKey.WithModelRestrictions()
+			c.Set(string(ContextKeyAPIKey), apiKey)
+			if service.IsGroupContextValid(apiKey.Group) && c.Request != nil {
+				c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), ctxkey.Group, apiKey.Group))
+			}
+		}
+		if !ok || apiKey == nil {
 			c.Next()
 			return
 		}
-		allowlist := apiKey.Group.ModelAllowlist
+		allowlist := service.GroupModelAllowlist{Enabled: len(apiKey.AllowedModels) > 0, Models: apiKey.AllowedModels}
+		if apiKey.Group != nil {
+			allowlist = apiKey.Group.ModelAllowlist
+		}
+		if !allowlist.Enabled {
+			c.Next()
+			return
+		}
 		if c.Request == nil {
 			c.Next()
 			return
@@ -84,7 +109,11 @@ func GroupModelAllowlist() gin.HandlerFunc {
 
 		service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalModelConfiguration)
 		MarkIngressRejected(c, IngressRejectModelNotAllowed)
-		groupModelAllowlistErrorWriter(c)(c, http.StatusNotFound, fmt.Sprintf("Model %q is not available for this group", blocked))
+		scope := "group"
+		if len(apiKey.AllowedModels) > 0 {
+			scope = "API key"
+		}
+		groupModelAllowlistErrorWriter(c)(c, http.StatusNotFound, fmt.Sprintf("Model %q is not available for this %s", blocked, scope))
 		c.Abort()
 	}
 }

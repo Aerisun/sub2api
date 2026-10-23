@@ -83,7 +83,8 @@ func shouldPreserveOpenAIResponsesNoneReasoningEffort(account *Account) bool {
 // non-reasoning model. Treat that catalog-only "none" value as omission for
 // compatible upstreams, while preserving official OpenAI request semantics.
 func filterOpenAIResponsesNoneReasoningEffortForAccount(account *Account, body []byte) ([]byte, error) {
-	if len(body) == 0 || shouldPreserveOpenAIResponsesNoneReasoningEffort(account) {
+	if len(body) == 0 || shouldPreserveOpenAIResponsesNoneReasoningEffort(account) ||
+		(account != nil && account.Platform == PlatformOpenAI && isGLMClientThinkingModel(gjson.GetBytes(body, "model").String())) {
 		return body, nil
 	}
 
@@ -111,6 +112,9 @@ func filterOpenAIResponsesNoneReasoningEffortForAccount(account *Account, body [
 
 func deleteOpenAIResponsesNoneReasoningEffortFromObject(account *Account, body map[string]any) {
 	if body == nil || shouldPreserveOpenAIResponsesNoneReasoningEffort(account) {
+		return
+	}
+	if model, _ := body["model"].(string); account != nil && account.Platform == PlatformOpenAI && isGLMClientThinkingModel(model) {
 		return
 	}
 	if effort, ok := body["reasoning_effort"].(string); ok && strings.EqualFold(strings.TrimSpace(effort), "none") {
@@ -1333,7 +1337,7 @@ func normalizeOpenAIOAuthResponsesCompatibilityBody(body []byte) ([]byte, bool, 
 }
 
 func normalizeGPT6ResponsesSampling(body []byte, model string) ([]byte, bool, error) {
-	if !openai.IsGPT6SolOrLunaModelSpelling(model) || gjson.GetBytes(body, "reasoning.effort").String() == "none" {
+	if !(openai.IsGPT6SolOrLunaModelSpelling(model) || isOpenAIGPT61SolModel(model)) || gjson.GetBytes(body, "reasoning.effort").String() == "none" {
 		return body, false, nil
 	}
 	out := body
@@ -2544,7 +2548,8 @@ func normalizeOpenAIReasoningEffort(raw string) string {
 }
 
 func normalizeOpenAIReasoningEffortForModel(raw, model string) string {
-	if strings.EqualFold(strings.TrimSpace(raw), "none") && openai.IsGPT6SolOrLunaModelSpelling(model) {
+	if strings.EqualFold(strings.TrimSpace(raw), "none") &&
+		(openai.IsGPT6SolOrLunaModelSpelling(model) || isGLMClientThinkingModel(model) || isNvidiaPortableThinkingModel(model)) {
 		return "none"
 	}
 	if strings.EqualFold(strings.TrimSpace(raw), "max") && supportsOpenAIReasoningEffortMax(model) {
@@ -2569,6 +2574,8 @@ func supportsOpenAIReasoningEffortMax(model string) bool {
 	case strings.HasPrefix(normalized, "glm-"):
 		return true
 	case strings.HasPrefix(normalized, "kimi-"), strings.HasPrefix(normalized, "moonshot-"):
+		return true
+	case isNvidiaPortableThinkingModel(model):
 		return true
 	case normalized == "k3" || strings.HasPrefix(normalized, "k3-"):
 		return true

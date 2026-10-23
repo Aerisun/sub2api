@@ -104,6 +104,8 @@ export function useChannelMonitorFormat() {
         return 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300'
       case PROVIDER_GEMINI:
         return 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300'
+      case 'qwen':
+        return 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300'
       case PROVIDER_GROK:
         return 'bg-zinc-100 text-zinc-700 dark:bg-zinc-500/15 dark:text-zinc-300'
       // 配色与 utils/platformColors.ts 的平台色对齐：antigravity=purple /
@@ -262,6 +264,8 @@ export function providerGradient(provider: string): string {
       return 'bg-gradient-to-br from-orange-50 to-amber-100 dark:from-orange-500/10 dark:to-amber-500/20'
     case PROVIDER_GEMINI:
       return 'bg-gradient-to-br from-sky-50 to-indigo-100 dark:from-sky-500/10 dark:to-indigo-500/20'
+    case 'qwen':
+      return 'bg-gradient-to-br from-violet-50 to-indigo-100 dark:from-violet-500/10 dark:to-indigo-500/20'
     case PROVIDER_GROK:
       return 'bg-gradient-to-br from-zinc-50 to-neutral-200 dark:from-zinc-500/10 dark:to-neutral-500/20'
     case PROVIDER_ANTIGRAVITY:

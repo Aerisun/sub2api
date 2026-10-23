@@ -285,12 +285,30 @@ func upstreamModelsMatchForAudit(sentModel, responseModel string) bool {
 	if strings.EqualFold(sentModel, responseModel) {
 		return true
 	}
+	if isGemini38RuntimeAlias(sentModel, responseModel) {
+		return true
+	}
 
 	// xAI reports the runtime build ID for these supported public aliases.
 	// Canonicalize only for mismatch auditing; keep the raw response model for
 	// observability and for the separate response-model billing safeguards.
 	sentGrokModel := canonicalGrokBuildRuntimeModel(sentModel)
 	return sentGrokModel != "" && sentGrokModel == canonicalGrokBuildRuntimeModel(responseModel)
+}
+
+// The proxied provider reports this runtime ID for its public Flash 3.8
+// effort routes. Preserve the raw declaration and only relax this exact audit
+// pair; a different family, tier or unknown runtime name remains a mismatch.
+func isGemini38RuntimeAlias(sentModel, responseModel string) bool {
+	if !strings.EqualFold(strings.TrimSpace(responseModel), "gemini-3.8-flash-n") {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(sentModel)) {
+	case "gemini-3.8-flash", "gemini-3.8-flash-low", "gemini-3.8-flash-medium", "gemini-3.8-flash-high", "gemini-3.8-flash-tiered":
+		return true
+	default:
+		return false
+	}
 }
 
 func canonicalGrokBuildRuntimeModel(model string) string {

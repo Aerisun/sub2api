@@ -57,6 +57,28 @@ func TestResolve_UnknownModel(t *testing.T) {
 	require.Equal(t, "fallback", resolved.Source)
 }
 
+func TestResolve_GeminiPrivateEffortUsesFamilyPrice(t *testing.T) {
+	bs := newTestBillingServiceForResolver()
+	r := NewModelPricingResolver(&ChannelService{}, bs)
+	group := &Group{ModelPricing: []ChannelModelPricing{{
+		Models: []string{"gemini-3.8-flash"}, BillingMode: BillingModeToken,
+		InputPrice: testPtrFloat64(.75e-6), OutputPrice: testPtrFloat64(3.75e-6),
+	}}}
+	for _, model := range []string{"gemini-3.8-flash", "gemini-3.8-flash-low", "gemini-3.8-flash-medium", "gemini-3.8-flash-high"} {
+		resolved := r.Resolve(context.Background(), PricingInput{Model: model, Group: group})
+		require.Equal(t, PricingSourceGroup, resolved.Source)
+		require.InDelta(t, .75e-6, resolved.BasePricing.InputPricePerToken, 1e-12)
+		require.InDelta(t, 3.75e-6, resolved.BasePricing.OutputPricePerToken, 1e-12)
+	}
+	// An explicit administrator override for a variant still takes precedence.
+	group.ModelPricing = append(group.ModelPricing, ChannelModelPricing{
+		Models: []string{"gemini-3.8-flash-high"}, BillingMode: BillingModeToken,
+		InputPrice: testPtrFloat64(1e-6), OutputPrice: testPtrFloat64(4e-6),
+	})
+	resolved := r.Resolve(context.Background(), PricingInput{Model: "gemini-3.8-flash-high", Group: group})
+	require.InDelta(t, 1e-6, resolved.BasePricing.InputPricePerToken, 1e-12)
+}
+
 func TestGetIntervalPricing_NoIntervals(t *testing.T) {
 	bs := newTestBillingServiceForResolver()
 	r := NewModelPricingResolver(&ChannelService{}, bs)

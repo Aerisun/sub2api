@@ -19,6 +19,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
+	"github.com/tidwall/gjson"
 )
 
 // antigravityRetryLoopParams 重试循环的参数
@@ -174,18 +175,28 @@ func (s *AntigravityGatewayService) handleSmartRetry(p antigravityRetryLoopParam
 		var lastRetryResp *http.Response
 		var lastRetryBody []byte
 
-		// MODEL_CAPACITY_EXHAUSTED 使用独立的重试参数（60 次，固定 1s 间隔）
+		// Capacity is shared across accounts: retry briefly, with one leader.
 		maxAttempts := antigravitySmartRetryMaxAttempts
 		if isModelCapacityExhausted {
 			maxAttempts = antigravityModelCapacityRetryMaxAttempts
 			waitDuration = antigravityModelCapacityRetryWait
+			if modelName == "" {
+				modelName = gjson.GetBytes(p.body, "model").String()
+				if modelName == "" {
+					modelName = p.requestedModel
+				}
+			}
 
 			// 全局去重：如果其他 goroutine 已在重试同一模型且尚在 cooldown 中，直接返回 503
 			if modelName != "" {
-				modelCapacityExhaustedMu.RLock()
+				modelCapacityExhaustedMu.Lock()
 				cooldownUntil, exists := modelCapacityExhaustedUntil[modelName]
-				modelCapacityExhaustedMu.RUnlock()
-				if exists && time.Now().Before(cooldownUntil) {
+				blocked := modelCapacityRetrying[modelName] || (exists && time.Now().Before(cooldownUntil))
+				if !blocked {
+					modelCapacityRetrying[modelName] = true
+				}
+				modelCapacityExhaustedMu.Unlock()
+				if blocked {
 					log.Printf("%s status=%d model_capacity_exhausted_dedup model=%s account=%d cooldown_until=%v (skip retry)",
 						p.prefix, resp.StatusCode, modelName, p.account.ID, cooldownUntil.Format("15:04:05"))
 					return &smartRetryResult{
@@ -197,14 +208,36 @@ func (s *AntigravityGatewayService) handleSmartRetry(p antigravityRetryLoopParam
 						},
 					}
 				}
+				defer func() {
+					modelCapacityExhaustedMu.Lock()
+					delete(modelCapacityRetrying, modelName)
+					modelCapacityExhaustedMu.Unlock()
+				}()
 			}
 		}
+		geminiRateRetry := !isModelCapacityExhausted && strings.HasPrefix(modelName, "gemini-")
+		if geminiRateRetry && waitDuration <= 500*time.Millisecond {
+			// Brief quota windows frequently expire during a single RPC. Keep
+			// the account/cache binding instead of paying for a full failover.
+			maxAttempts = 3
+		}
+		var retryWaited time.Duration
 
 		for attempt := 1; attempt <= maxAttempts; attempt++ {
+			// Honor Gemini's subsecond reset without synchronizing every caller
+			// on the same one-second boundary. Never shorten the provider hint.
+			retryWait := waitDuration
+			if !isModelCapacityExhausted && strings.HasPrefix(modelName, "gemini-") {
+				retryWait += time.Duration(mathrand.Int63n(int64(50 * time.Millisecond)))
+			}
+			if geminiRateRetry && attempt > 1 && retryWaited+retryWait > 1500*time.Millisecond {
+				break
+			}
+			retryWaited += retryWait
 			log.Printf("%s status=%d oauth_smart_retry attempt=%d/%d delay=%v model=%s account=%d",
-				p.prefix, resp.StatusCode, attempt, maxAttempts, waitDuration, modelName, p.account.ID)
+				p.prefix, resp.StatusCode, attempt, maxAttempts, retryWait, modelName, p.account.ID)
 
-			timer := time.NewTimer(waitDuration)
+			timer := time.NewTimer(retryWait)
 			select {
 			case <-p.ctx.Done():
 				timer.Stop()
@@ -257,16 +290,35 @@ func (s *AntigravityGatewayService) handleSmartRetry(p antigravityRetryLoopParam
 			}
 
 			// 解析新的重试信息，用于下次重试的等待时间（MODEL_CAPACITY_EXHAUSTED 使用固定循环，跳过）
-			if !isModelCapacityExhausted && attempt < maxAttempts && lastRetryBody != nil {
-				newShouldRetry, _, newWaitDuration, _, _ := shouldTriggerAntigravitySmartRetry(p.account, lastRetryBody)
+			if !isModelCapacityExhausted && (attempt < maxAttempts || geminiRateRetry) && lastRetryBody != nil {
+				newShouldRetry, newRateLimit, newWaitDuration, _, _ := shouldTriggerAntigravitySmartRetry(p.account, lastRetryBody)
+				if newRateLimit {
+					break
+				}
 				if newShouldRetry && newWaitDuration > 0 {
 					waitDuration = newWaitDuration
+					if geminiRateRetry && maxAttempts == 1 && newWaitDuration <= 500*time.Millisecond && retryWaited+newWaitDuration <= 1500*time.Millisecond {
+						// An initial >500ms hint can shrink to a short reset
+						// after the first retry. Re-evaluate using that latest
+						// hint instead of needlessly discarding the cache binding.
+						maxAttempts = 3
+					}
 				}
 			}
 		}
 
 		// 所有重试都失败
 		rateLimitDuration := waitDuration
+		// A second rejection can carry a different reset (including zero).
+		// Keep the latest provider cooldown rather than the previous sleep.
+		if !isModelCapacityExhausted && lastRetryBody != nil {
+			if info := parseAntigravitySmartRetryInfo(lastRetryBody); info != nil && !info.IsModelCapacityExhausted {
+				rateLimitDuration = info.RetryDelay
+				if floor := antigravityRateRetryMinWait(info.ModelName); rateLimitDuration < floor {
+					rateLimitDuration = floor
+				}
+			}
+		}
 		if rateLimitDuration <= 0 {
 			rateLimitDuration = antigravityDefaultRateLimitDuration
 		}
@@ -971,6 +1023,7 @@ func parseAntigravitySmartRetryInfo(body []byte) *antigravitySmartRetryInfo {
 	}
 
 	var retryDelay time.Duration
+	var hasRetryDelay bool
 	var modelName string
 	var hasRateLimitExceeded bool      // 429 需要此 reason
 	var hasModelCapacityExhausted bool // 503 需要此 reason
@@ -1011,11 +1064,12 @@ func parseAntigravitySmartRetryInfo(body []byte) *antigravitySmartRetryInfo {
 			// 使用 time.ParseDuration 解析，支持所有 Go duration 格式
 			// 例如: "0.5s", "10s", "4m50s", "1h30m", "200ms" 等
 			dur, err := time.ParseDuration(delay)
-			if err != nil {
+			if err != nil || dur < 0 {
 				logger.LegacyPrintf("service.antigravity_gateway", "[Antigravity] failed to parse retryDelay: %s error=%v", delay, err)
 				continue
 			}
 			retryDelay = dur
+			hasRetryDelay = true
 		}
 	}
 
@@ -1034,8 +1088,8 @@ func parseAntigravitySmartRetryInfo(body []byte) *antigravitySmartRetryInfo {
 		return nil
 	}
 
-	// 如果上游未提供 retryDelay，使用默认限流时间
-	if retryDelay <= 0 {
+	// Missing or invalid hints keep the fallback; an explicit 0s is valid.
+	if !hasRetryDelay {
 		retryDelay = antigravityDefaultRateLimitDuration
 	}
 
@@ -1078,11 +1132,18 @@ func shouldTriggerAntigravitySmartRetry(account *Account, respBody []byte) (shou
 
 	// retryDelay < 阈值：智能重试
 	waitDuration = info.RetryDelay
-	if waitDuration < antigravitySmartRetryMinWait {
-		waitDuration = antigravitySmartRetryMinWait
+	if floor := antigravityRateRetryMinWait(info.ModelName); waitDuration < floor {
+		waitDuration = floor
 	}
 
 	return true, false, waitDuration, info.ModelName, false
+}
+
+func antigravityRateRetryMinWait(model string) time.Duration {
+	if strings.HasPrefix(model, "gemini-") {
+		return 100 * time.Millisecond
+	}
+	return antigravitySmartRetryMinWait
 }
 
 // handleModelRateLimitParams 模型级限流处理参数

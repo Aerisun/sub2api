@@ -1,0 +1,33 @@
+name: Aerisun add-ons
+
+on:
+  push:
+    branches: [aerisun]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-aerisun.txt
+      - run: pip install -r requirements-aerisun.txt
+      - name: Network isolation, accepted stream completion and tool admission
+        run: >-
+          python -m unittest
+          nvidia_pool.tests nvidia_pool.egress_tests nvidia_pool.egress_transport_tests
+          nvidia_pool.vision_reliability_tests
+          internal_tools.test_image_tools internal_tools.test_concurrency
+          image_hub.proxy_qualifier_test image_hub.egress_subscriptions_test
+          image_hub.egress_control_test image_hub.egress_watchdog_test
+      - name: CPU embedding scheduler
+        run: PYTHONPATH=inference/embedding/scripts python -m unittest discover -s inference/embedding/tests
+      - name: CPU reranker scheduler
+        run: PYTHONPATH=inference/reranker/scripts python -m unittest discover -s inference/reranker/tests

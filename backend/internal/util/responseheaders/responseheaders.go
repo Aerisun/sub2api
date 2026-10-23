@@ -17,6 +17,7 @@ var defaultAllowed = map[string]struct{}{
 	"content-encoding":               {},
 	"content-language":               {},
 	"cache-control":                  {},
+	"cache-status":                   {},
 	"etag":                           {},
 	"last-modified":                  {},
 	"expires":                        {},

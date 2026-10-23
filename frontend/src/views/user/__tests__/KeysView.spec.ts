@@ -5,6 +5,9 @@ import { nextTick } from 'vue'
 import type { ApiKey } from '@/types'
 import { keysAPI } from '@/api'
 import KeysView from '../KeysView.vue'
+import ModelAccessSelector from '@/components/keys/ModelAccessSelector.vue'
+
+vi.mock('@/api/modelPlaza', () => ({ modelPlazaAPI: { getModelPlaza: vi.fn().mockResolvedValue({ groups: [{ id: 10, models: [{ name: 'claude-sonnet-4-6' }, { name: 'gemini-3.8-flash' }] }] }) } }))
 
 const {
   listKeys,
@@ -547,93 +550,107 @@ describe('user KeysView column settings', () => {
     )
   })
 
-  describe('create provider selection', () => {
+  describe('fixed Other provider', () => {
     const platforms = ['anthropic', 'openai', 'kimi', 'zhipu', 'deepseek', 'minimax', 'gemini', 'grok', 'antigravity', 'composite', 'opencode_go']
     const availableGroups = platforms.map((platform, index) => ({
-      id: index + 1,
-      // Deliberately ambiguous names: classification must follow the platform.
-      name: `Shared group ${index + 1}`,
-      platform,
-      rate_multiplier: 1,
-      subscription_type: 'standard',
+      id: index + 1, name: `Shared group ${index + 1}`, platform,
+      rate_multiplier: 1, subscription_type: 'standard',
     }))
     const groupSelect = (wrapper: VueWrapper) => wrapper.findComponent('[data-tour="key-form-group"]')
     const optionIds = (wrapper: VueWrapper) => groupSelect(wrapper).props('options').map((option: { value: number }) => option.value)
-    const chooseProvider = (wrapper: VueWrapper, value: string) => wrapper.get(`input[name="key-provider"][value="${value}"]`).setValue()
     const openCreate = async () => {
       const wrapper = await mountView()
       await wrapper.get('[data-tour="keys-create-btn"]').trigger('click')
       return wrapper
     }
+    beforeEach(() => { getAvailableGroups.mockResolvedValue(availableGroups) })
 
-    beforeEach(() => {
-      getAvailableGroups.mockResolvedValue(availableGroups)
-    })
-
-    it('classifies all configured platforms and retains the complete table filter', async () => {
+    it('shows a fixed Other provider and only compatible groups', async () => {
       const wrapper = await openCreate()
-      expect(wrapper.findAll('input[name="key-provider"]')).toHaveLength(4)
-      expect(optionIds(wrapper)).toEqual([1])
-      await chooseProvider(wrapper, 'openai')
-      expect(optionIds(wrapper)).toEqual([2])
-      await chooseProvider(wrapper, 'domestic')
-      expect(optionIds(wrapper)).toEqual([3, 4, 5, 6])
-      await chooseProvider(wrapper, 'other')
+      expect(wrapper.findAll('input[name="key-provider"]')).toHaveLength(0)
+      expect(wrapper.get('[data-tour="key-form-provider"]').text()).toContain('keys.providers.other')
       expect(optionIds(wrapper)).toEqual([7, 8, 9, 10, 11])
       expect(wrapper.findAllComponents({ name: 'Select' })[0].props('options')).toHaveLength(13)
     })
 
-    it('clears the previous group on provider change and submits only the newly selected group', async () => {
+    it('automatically selects the unified composite group and submits it', async () => {
+      getAvailableGroups.mockResolvedValue([availableGroups[9]])
       const wrapper = await openCreate()
+      expect(groupSelect(wrapper).props('modelValue')).toBe(10)
       await wrapper.get('[data-tour="key-form-name"]').setValue('My key')
-      await groupSelect(wrapper).vm.$emit('update:modelValue', 1)
-      await chooseProvider(wrapper, 'domestic')
-      expect(groupSelect(wrapper).props('modelValue')).toBeNull()
-      await wrapper.get('#key-form').trigger('submit')
-      expect(keysAPI.create).not.toHaveBeenCalled()
-      expect(showError).toHaveBeenCalledWith('keys.groupRequired')
-
-      await groupSelect(wrapper).vm.$emit('update:modelValue', 5)
-      vi.mocked(keysAPI.create).mockResolvedValue({ ...createApiKey(), group_id: 5 })
+      vi.mocked(keysAPI.create).mockResolvedValue({ ...createApiKey(), group_id: 10 })
       await wrapper.get('#key-form').trigger('submit')
       await flushPromises()
       expect(keysAPI.create).toHaveBeenCalledOnce()
-      expect(vi.mocked(keysAPI.create).mock.calls[0].slice(0, 2)).toEqual(['My key', 5])
+      expect(vi.mocked(keysAPI.create).mock.calls[0].slice(0, 2)).toEqual(['My key', 10])
+      expect(vi.mocked(keysAPI.create).mock.calls[0][8]).toEqual([])
     })
 
-    it('defaults to a provider with available groups and disables empty categories', async () => {
+    it('requires a selection in restricted mode and sends only selected models', async () => {
+      getAvailableGroups.mockResolvedValue([availableGroups[9]])
+      const wrapper = await openCreate()
+      await wrapper.get('[data-tour="key-form-name"]').setValue('Restricted key')
+      const selector = wrapper.findComponent(ModelAccessSelector)
+      selector.vm.$emit('update:restricted', true)
+      await nextTick()
+      await wrapper.get('#key-form').trigger('submit')
+      expect(keysAPI.create).not.toHaveBeenCalled()
+      expect(showError).toHaveBeenCalledWith('keys.selectAtLeastOneModel')
+      selector.vm.$emit('update:models', ['claude-sonnet-4-6'])
+      await nextTick()
+      vi.mocked(keysAPI.create).mockResolvedValue(createApiKey())
+      await wrapper.get('#key-form').trigger('submit')
+      await flushPromises()
+      expect(vi.mocked(keysAPI.create).mock.calls[0][8]).toEqual(['claude-sonnet-4-6'])
+    })
+
+    it('restores a saved selection on edit and can clear the restriction', async () => {
+      const key = { ...createApiKey(), group_id: 10, allowed_models: ['claude-sonnet-4-6'] }
+      listKeys.mockResolvedValue({ items: [key], total: 1, page: 1, page_size: 20, pages: 1 })
+      updateKey.mockResolvedValue({ ...key, allowed_models: [] })
+      const wrapper = await mountView()
+      await getButtonByText(wrapper, 'common.edit').trigger('click')
+      const selector = wrapper.findComponent(ModelAccessSelector)
+      expect(selector.props('restricted')).toBe(true)
+      expect(selector.props('models')).toEqual(key.allowed_models)
+      selector.vm.$emit('update:restricted', false)
+      await nextTick()
+      await wrapper.get('#key-form').trigger('submit')
+      await flushPromises()
+      expect(updateKey).toHaveBeenCalledWith(key.id, expect.objectContaining({ allowed_models: [] }))
+    })
+
+    it('keeps Other fixed when only a different provider is available', async () => {
       getAvailableGroups.mockResolvedValue([availableGroups[5]])
       const wrapper = await openCreate()
-      expect(wrapper.get<HTMLInputElement>('input[value="domestic"]').element.checked).toBe(true)
-      expect(wrapper.get<HTMLInputElement>('input[value="anthropic"]').element.disabled).toBe(true)
-      expect(optionIds(wrapper)).toEqual([6])
+      expect(optionIds(wrapper)).toEqual([])
+      expect(groupSelect(wrapper).props('modelValue')).toBeNull()
+      expect(wrapper.findAll('input[name="key-provider"]')).toHaveLength(0)
     })
 
-    it('shows the empty state when no groups are available', async () => {
+    it('keeps the group empty when no groups are available', async () => {
       getAvailableGroups.mockResolvedValue([])
       const wrapper = await openCreate()
-      expect(wrapper.get('[data-tour="key-form-provider"]').text()).toContain('common.noGroupsAvailable')
       expect(optionIds(wrapper)).toEqual([])
-      expect(wrapper.findAll<HTMLInputElement>('input[name="key-provider"]').every((input) => input.element.disabled)).toBe(true)
+      expect(groupSelect(wrapper).props('modelValue')).toBeNull()
     })
 
-    it('selects an available provider when groups arrive after opening', async () => {
+    it('selects the unified group when groups arrive after opening', async () => {
       let resolveGroups!: (value: typeof availableGroups) => void
       getAvailableGroups.mockReturnValue(new Promise((resolve) => { resolveGroups = resolve }))
       const wrapper = await openCreate()
-      resolveGroups([availableGroups[1]])
+      resolveGroups([availableGroups[9]])
       await flushPromises()
-      expect(wrapper.get<HTMLInputElement>('input[value="openai"]').element.checked).toBe(true)
-      expect(optionIds(wrapper)).toEqual([2])
+      expect(optionIds(wrapper)).toEqual([10])
+      expect(groupSelect(wrapper).props('modelValue')).toBe(10)
     })
 
-    it('resets provider and group when reopening create, and preserves edit options', async () => {
+    it('keeps Other on reopening create and preserves edit options', async () => {
       const wrapper = await openCreate()
-      await chooseProvider(wrapper, 'domestic')
-      await groupSelect(wrapper).vm.$emit('update:modelValue', 5)
+      await groupSelect(wrapper).vm.$emit('update:modelValue', 10)
       await wrapper.get('[data-test="close-dialog"]').trigger('click')
       await wrapper.get('[data-tour="keys-create-btn"]').trigger('click')
-      expect(optionIds(wrapper)).toEqual([1])
+      expect(optionIds(wrapper)).toEqual([7, 8, 9, 10, 11])
       expect(groupSelect(wrapper).props('modelValue')).toBeNull()
       await wrapper.get('[data-test="close-dialog"]').trigger('click')
       await getButtonByText(wrapper, 'common.edit').trigger('click')

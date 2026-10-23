@@ -151,7 +151,7 @@ const (
 )
 
 func (r *usageLogRepository) Create(ctx context.Context, log *service.UsageLog) (bool, error) {
-	if log == nil {
+	if log == nil || r.excludesAPIKey(log.APIKeyID) {
 		return false, nil
 	}
 
@@ -167,7 +167,7 @@ func (r *usageLogRepository) Create(ctx context.Context, log *service.UsageLog) 
 }
 
 func (r *usageLogRepository) CreateBestEffort(ctx context.Context, log *service.UsageLog) error {
-	if log == nil {
+	if log == nil || r.excludesAPIKey(log.APIKeyID) {
 		return nil
 	}
 

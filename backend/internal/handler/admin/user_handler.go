@@ -22,7 +22,8 @@ import (
 // UserWithConcurrency wraps AdminUser with current concurrency info
 type UserWithConcurrency struct {
 	dto.AdminUser
-	CurrentConcurrency int `json:"current_concurrency"`
+	CurrentConcurrency       int `json:"current_concurrency"`
+	CurrentOpenAIConcurrency int `json:"current_openai_concurrency"`
 }
 
 // UserHandler handles admin user management
@@ -66,6 +67,7 @@ type CreateUserRequest struct {
 	Role                 string   `json:"role" binding:"omitempty,oneof=admin user"`
 	Balance              *float64 `json:"balance"`
 	Concurrency          int      `json:"concurrency"`
+	OpenAIConcurrency    int      `json:"openai_concurrency" binding:"min=0"`
 	RPMLimit             int      `json:"rpm_limit"`
 	AllowedGroups        []int64  `json:"allowed_groups"`
 	RestrictPublicGroups bool     `json:"restrict_public_groups"`
@@ -81,6 +83,7 @@ type UpdateUserRequest struct {
 	Role                 string   `json:"role" binding:"omitempty,oneof=admin user"`
 	Balance              *float64 `json:"balance"`
 	Concurrency          *int     `json:"concurrency"`
+	OpenAIConcurrency    *int     `json:"openai_concurrency" binding:"omitempty,min=0"`
 	RPMLimit             *int     `json:"rpm_limit"`
 	Status               string   `json:"status" binding:"omitempty,oneof=active disabled"`
 	AllowedGroups        *[]int64 `json:"allowed_groups"`
@@ -159,6 +162,7 @@ func (h *UserHandler) List(c *gin.Context) {
 
 	// Batch get current concurrency (nil map if unavailable)
 	var loadInfo map[int64]*service.UserLoadInfo
+	var openAILoad map[int64]int
 	if len(users) > 0 && h.concurrencyService != nil {
 		usersConcurrency := make([]service.UserWithConcurrency, len(users))
 		for i := range users {
@@ -168,13 +172,19 @@ func (h *UserHandler) List(c *gin.Context) {
 			}
 		}
 		loadInfo, _ = h.concurrencyService.GetUsersLoadBatch(c.Request.Context(), usersConcurrency)
+		ids := make([]int64, len(users))
+		for i := range users {
+			ids[i] = users[i].ID
+		}
+		openAILoad, _ = h.concurrencyService.GetUserOpenAIConcurrencyBatch(c.Request.Context(), ids)
 	}
 
 	// Build response with concurrency info
 	out := make([]UserWithConcurrency, len(users))
 	for i := range users {
 		out[i] = UserWithConcurrency{
-			AdminUser: *dto.UserFromServiceAdmin(&users[i]),
+			AdminUser:                *dto.UserFromServiceAdmin(&users[i]),
+			CurrentOpenAIConcurrency: openAILoad[users[i].ID],
 		}
 		if info := loadInfo[users[i].ID]; info != nil {
 			out[i].CurrentConcurrency = info.CurrentConcurrency
@@ -293,6 +303,7 @@ func (h *UserHandler) Create(c *gin.Context) {
 		Role:                 req.Role,
 		Balance:              req.Balance,
 		Concurrency:          req.Concurrency,
+		OpenAIConcurrency:    req.OpenAIConcurrency,
 		RPMLimit:             req.RPMLimit,
 		AllowedGroups:        req.AllowedGroups,
 		RestrictPublicGroups: req.RestrictPublicGroups,
@@ -352,6 +363,7 @@ func (h *UserHandler) Update(c *gin.Context) {
 		Role:                 req.Role,
 		Balance:              req.Balance,
 		Concurrency:          req.Concurrency,
+		OpenAIConcurrency:    req.OpenAIConcurrency,
 		RPMLimit:             req.RPMLimit,
 		Status:               req.Status,
 		AllowedGroups:        req.AllowedGroups,
@@ -616,10 +628,11 @@ func (h *UserHandler) BatchUpdateConcurrency(c *gin.Context) {
 // BatchUpdateLimits overwrites concurrency and/or RPM limits for multiple users.
 // POST /api/v1/admin/users/batch-limits
 type BatchUpdateLimitsRequest struct {
-	UserIDs     []int64 `json:"user_ids"`
-	All         bool    `json:"all"`
-	Concurrency *int    `json:"concurrency" binding:"omitempty,min=0"`
-	RPMLimit    *int    `json:"rpm_limit" binding:"omitempty,min=0"`
+	UserIDs           []int64 `json:"user_ids"`
+	All               bool    `json:"all"`
+	Concurrency       *int    `json:"concurrency" binding:"omitempty,min=0"`
+	OpenAIConcurrency *int    `json:"openai_concurrency" binding:"omitempty,min=0"`
+	RPMLimit          *int    `json:"rpm_limit" binding:"omitempty,min=0"`
 }
 
 func (h *UserHandler) BatchUpdateLimits(c *gin.Context) {
@@ -628,8 +641,8 @@ func (h *UserHandler) BatchUpdateLimits(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
-	if req.Concurrency == nil && req.RPMLimit == nil {
-		response.BadRequest(c, "at least one of concurrency or rpm_limit is required")
+	if req.Concurrency == nil && req.OpenAIConcurrency == nil && req.RPMLimit == nil {
+		response.BadRequest(c, "at least one of concurrency, openai_concurrency or rpm_limit is required")
 		return
 	}
 	if !req.All && len(req.UserIDs) == 0 {
@@ -667,12 +680,18 @@ func (h *UserHandler) BatchUpdateLimits(c *gin.Context) {
 		return
 	}
 
-	affected, err := h.adminService.BatchUpdateLimits(
-		c.Request.Context(),
-		userIDs,
-		req.Concurrency,
-		req.RPMLimit,
-	)
+	var affected int
+	var err error
+	if req.OpenAIConcurrency == nil {
+		affected, err = h.adminService.BatchUpdateLimits(c.Request.Context(), userIDs, req.Concurrency, req.RPMLimit)
+	} else if updater, ok := h.adminService.(interface {
+		BatchUpdateLimitsWithOpenAI(context.Context, []int64, *int, *int, *int) (int, error)
+	}); ok {
+		affected, err = updater.BatchUpdateLimitsWithOpenAI(c.Request.Context(), userIDs, req.Concurrency, req.OpenAIConcurrency, req.RPMLimit)
+	} else {
+		response.BadRequest(c, "OpenAI concurrency updates unavailable")
+		return
+	}
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

@@ -1,3 +1,5 @@
+> Aerisun 定制部署统一收录网关、工具、供应商池和 CPU 推理组件，维护分支为 `aerisun`。目录、运维、加密备份和恢复说明见 [deployment/README.md](deployment/README.md)。
+
 <div align="center">
 
 <img src="assets/logo.svg" alt="Sub2API Logo" width="128" />

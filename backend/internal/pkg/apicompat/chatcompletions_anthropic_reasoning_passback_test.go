@@ -127,11 +127,11 @@ func TestAnthropicChatBridge_MatchesResponsesChatBridgeReasoningPlacement(t *tes
 		"两条桥对等价历史必须产出同样的 reasoning_content 位置")
 }
 
-// 作用域守卫：不带工具调用的纯文本轮次维持现状(与兄弟桥一致 —— reasoning 只随
-// 工具调用回传)，避免把 reasoning_content 撒到不需要它的上游请求上。
+// Unrelated OpenAI models still omit non-tool thinking history. Domestic
+// passback models are covered separately because they require the full history.
 func TestAnthropicToChatCompletionsRequest_ThinkingWithoutToolCallsStaysDropped(t *testing.T) {
 	req := &AnthropicRequest{
-		Model:     "deepseek-v4-flash",
+		Model:     "gpt-5.5",
 		MaxTokens: 100,
 		Messages: []AnthropicMessage{
 			{Role: "assistant", Content: json.RawMessage(
@@ -148,6 +148,17 @@ func TestAnthropicToChatCompletionsRequest_ThinkingWithoutToolCallsStaysDropped(
 	payload, err := json.Marshal(out)
 	require.NoError(t, err)
 	require.NotContains(t, string(payload), "reasoning_content")
+}
+
+func TestAnthropicNvidiaModelsPreserveNonToolThinkingHistory(t *testing.T) {
+	for _, model := range []string{"glm-5.3-flash", "nemotron-3.5-lightning-30b-a3b", "step-5-preview"} {
+		req := &AnthropicRequest{Model: model, Messages: []AnthropicMessage{
+			{Role: "assistant", Content: json.RawMessage(`[{"type":"thinking","thinking":"retain history"},{"type":"text","text":"answer"}]`)},
+		}}
+		out, err := AnthropicToChatCompletionsRequest(req)
+		require.NoError(t, err)
+		require.Equal(t, "retain history", out.Messages[0].ReasoningContent)
+	}
 }
 
 func TestAnthropicThinkingToReasoningContent(t *testing.T) {

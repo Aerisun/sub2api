@@ -60,7 +60,8 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 	account *Account,
 	body []byte,
 	defaultMappedModel string,
-) (*OpenAIForwardResult, error) {
+) (result *OpenAIForwardResult, err error) {
+	defer func() { attachGLMVisionUsage(c, result) }()
 	startTime := time.Now()
 
 	// 1. Parse minimal fields needed for routing/billing
@@ -93,6 +94,11 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 	}
 	if normalizedBody, normalized := NormalizeGLMOpenAIReasoningEffort(upstreamBody, upstreamModel); normalized {
 		upstreamBody = normalizedBody
+	}
+	upstreamBody, err = prepareDomesticChatControls(upstreamBody, body, upstreamModel, "chat", account)
+	if err != nil {
+		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		return nil, err
 	}
 
 	// 4. Apply OpenAI fast policy on the CC body
@@ -245,8 +251,10 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 		s.updateGrokUsageFromResponse(withGrokTeamRateLimitModel(ctx, upstreamModel), account, resp.Header, resp.StatusCode)
 	}
 
+	upstreamModel = resolvePoolUpstreamModel(account, resp.Header, upstreamModel)
+	SetOpsUpstreamModel(c, upstreamModel)
+
 	// 8. Forward response
-	var result *OpenAIForwardResult
 	var forwardErr error
 	if clientStream {
 		result, forwardErr = s.streamRawChatCompletions(c, resp, account, originalModel, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime, len(body))
@@ -305,6 +313,8 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	pendingLines := make([]string, 0, 8)
 	refusalDetector := newOpenAIChatSilentRefusalDetector(requestBodyLen)
 	var terminal openAIRawStreamTerminalState
+	recognition := c.GetInt("standard_tool.image_recognition_count") > 0
+	var recognitionFinished, recognitionUsage, recognitionFailed bool
 
 	writeLine := func(line string) {
 		if clientDisconnected {
@@ -344,6 +354,10 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 		if payload, ok := extractOpenAISSEDataLine(line); ok {
 			trimmedPayload := strings.TrimSpace(payload)
 			terminal.ObserveDataLine(trimmedPayload)
+			if recognition {
+				recognitionFinished, recognitionUsage, recognitionFailed = observeRecognitionCompletion(
+					trimmedPayload, recognitionFinished, recognitionUsage, recognitionFailed)
+			}
 			if trimmedPayload != "[DONE]" {
 				observer.ObserveOpenAI([]byte(payload), strings.TrimSpace(gjson.Get(payload, "type").String()))
 				usageOnlyChunk := isOpenAIChatUsageOnlyStreamChunk(payload)
@@ -404,6 +418,16 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	clientAborted := clientDisconnected ||
 		errors.Is(scanErr, context.Canceled) ||
 		errors.Is(scanErr, context.DeadlineExceeded)
+	// A tool recognition is charged per completed image. A provider error,
+	// partial usage, [DONE] alone, or a downstream disconnect cannot turn an
+	// unfinished image into a successful billed recognition.
+	if recognition && (recognitionFailed || !recognitionFinished || !recognitionUsage) {
+		cause := scanErr
+		if cause == nil {
+			cause = ErrOpenAIUpstreamStreamTruncated
+		}
+		return resultWithUsage(), newOpenAIUpstreamStreamReadError(cause)
+	}
 
 	// 上游在任何终止信号之前结束：连接被 reset（scanErr != nil）或干净 EOF。
 	// 两者都不能再记成功——此前统一返回 nil error，把上游截断伪装成

@@ -11,6 +11,7 @@ import (
 )
 
 var codexModelMap = map[string]string{
+	"gpt-6.1-sol":          "gpt-6.1-sol",
 	"gpt-6-sol":            "gpt-6-sol",
 	"gpt-6-luna":           "gpt-6-luna",
 	"gpt-6-astra":          "gpt-6-astra",
@@ -62,6 +63,7 @@ var codexVersionModelPrefixes = []struct {
 	prefix string
 	target string
 }{
+	{prefix: "gpt-6.1-sol", target: "gpt-6.1-sol"},
 	{prefix: "gpt-6-sol", target: "gpt-6-sol"},
 	{prefix: "gpt-6-luna", target: "gpt-6-luna"},
 	{prefix: "gpt-5.6-sol", target: "gpt-5.6-sol"},
@@ -1069,6 +1071,9 @@ func ensureOpenAIResponsesImageGenerationTool(reqBody map[string]any) bool {
 	tool := map[string]any{
 		"type":          "image_generation",
 		"output_format": "png",
+	}
+	if model := firstNonEmptyString(reqBody["model"]); isOpenAIGPT6Model(model) || isOpenAIGPT56Model(model) {
+		tool["model"] = "gpt-image-2.5-flare"
 	}
 
 	rawTools, ok := reqBody["tools"]

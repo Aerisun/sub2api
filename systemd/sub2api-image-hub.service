@@ -1,0 +1,16 @@
+[Unit]
+Description=Aerisun image hub and RightAPI drawing adapter
+After=network-online.target sub2api.service
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=@ROOT@
+ExecStart=/usr/bin/python3 -m image_hub.server
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

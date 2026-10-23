@@ -138,10 +138,8 @@ func AnthropicToResponsesResponse(resp *AnthropicResponse) *ResponsesResponse {
 		TotalTokens:              totalInputTokens + resp.Usage.OutputTokens,
 		CacheCreationInputTokens: resp.Usage.CacheCreationInputTokens,
 	}
-	if resp.Usage.CacheReadInputTokens > 0 {
-		out.Usage.InputTokensDetails = &ResponsesInputTokensDetails{
-			CachedTokens: resp.Usage.CacheReadInputTokens,
-		}
+	out.Usage.InputTokensDetails = &ResponsesInputTokensDetails{
+		CachedTokens: resp.Usage.CacheReadInputTokens,
 	}
 
 	return out
@@ -651,10 +649,8 @@ func makeResponsesCompletedEvent(
 		TotalTokens:              totalInputTokens + state.OutputTokens,
 		CacheCreationInputTokens: state.CacheCreationInputTokens,
 	}
-	if state.CacheReadInputTokens > 0 {
-		usage.InputTokensDetails = &ResponsesInputTokensDetails{
-			CachedTokens: state.CacheReadInputTokens,
-		}
+	usage.InputTokensDetails = &ResponsesInputTokensDetails{
+		CachedTokens: state.CacheReadInputTokens,
 	}
 
 	eventType := "response.completed"

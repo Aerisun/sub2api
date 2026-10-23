@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/tidwall/gjson"
 )
 
 const (
@@ -67,7 +69,21 @@ func classifyOpenAIOAuth429(headers http.Header, responseBody []byte) (openAIOAu
 		resetAt := time.Unix(*resetUnix, 0)
 		return openAIOAuth429QuotaReset, &resetAt
 	}
+	for _, field := range []string{"error.code", "error.type"} {
+		switch gjson.GetBytes(responseBody, field).String() {
+		case "subscription_sharing_usage_limit_exceeded", "usage_limit_reached", "insufficient_quota":
+			return openAIOAuth429QuotaReset, nil
+		}
+	}
 	return openAIOAuth429Transient, nil
+}
+
+func openAIOAuth429RetriesDisabled(account *Account) bool {
+	if !isOpenAIOAuthAccount(account) {
+		return false
+	}
+	disabled, _ := account.Extra["openai_oauth_429_retry_disabled"].(bool)
+	return disabled
 }
 
 func openAIAccountStateContext(ctx context.Context) (context.Context, context.CancelFunc) {
@@ -155,6 +171,10 @@ func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Cont
 	if s.rateLimitService != nil && len(canonicalModel) > 0 && s.rateLimitService.HandleUpstreamModelNotFound(stateCtx, account, canonicalModel[0], statusCode, responseBody) {
 		return true
 	}
+	if poolManagesTransientErrors(account) && (statusCode == http.StatusTooManyRequests ||
+		shouldCooldownOpenAITransientUpstreamError(statusCode, responseBody)) {
+		return false
+	}
 	// Isolate a custom temporary-unschedulable match to the known upstream
 	// model before entering the generic account error path. This keeps the
 	// account available to other models and avoids the account runtime blocker.
@@ -240,6 +260,11 @@ func (s *OpenAIGatewayService) markOpenAIOAuth429RateLimited(ctx context.Context
 		}
 		cooldownUntil = now.Add(cooldown)
 	}
+	// Retry-After is a lower bound, including when it exceeds our local retry
+	// budget. Cool down the whole account so concurrent callers cannot hammer it.
+	if retryAt := parseRetryAfterResetTime(headers, now); retryAt != nil && retryAt.After(cooldownUntil) {
+		cooldownUntil = *retryAt
+	}
 	s.BlockAccountScheduling(account, cooldownUntil, "429")
 	s.openaiOAuth429RetryStartedAt.Delete(account.ID)
 }
@@ -278,7 +303,7 @@ func (s *OpenAIGatewayService) ShouldRetryOpenAIOAuth429(account *Account, heade
 }
 
 func (s *OpenAIGatewayService) openAIOAuth429RetryWindowActive(account *Account) bool {
-	if s == nil || !isOpenAIOAuthAccount(account) || account.IsShadow() {
+	if s == nil || !isOpenAIOAuthAccount(account) || account.IsShadow() || openAIOAuth429RetriesDisabled(account) {
 		return false
 	}
 	now := time.Now()

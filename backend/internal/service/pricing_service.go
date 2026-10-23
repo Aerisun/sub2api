@@ -272,18 +272,39 @@ func (s *PricingService) Initialize() error {
 		logger.LegacyPrintf("service.pricing", "[Pricing] Failed to create data directory: %v", err)
 	}
 
-	// 首次加载价格数据
-	if err := s.checkAndUpdatePricing(); err != nil {
-		logger.LegacyPrintf("service.pricing", "[Pricing] Initial load failed, using fallback: %v", err)
-		if err := s.useFallbackPricing(); err != nil {
-			return fmt.Errorf("failed to load pricing data: %w", err)
+	// A validated local catalog includes all fallback/override layers and can
+	// serve immediately. Remote freshness checks must not delay HTTP readiness.
+	warm := s.loadPricingData(s.getPricingFilePath()) == nil
+	if !warm {
+		if err := s.checkAndUpdatePricing(); err != nil {
+			logger.LegacyPrintf("service.pricing", "[Pricing] Initial load failed, using fallback: %v", err)
+			if err := s.useFallbackPricing(); err != nil {
+				return fmt.Errorf("failed to load pricing data: %w", err)
+			}
 		}
 	}
 
 	// 启动定时更新
 	s.startUpdateScheduler()
+	if warm && strings.TrimSpace(s.cfg.Pricing.RemoteURL) != "" {
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			select {
+			case <-s.stopCh:
+				return
+			default:
+			}
+			if err := s.syncWithRemote(); err != nil {
+				logger.LegacyPrintf("service.pricing", "[Pricing] Background startup sync failed: %v", err)
+			}
+		}()
+	}
 
-	logger.LegacyPrintf("service.pricing", "[Pricing] Service initialized with %d models", len(s.pricingData))
+	s.mu.RLock()
+	modelCount := len(s.pricingData)
+	s.mu.RUnlock()
+	logger.LegacyPrintf("service.pricing", "[Pricing] Service initialized with %d models", modelCount)
 	return nil
 }
 

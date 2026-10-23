@@ -1,3 +1,5 @@
+> Aerisun deployment: gateway, tools, provider pools and CPU inference operations are maintained together on the `aerisun` branch. See [deployment/README.md](deployment/README.md). Private state is excluded from Git and backed up with encryption.
+
 <div align="center">
 
 <img src="assets/logo.svg" alt="Sub2API Logo" width="128" />

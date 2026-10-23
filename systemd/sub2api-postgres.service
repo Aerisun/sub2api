@@ -1,0 +1,17 @@
+[Unit]
+Description=Sub2API PostgreSQL 18
+After=network.target
+
+[Service]
+WorkingDirectory=@ROOT@
+ExecStart=@ROOT@/runtime/bin/postgres -D @ROOT@/postgres_data -h 127.0.0.1 -p 55432 -k @ROOT@/postgres_socket
+Environment=TZ=Asia/Shanghai
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=60
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

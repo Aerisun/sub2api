@@ -43,6 +43,11 @@
         </div>
       </div>
       <div>
+        <label class="input-label">{{ t('admin.users.form.openaiConcurrency') }}</label>
+        <input v-model.number="form.openai_concurrency" type="number" min="0" step="1" class="input" />
+        <p class="input-hint">{{ t('admin.users.form.openaiConcurrencyHint') }}</p>
+      </div>
+      <div>
         <label class="input-label">{{ t('admin.users.form.rpmLimit') }}</label>
         <input
           v-model.number="form.rpm_limit"
@@ -82,13 +87,17 @@ const props = defineProps<{ show: boolean }>()
 const emit = defineEmits(['close', 'success']); const { t } = useI18n()
 const appStore = useAppStore()
 
-const form = reactive({ email: '', password: '', username: '', notes: '', role: 'user' as 'user' | 'admin', balance: '', concurrency: 1, rpm_limit: 0 })
+const form = reactive({ email: '', password: '', username: '', notes: '', role: 'user' as 'user' | 'admin', balance: '', concurrency: 1, openai_concurrency: 0, rpm_limit: 0 })
 
 const stepUp = useStepUp()
 const loading = ref(false)
 
 const submit = async () => {
   if (loading.value) return
+  if (!Number.isInteger(form.openai_concurrency) || form.openai_concurrency < 0) {
+    appStore.showError(t('admin.users.bulkLimits.nonNegativeInteger'))
+    return
+  }
   loading.value = true
   try {
     const { balance: rawBalance, ...rest } = { ...form }
@@ -116,7 +125,7 @@ const submit = async () => {
   } finally { loading.value = false }
 }
 
-watch(() => props.show, (v) => { if(v) Object.assign(form, { email: '', password: '', username: '', notes: '', role: 'user', balance: '', concurrency: 1, rpm_limit: 0 }) })
+watch(() => props.show, (v) => { if(v) Object.assign(form, { email: '', password: '', username: '', notes: '', role: 'user', balance: '', concurrency: 1, openai_concurrency: 0, rpm_limit: 0 }) })
 
 const generateRandomPassword = () => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%^&*'

@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" type="image/svg+xml" href="/sub2api/logo.svg">
+  <title>API 接入指南 · Aerisun-API</title>
+  <meta name="description" content="模型 ID、API 调用与客户端配置、Embedding / Rerank、识图 / 生图。">
+  <script src="/sub2api/api-docs.js?v=20261011-concise"></script>
+  <script src="/sub2api/api-guide-builder.js?v=codex-aerisun-20261023-v2" defer></script>
+  <link rel="stylesheet" href="/sub2api/assets/index-B5cvKWjl.css">
+  <link rel="stylesheet" href="/sub2api/api-docs.css?v=20261021-slim-2">
+<script id="model-context-limits" type="application/json">{"claude-sonnet-4-6": 250000, "claude-opus-4-6-thinking": 250000, "gemini-3.8-flash": 1048576, "glm-5.2": 1000000, "glm-5.3": 1000000, "kimi-k3": 1048576, "deepseek-v4.1-flash": 1000000, "qwen3.8-flash": 1000000, "qwen3.8-max": 1000000, "Nemotron-3.5": 1000000, "gpt-6.1-sol": 1050000, "gpt-6-astra": 1050000, "gpt-6-sol": 1050000, "gpt-6-luna": 1050000, "gpt-5.6-sol": 1050000, "gpt-5.6-terra": 1050000, "gpt-5.6-luna": 1050000}</script>
+</head>
+<body>
+  <a class="docs-skip" href="#main">跳到正文</a>
+  <header class="docs-topbar"><div class="docs-topbar-inner"><a class="docs-brand" href="/sub2api/home" target="_top"><img class="docs-site-logo" src="/sub2api/logo.svg" width="32" height="32" alt=""><span class="docs-site-name">Aerisun-API</span></a><button class="docs-theme-toggle" type="button" aria-label="切换到深色模式" title="切换到深色模式"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.9 13.1A9 9 0 0 1 10.9 3.1a9 9 0 1 0 10 10Z"></path></svg></button></div></header>
+  <div class="docs-layout docs-guide-layout">
+    <aside class="docs-sidebar docs-guide-sidebar"><nav class="docs-sidenav" aria-label="页内导航"><a href="#models">模型 ID</a><a href="#direct">直接调用</a><a href="#python">Python</a><a href="#claude">Claude Code</a><a href="#vscode">VS Code 扩展</a><a href="#codex">Codex</a><a href="#opencode">OpenCode</a><a href="#ccswitch">CC Switch</a><a href="#embedding">Embedding / Rerank</a><a href="#vision">工具</a><a href="#supplement">补充介绍</a></nav></aside>
+    <main id="main">
+      <div class="docs-intro"><h1>API 接入指南</h1></div>
+      <dl class="docs-facts card">
+        <div class="docs-fact"><dt>接口地址</dt><dd><code>https://aerisun.top/sub2api</code><button class="docs-copy btn btn-secondary" type="button" data-copy="https://aerisun.top/sub2api">复制</button></dd></div>
+      </dl>
+      <section class="docs-guide-section" id="models" data-guide-builder="key">
+<h2>模型 ID</h2>
+<p>点击 ID 复制。</p>
+<div class="docs-model-tools"><label class="docs-search-label" for="models-search">搜索模型 <span class="docs-count" id="models-count" aria-live="polite">19 个模型</span></label><input class="input" id="models-search" type="search" placeholder="搜索名称或 ID" autocomplete="off"></div>
+<div class="docs-model-catalog">
+<!-- MODEL_IDS_START -->
+<div class="docs-model-group"><h3>Codex</h3><div class="docs-model-ids"><button class="docs-model-id docs-copy btn btn-secondary" type="button" data-model-id="gpt-5.6-luna" data-model-search="codex gpt-5.6-luna" data-copy="gpt-5.6-luna" aria-label="复制 gpt-5.6-luna">gpt-5.6-luna</button><button class="docs-model-id docs-copy btn btn-secondary" type="button" data-model-id="gpt-5.6-sol" data-model-search="codex gpt-5.6-sol" data-copy="gpt-5.6-sol" aria-label="复制 gpt-5.6-sol">gpt-5.6-sol</button><button class="docs-model-id docs-copy btn btn-secondary" type="button" data-model-id="gpt-5.6-terra" data-model-search="codex gpt-5.6-terra" data-copy="gpt-5.6-terra" aria-label="复制 gpt-5.6-terra">gpt-5.6-terra</button><button class="docs-model-id docs-copy btn btn-secondary" type="button" data-model-id="gpt-6-astra" data-model-search="codex gpt-6-astra" data-copy="gpt-6-astra" aria-label="复制 gpt-6-astra">gpt-6-astra</button><button class="docs-model-id docs-copy btn btn-secondary" type="button" data-model-id="gpt-6-luna" data-model-search="codex gpt-6-luna" data-copy="gpt-6-luna" aria-label="复制 gpt-6-luna">gpt-6-luna</button><button class="docs-model-id docs-copy btn btn-secondary" type="button" data-model-id="gpt-6-sol" data-model-search="codex gpt-6-sol" data-copy="gpt-6-sol" aria-label="复制 gpt-6-sol">gpt-6-sol</button><button class="docs-model-id docs-copy btn btn-secondary" type="button" data-model-id="gpt-6.1-sol" data-model-search="codex gpt-6.1-sol" data-copy="gpt-6.1-sol" aria-label="复制 gpt-6.1-sol">gpt-6.1-sol</button></div></div>
+<div class="docs-model-group"><h3>Claude</h3><div class="docs-model-ids"><button class="docs-model-id docs-copy btn btn-secondary" type="button" data-model-id="claude-opus-4-6-thinking" data-model-search="claude claude-opus-4-6-thinking" data-copy="claude-opus-4-6-thinking" aria-label="复制 claude-opus-4-6-thinking">claude-opus-4-6-thinking</button><button class="docs-model-id docs-copy btn btn-secondary" type="button" data-model-id="claude-sonnet-4-6" data-model-search="claude claude-sonnet-4-6" data-copy="claude-sonnet-4-6" aria-label="复制 claude-sonnet-4-6">claude-sonnet-4-6</button></div></div>
+<div class="docs-model-group"><h3>Kimi</h3><div class="docs-model-ids"><button class="docs-model-id docs-copy btn btn-secondary" type="button" data-model-id="kimi-k3" data-model-search="kimi kimi-k3" data-copy="kimi-k3" aria-label="复制 kimi-k3">kimi-k3</button></div></div>
+<div class="docs-model-group"><h3>GLM</h3><div class="docs-model-ids"><button class="docs-model-id docs-copy btn btn-secondary" type="button" data-model-id="glm-5.2" data-model-search="glm glm-5.2" data-copy="glm-5.2" aria-label="复制 glm-5.2">glm-5.2</button><button class="docs-model-id docs-copy btn btn-secondary" type="button" data-model-id="glm-5.3" data-model-search="glm glm-5.3" data-copy="glm-5.3" aria-label="复制 glm-5.3">glm-5.3</button></div></div>
+<div class="docs-model-group"><h3>DeepSeek</h3><div class="docs-model-ids"><button class="docs-model-id docs-copy btn btn-secondary" type="button" data-model-id="deepseek-v4.1-flash" data-model-search="deepseek deepseek-v4.1-flash" data-copy="deepseek-v4.1-flash" aria-label="复制 deepseek-v4.1-flash">deepseek-v4.1-flash</button></div></div>
+<div class="docs-model-group"><h3>Qwen</h3><div class="docs-model-ids"><button class="docs-model-id docs-copy btn btn-secondary" type="button" data-model-id="qwen3-embedding-4b" data-model-search="qwen qwen3-embedding-4b" data-copy="qwen3-embedding-4b" aria-label="复制 qwen3-embedding-4b">qwen3-embedding-4b</button><button class="docs-model-id docs-copy btn btn-secondary" type="button" data-model-id="qwen3-reranker-4b" data-model-search="qwen qwen3-reranker-4b" data-copy="qwen3-reranker-4b" aria-label="复制 qwen3-reranker-4b">qwen3-reranker-4b</button><button class="docs-model-id docs-copy btn btn-secondary" type="button" data-model-id="qwen3.8-flash" data-model-search="qwen qwen3.8-flash" data-copy="qwen3.8-flash" aria-label="复制 qwen3.8-flash">qwen3.8-flash</button><button class="docs-model-id docs-copy btn btn-secondary" type="button" data-model-id="qwen3.8-max" data-model-search="qwen qwen3.8-max" data-copy="qwen3.8-max" aria-label="复制 qwen3.8-max">qwen3.8-max</button></div></div>
+<div class="docs-model-group"><h3>Gemini</h3><div class="docs-model-ids"><button class="docs-model-id docs-copy btn btn-secondary" type="button" data-model-id="gemini-3.8-flash" data-model-search="gemini gemini-3.8-flash" data-copy="gemini-3.8-flash" aria-label="复制 gemini-3.8-flash">gemini-3.8-flash</button></div></div>
+<div class="docs-model-group"><h3>NVIDIA</h3><div class="docs-model-ids"><button class="docs-model-id docs-copy btn btn-secondary" type="button" data-model-id="Nemotron-3.5" data-model-search="nvidia nemotron-3.5" data-copy="Nemotron-3.5" aria-label="复制 Nemotron-3.5">Nemotron-3.5</button></div></div>
+<!-- MODEL_IDS_END -->
+</div>
+<p class="docs-model-empty" id="models-empty" hidden>没有匹配的模型，请换个关键词。</p>
+<details class="docs-details"><summary>查询当前密钥可用的模型</summary><div><div class="docs-codebox docs-command-box" data-command-box>
+  <div class="docs-codebar docs-command-bar">
+    <div class="docs-command-tabs" role="tablist" aria-label="查询模型的操作系统">
+      <button type="button" role="tab" id="models-tab-linux" aria-controls="models-panel-linux" aria-selected="true" tabindex="0" data-command-os="linux">Linux / macOS</button>
+      <button type="button" role="tab" id="models-tab-windows" aria-controls="models-panel-windows" aria-selected="false" tabindex="-1" data-command-os="windows">Windows</button>
+    </div>
+    <button class="docs-copy btn btn-secondary" type="button" data-target="models-code">复制命令</button>
+  </div>
+  <div class="docs-command-panel" role="tabpanel" id="models-panel-linux" aria-labelledby="models-tab-linux" data-command-panel="linux"><pre><code id="models-code">export SUB2API_API_KEY='sk-REPLACE_WITH_YOUR_API_KEY'
+
+curl 'https://aerisun.top/sub2api/models' \
+  -H "Authorization: Bearer $SUB2API_API_KEY"</code></pre></div>
+  <div class="docs-command-panel" role="tabpanel" id="models-panel-windows" aria-labelledby="models-tab-windows" data-command-panel="windows" hidden><pre><code id="models-windows-code">$env:SUB2API_API_KEY = 'sk-REPLACE_WITH_YOUR_API_KEY'
+
+$models = Invoke-RestMethod -Uri 'https://aerisun.top/sub2api/models' `
+  -Headers @{Authorization = "Bearer $env:SUB2API_API_KEY"}
+
+$models.data | Select-Object -ExpandProperty id</code></pre></div>
+</div></div></details>
+</section>
+<section class="docs-guide-section" id="direct" data-guide-builder="chat">
+<h2>直接调用</h2>
+
+
+<div class="docs-codebox docs-command-box" data-command-box>
+  <div class="docs-codebar docs-command-bar">
+    <div class="docs-command-tabs" role="tablist" aria-label="直接调用的操作系统">
+      <button type="button" role="tab" id="direct-tab-linux" aria-controls="direct-panel-linux" aria-selected="true" tabindex="0" data-command-os="linux">Linux / macOS</button>
+      <button type="button" role="tab" id="direct-tab-windows" aria-controls="direct-panel-windows" aria-selected="false" tabindex="-1" data-command-os="windows">Windows</button>
+    </div>
+    <button class="docs-copy btn btn-secondary" type="button" data-target="direct-code">复制命令</button>
+  </div>
+  <div class="docs-command-panel" role="tabpanel" id="direct-panel-linux" aria-labelledby="direct-tab-linux" data-command-panel="linux"><pre><code id="direct-code">export SUB2API_API_KEY='sk-REPLACE_WITH_YOUR_API_KEY'
+
+curl 'https://aerisun.top/sub2api/chat/completions' \
+  -H "Authorization: Bearer $SUB2API_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "glm-5.2",
+    "messages": [{"role": "user", "content": "你好"}]
+  }'</code></pre></div>
+  <div class="docs-command-panel" role="tabpanel" id="direct-panel-windows" aria-labelledby="direct-tab-windows" data-command-panel="windows" hidden><pre><code id="direct-windows-code">$env:SUB2API_API_KEY = 'sk-REPLACE_WITH_YOUR_API_KEY'
+
+$body = @{
+  model = 'glm-5.2'
+  messages = @(@{role = 'user'; content = '你好'})
+} | ConvertTo-Json -Depth 6
+
+$reply = Invoke-RestMethod -Uri 'https://aerisun.top/sub2api/chat/completions' `
+  -Method Post -Headers @{Authorization = "Bearer $env:SUB2API_API_KEY"} `
+  -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($body))
+
+$reply.choices[0].message.content</code></pre></div>
+</div>
+</section>
+<section class="docs-guide-section" id="python" data-guide-builder="chat">
+<h2>Python</h2>
+<h3 class="docs-step">1. 安装依赖，设置密钥</h3><div class="docs-codebox docs-command-box" data-command-box>
+  <div class="docs-codebar docs-command-bar">
+    <div class="docs-command-tabs" role="tablist" aria-label="安装 Python 依赖的操作系统">
+      <button type="button" role="tab" id="pip-tab-linux" aria-controls="pip-panel-linux" aria-selected="true" tabindex="0" data-command-os="linux">Linux / macOS</button>
+      <button type="button" role="tab" id="pip-tab-windows" aria-controls="pip-panel-windows" aria-selected="false" tabindex="-1" data-command-os="windows">Windows</button>
+    </div>
+    <button class="docs-copy btn btn-secondary" type="button" data-target="pip-code">复制命令</button>
+  </div>
+  <div class="docs-command-panel" role="tabpanel" id="pip-panel-linux" aria-labelledby="pip-tab-linux" data-command-panel="linux"><pre><code id="pip-code">python3 -m pip install openai
+export SUB2API_API_KEY='sk-REPLACE_WITH_YOUR_API_KEY'</code></pre></div>
+  <div class="docs-command-panel" role="tabpanel" id="pip-panel-windows" aria-labelledby="pip-tab-windows" data-command-panel="windows" hidden><pre><code id="pip-windows-code">py -m pip install openai
+$env:SUB2API_API_KEY = 'sk-REPLACE_WITH_YOUR_API_KEY'</code></pre></div>
+</div><h3 class="docs-step">2. 保存为 example.py</h3><div class="docs-codebox">
+  <div class="docs-codebar"><span>example.py</span><button class="docs-copy btn btn-secondary" type="button" data-target="python-code">复制代码</button></div>
+  <pre><code id="python-code">import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ["SUB2API_API_KEY"],
+    base_url="https://aerisun.top/sub2api",
+)
+reply = client.chat.completions.create(
+    model="glm-5.2",
+    messages=[{"role": "user", "content": "你好"}],
+)
+print(reply.choices[0].message.content)</code></pre>
+</div><h3 class="docs-step">3. 在同一终端运行</h3><div class="docs-codebox docs-command-box" data-command-box>
+  <div class="docs-codebar docs-command-bar">
+    <div class="docs-command-tabs" role="tablist" aria-label="运行 Python的操作系统">
+      <button type="button" role="tab" id="python-run-tab-linux" aria-controls="python-run-panel-linux" aria-selected="true" tabindex="0" data-command-os="linux">Linux / macOS</button>
+      <button type="button" role="tab" id="python-run-tab-windows" aria-controls="python-run-panel-windows" aria-selected="false" tabindex="-1" data-command-os="windows">Windows</button>
+    </div>
+    <button class="docs-copy btn btn-secondary" type="button" data-target="python-run-code">复制命令</button>
+  </div>
+  <div class="docs-command-panel" role="tabpanel" id="python-run-panel-linux" aria-labelledby="python-run-tab-linux" data-command-panel="linux"><pre><code id="python-run-code">python3 example.py</code></pre></div>
+  <div class="docs-command-panel" role="tabpanel" id="python-run-panel-windows" aria-labelledby="python-run-tab-windows" data-command-panel="windows" hidden><pre><code id="python-run-windows-code">py example.py</code></pre></div>
+</div>
+</section>
+<section class="docs-guide-section" id="claude" data-guide-builder="cli">
+<h2>Claude Code</h2>
+<h3 class="docs-step">1. 安装 Claude Code</h3><div class="docs-codebox docs-command-box" data-command-box>
+  <div class="docs-codebar docs-command-bar">
+    <div class="docs-command-tabs" role="tablist" aria-label="安装 Claude Code的操作系统">
+      <button type="button" role="tab" id="claude-install-tab-linux" aria-controls="claude-install-panel-linux" aria-selected="true" tabindex="0" data-command-os="linux">Linux / macOS</button>
+      <button type="button" role="tab" id="claude-install-tab-windows" aria-controls="claude-install-panel-windows" aria-selected="false" tabindex="-1" data-command-os="windows">Windows</button>
+    </div>
+    <button class="docs-copy btn btn-secondary" type="button" data-target="claude-install-code">复制命令</button>
+  </div>
+  <div class="docs-command-panel" role="tabpanel" id="claude-install-panel-linux" aria-labelledby="claude-install-tab-linux" data-command-panel="linux"><pre><code id="claude-install-code">curl -fsSL https://claude.ai/install.sh | bash
+claude --version</code></pre></div>
+  <div class="docs-command-panel" role="tabpanel" id="claude-install-panel-windows" aria-labelledby="claude-install-tab-windows" data-command-panel="windows" hidden><pre><code id="claude-install-windows-code">irm https://claude.ai/install.ps1 | iex
+claude --version</code></pre></div>
+</div><h3 class="docs-step">2. 配置并启动</h3><div class="docs-codebox docs-command-box" data-command-box>
+  <div class="docs-codebar docs-command-bar">
+    <div class="docs-command-tabs" role="tablist" aria-label="配置 Claude Code的操作系统">
+      <button type="button" role="tab" id="claude-tab-linux" aria-controls="claude-panel-linux" aria-selected="true" tabindex="0" data-command-os="linux">Linux / macOS</button>
+      <button type="button" role="tab" id="claude-tab-windows" aria-controls="claude-panel-windows" aria-selected="false" tabindex="-1" data-command-os="windows">Windows</button>
+    </div>
+    <button class="docs-copy btn btn-secondary" type="button" data-target="claude-code">复制命令</button>
+  </div>
+  <div class="docs-command-panel" role="tabpanel" id="claude-panel-linux" aria-labelledby="claude-tab-linux" data-command-panel="linux"><pre><code id="claude-code">export ANTHROPIC_AUTH_TOKEN='sk-REPLACE_WITH_YOUR_API_KEY'
+export ANTHROPIC_BASE_URL='https://aerisun.top/sub2api'
+export API_TIMEOUT_MS='9000000'
+export CLAUDE_CODE_AUTO_COMPACT_WINDOW='200000'
+export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC='1'
+export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS='1'
+export ANTHROPIC_MODEL='claude-sonnet-4-6'
+export ANTHROPIC_DEFAULT_OPUS_MODEL='claude-sonnet-4-6'
+export ANTHROPIC_DEFAULT_HAIKU_MODEL='claude-sonnet-4-6'
+export ANTHROPIC_DEFAULT_SONNET_MODEL='claude-sonnet-4-6'
+export CLAUDE_CODE_SUBAGENT_MODEL='claude-sonnet-4-6'
+
+IS_SANDBOX=1 claude --dangerously-skip-permissions</code></pre></div>
+  <div class="docs-command-panel" role="tabpanel" id="claude-panel-windows" aria-labelledby="claude-tab-windows" data-command-panel="windows" hidden><pre><code id="claude-windows-code">$env:ANTHROPIC_AUTH_TOKEN = 'sk-REPLACE_WITH_YOUR_API_KEY'
+$env:ANTHROPIC_BASE_URL = 'https://aerisun.top/sub2api'
+$env:API_TIMEOUT_MS = '9000000'
+$env:CLAUDE_CODE_AUTO_COMPACT_WINDOW = '200000'
+$env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = '1'
+$env:CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = '1'
+$env:ANTHROPIC_MODEL = 'claude-sonnet-4-6'
+$env:ANTHROPIC_DEFAULT_OPUS_MODEL = 'claude-sonnet-4-6'
+$env:ANTHROPIC_DEFAULT_HAIKU_MODEL = 'claude-sonnet-4-6'
+$env:ANTHROPIC_DEFAULT_SONNET_MODEL = 'claude-sonnet-4-6'
+$env:CLAUDE_CODE_SUBAGENT_MODEL = 'claude-sonnet-4-6'
+
+$env:IS_SANDBOX = '1'
+claude --dangerously-skip-permissions</code></pre></div>
+</div><details class="docs-details"><summary>保存到用户配置</summary><div><p>保存到 <code>~/.claude/settings.json</code>（Windows：<code>%USERPROFILE%\.claude\settings.json</code>），合并已有 <code>env</code> 字段。</p><div class="docs-codebox">
+  <div class="docs-codebar"><span>~/.claude/settings.json</span><button class="docs-copy btn btn-secondary" type="button" data-target="claude-settings-code">复制代码</button></div>
+  <pre><code id="claude-settings-code">{
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "sk-REPLACE_WITH_YOUR_API_KEY",
+    "ANTHROPIC_BASE_URL": "https://aerisun.top/sub2api",
+    "API_TIMEOUT_MS": "9000000",
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "200000",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "ANTHROPIC_MODEL": "claude-sonnet-4-6",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-sonnet-4-6",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-sonnet-4-6",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-6",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "claude-sonnet-4-6"
+  }
+}</code></pre>
+</div></div></details>
+</section>
+<section class="docs-guide-section" id="vscode" data-guide-builder="config">
+<h2>VS Code · <span class="docs-nobreak">Claude 扩展</span></h2>
+<h3 class="docs-step">1. 安装扩展</h3><p>安装 Anthropic 的 <code>Claude Code</code> 扩展。命令面板执行 <code>Preferences: Open User Settings (JSON)</code>；SSH / WSL / 容器打开远端设置。</p><div class="docs-screenshots">
+  <figure class="docs-screenshot"><a href="/sub2api/guide-images/vscode-claude-extension.png" target="_blank" rel="noopener noreferrer" aria-label="查看扩展设置入口大图"><img src="/sub2api/guide-images/vscode-claude-extension.png" width="579" height="651" loading="lazy" decoding="async" alt="Claude Code for VS Code 扩展的齿轮菜单，Settings 入口已标红"></a><figcaption>扩展设置</figcaption></figure>
+  <figure class="docs-screenshot"><a href="/sub2api/guide-images/vscode-claude-settings.png" target="_blank" rel="noopener noreferrer" aria-label="查看编辑配置入口大图"><img src="/sub2api/guide-images/vscode-claude-settings.png" width="1001" height="871" loading="lazy" decoding="async" alt="Claude Code 设置页的 Environment Variables 区域，Edit in settings.json 入口已标红"></a><figcaption>用户配置入口</figcaption></figure>
+</div>
+<h3 class="docs-step">2. 填写用户配置</h3>
+
+<p>合并到上一步打开的 <code>settings.json</code>。</p>
+<div class="docs-codebox"><div class="docs-codebar"><span>VS Code · 用户 settings.json</span><button class="docs-copy btn btn-secondary" type="button" data-target="vscode-code">复制配置</button></div><pre><code id="vscode-code">{
+  "security.workspace.trust.untrustedFiles": "open",
+  "claudeCode.preferredLocation": "panel",
+  "claudeCode.disableLoginPrompt": true,
+  "claudeCode.environmentVariables": [
+    {"name": "ANTHROPIC_AUTH_TOKEN", "value": "sk-REPLACE_WITH_YOUR_API_KEY"},
+    {"name": "ANTHROPIC_BASE_URL", "value": "https://aerisun.top/sub2api"},
+    {"name": "ANTHROPIC_MODEL", "value": "claude-sonnet-4-6"},
+    {"name": "ANTHROPIC_DEFAULT_HAIKU_MODEL", "value": "claude-sonnet-4-6"},
+    {"name": "ANTHROPIC_DEFAULT_OPUS_MODEL", "value": "claude-sonnet-4-6"},
+    {"name": "ANTHROPIC_DEFAULT_SONNET_MODEL", "value": "claude-sonnet-4-6"},
+    {"name": "CLAUDE_CODE_SUBAGENT_MODEL", "value": "claude-sonnet-4-6"}
+  ],
+  "claudeCode.allowDangerouslySkipPermissions": true,
+  "claudeCode.enableNewConversationShortcut": true,
+  "claudeCode.initialPermissionMode": "bypassPermissions"
+}</code></pre></div>
+
+<h3 class="docs-step">3. 重新加载</h3><p>执行 <code>Developer: Reload Window</code>，新建对话。</p>
+</section>
+<section class="docs-guide-section" id="codex" data-guide-builder="cli">
+<h2>Codex</h2>
+<h3 class="docs-step">1. 安装 Codex</h3><div class="docs-codebox docs-command-box" data-command-box>
+  <div class="docs-codebar docs-command-bar">
+    <div class="docs-command-tabs" role="tablist" aria-label="安装 Codex的操作系统">
+      <button type="button" role="tab" id="codex-install-tab-linux" aria-controls="codex-install-panel-linux" aria-selected="true" tabindex="0" data-command-os="linux">Linux / macOS</button>
+      <button type="button" role="tab" id="codex-install-tab-windows" aria-controls="codex-install-panel-windows" aria-selected="false" tabindex="-1" data-command-os="windows">Windows</button>
+    </div>
+    <button class="docs-copy btn btn-secondary" type="button" data-target="codex-install-code">复制命令</button>
+  </div>
+  <div class="docs-command-panel" role="tabpanel" id="codex-install-panel-linux" aria-labelledby="codex-install-tab-linux" data-command-panel="linux"><pre><code id="codex-install-code">npm install -g @openai/codex
+codex --version
+</code></pre></div>
+  <div class="docs-command-panel" role="tabpanel" id="codex-install-panel-windows" aria-labelledby="codex-install-tab-windows" data-command-panel="windows" hidden><pre><code id="codex-install-windows-code">npm install -g @openai/codex
+codex --version
+</code></pre></div>
+</div><h3 class="docs-step">2. 编辑 config.toml 并填写密钥</h3><p>保存到 <code>~/.codex/config.toml</code>（Windows：<code>%USERPROFILE%\.codex\config.toml</code>），更新同名字段。SSH 终端请保存到服务器当前账号的用户目录。</p><div class="docs-codebox">
+  <div class="docs-codebar"><span>~/.codex/config.toml</span><button class="docs-copy btn btn-secondary" type="button" data-target="codex-code">复制代码</button></div>
+  <pre><code id="codex-code">model_provider = "aerisun"
+model = "gpt-6.1-sol"
+model_reasoning_effort = "xhigh"
+service_tier = "fast"
+personality = "friendly"
+model_reasoning_summary = "detailed"
+model_verbosity = "high"
+web_search = "live"
+
+[notice]
+hide_rate_limit_model_nudge = true
+fast_default_opt_out = true
+
+[features]
+fast_mode = true
+
+[tui]
+status_line = ["model-with-reasoning", "fast-mode"]
+status_line_use_colors = true
+screen_reader_detection_done = true
+
+[model_providers]
+[model_providers.aerisun]
+name = "Aerisun-API"
+base_url = "https://aerisun.top/sub2api"
+wire_api = "responses"
+requires_openai_auth = false
+experimental_bearer_token = "sk-REPLACE_WITH_YOUR_API_KEY"</code></pre>
+</div><h3 class="docs-step">3. 启动</h3><div class="docs-codebox docs-command-box" data-command-box>
+  <div class="docs-codebar docs-command-bar">
+    <div class="docs-command-tabs" role="tablist" aria-label="启动 Codex的操作系统">
+      <button type="button" role="tab" id="codex-run-tab-linux" aria-controls="codex-run-panel-linux" aria-selected="true" tabindex="0" data-command-os="linux">Linux / macOS</button>
+      <button type="button" role="tab" id="codex-run-tab-windows" aria-controls="codex-run-panel-windows" aria-selected="false" tabindex="-1" data-command-os="windows">Windows</button>
+    </div>
+    <button class="docs-copy btn btn-secondary" type="button" data-target="codex-run-code">复制命令</button>
+  </div>
+  <div class="docs-command-panel" role="tabpanel" id="codex-run-panel-linux" aria-labelledby="codex-run-tab-linux" data-command-panel="linux"><pre><code id="codex-run-code">codex</code></pre></div>
+  <div class="docs-command-panel" role="tabpanel" id="codex-run-panel-windows" aria-labelledby="codex-run-tab-windows" data-command-panel="windows" hidden><pre><code id="codex-run-windows-code">codex</code></pre></div>
+</div>
+<p>底部状态栏显示 <code>Fast on</code> / <code>Fast off</code>；输入 <code>/fast</code> 切换档位。本站 Fast 按标准 Token 单价的 3 倍计费。</p>
+</section>
+<section class="docs-guide-section" id="opencode" data-guide-builder="config">
+<h2>OpenCode</h2>
+<h3 class="docs-step">1. 安装，设置密钥</h3><div class="docs-codebox docs-command-box" data-command-box>
+  <div class="docs-codebar docs-command-bar">
+    <div class="docs-command-tabs" role="tablist" aria-label="安装 OpenCode的操作系统">
+      <button type="button" role="tab" id="opencode-install-tab-linux" aria-controls="opencode-install-panel-linux" aria-selected="true" tabindex="0" data-command-os="linux">Linux / macOS</button>
+      <button type="button" role="tab" id="opencode-install-tab-windows" aria-controls="opencode-install-panel-windows" aria-selected="false" tabindex="-1" data-command-os="windows">Windows</button>
+    </div>
+    <button class="docs-copy btn btn-secondary" type="button" data-target="opencode-install-code">复制命令</button>
+  </div>
+  <div class="docs-command-panel" role="tabpanel" id="opencode-install-panel-linux" aria-labelledby="opencode-install-tab-linux" data-command-panel="linux"><pre><code id="opencode-install-code">npm install -g opencode-ai
+export SUB2API_API_KEY='sk-REPLACE_WITH_YOUR_API_KEY'</code></pre></div>
+  <div class="docs-command-panel" role="tabpanel" id="opencode-install-panel-windows" aria-labelledby="opencode-install-tab-windows" data-command-panel="windows" hidden><pre><code id="opencode-install-windows-code">npm install -g opencode-ai
+$env:SUB2API_API_KEY = 'sk-REPLACE_WITH_YOUR_API_KEY'</code></pre></div>
+</div><h3 class="docs-step">2. 保存配置</h3><p>保存到 <code>~/.config/opencode/opencode.json</code>（Windows：<code>%USERPROFILE%\.config\opencode\opencode.json</code>），合并 <code>provider</code>。</p><details class="docs-details docs-config-details"><summary>展开 OpenCode 配置</summary><div><div class="docs-codebox">
+  <div class="docs-codebar"><span>~/.config/opencode/opencode.json</span><button class="docs-copy btn btn-secondary" type="button" data-target="opencode-config-code">复制代码</button></div>
+  <pre><code id="opencode-config-code">{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "aerisun/gpt-6-sol",
+  "provider": {
+    "aerisun": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Aerisun-API",
+      "options": {
+        "baseURL": "https://aerisun.top/sub2api",
+        "apiKey": "{env:SUB2API_API_KEY}"
+      },
+      "models": {
+        "gpt-5.6-luna": {"name": "gpt-5.6-luna", "limit": {"context": 1050000, "output": 128000}, "reasoning": true, "options": {"reasoningEffort": "medium"}, "variants": {"low": {"reasoningEffort": "low"}, "medium": {"reasoningEffort": "medium"}, "high": {"reasoningEffort": "high"}, "xhigh": {"reasoningEffort": "xhigh"}, "max": {"reasoningEffort": "max"}, "off": {"reasoningEffort": "none"}}, "modalities": {"input": ["text", "image"], "output": ["text"]}},
+        "gpt-5.6-sol": {"name": "gpt-5.6-sol", "limit": {"context": 1050000, "output": 128000}, "reasoning": true, "options": {"reasoningEffort": "medium"}, "variants": {"low": {"reasoningEffort": "low"}, "medium": {"reasoningEffort": "medium"}, "high": {"reasoningEffort": "high"}, "xhigh": {"reasoningEffort": "xhigh"}, "max": {"reasoningEffort": "max"}, "off": {"reasoningEffort": "none"}}, "modalities": {"input": ["text", "image"], "output": ["text"]}},
+        "gpt-5.6-terra": {"name": "gpt-5.6-terra", "limit": {"context": 1050000, "output": 128000}, "reasoning": true, "options": {"reasoningEffort": "medium"}, "variants": {"low": {"reasoningEffort": "low"}, "medium": {"reasoningEffort": "medium"}, "high": {"reasoningEffort": "high"}, "xhigh": {"reasoningEffort": "xhigh"}, "max": {"reasoningEffort": "max"}, "off": {"reasoningEffort": "none"}}, "modalities": {"input": ["text", "image"], "output": ["text"]}},
+        "gpt-6-astra": {"name": "gpt-6-astra", "limit": {"context": 1050000, "output": 128000}, "reasoning": true, "options": {"reasoningEffort": "medium"}, "variants": {"low": {"reasoningEffort": "low"}, "medium": {"reasoningEffort": "medium"}, "high": {"reasoningEffort": "high"}, "xhigh": {"reasoningEffort": "xhigh"}, "max": {"reasoningEffort": "max"}}, "modalities": {"input": ["text", "image"], "output": ["text"]}},
+        "gpt-6-luna": {"name": "gpt-6-luna", "limit": {"context": 1050000, "output": 128000}, "reasoning": true, "options": {"reasoningEffort": "medium"}, "variants": {"low": {"reasoningEffort": "low"}, "medium": {"reasoningEffort": "medium"}, "high": {"reasoningEffort": "high"}, "xhigh": {"reasoningEffort": "xhigh"}, "max": {"reasoningEffort": "max"}, "off": {"reasoningEffort": "none"}}, "modalities": {"input": ["text", "image"], "output": ["text"]}},
+        "gpt-6-sol": {"name": "gpt-6-sol", "limit": {"context": 1050000, "output": 128000}, "reasoning": true, "options": {"reasoningEffort": "medium"}, "variants": {"low": {"reasoningEffort": "low"}, "medium": {"reasoningEffort": "medium"}, "high": {"reasoningEffort": "high"}, "xhigh": {"reasoningEffort": "xhigh"}, "max": {"reasoningEffort": "max"}, "off": {"reasoningEffort": "none"}}, "modalities": {"input": ["text", "image"], "output": ["text"]}},
+        "gpt-6.1-sol": {"name": "gpt-6.1-sol", "limit": {"context": 1050000, "output": 128000}, "reasoning": true, "options": {"reasoningEffort": "medium"}, "variants": {"low": {"reasoningEffort": "low"}, "medium": {"reasoningEffort": "medium"}, "high": {"reasoningEffort": "high"}, "xhigh": {"reasoningEffort": "xhigh"}, "max": {"reasoningEffort": "max"}}, "modalities": {"input": ["text", "image"], "output": ["text"]}},
+        "claude-opus-4-6-thinking": {"name": "claude-opus-4-6-thinking", "limit": {"context": 250000, "output": 64000}, "reasoning": true, "options": {"reasoningEffort": "low"}, "variants": {"auto": {"reasoningEffort": "auto"}, "low": {"reasoningEffort": "low"}, "medium": {"reasoningEffort": "medium"}, "high": {"reasoningEffort": "high"}, "xhigh": {"reasoningEffort": "xhigh"}, "max": {"reasoningEffort": "max"}}, "modalities": {"input": ["text", "image"], "output": ["text"]}},
+        "claude-sonnet-4-6": {"name": "claude-sonnet-4-6", "limit": {"context": 250000, "output": 64000}, "reasoning": true, "options": {"reasoningEffort": "low"}, "variants": {"auto": {"reasoningEffort": "auto"}, "low": {"reasoningEffort": "low"}, "medium": {"reasoningEffort": "medium"}, "high": {"reasoningEffort": "high"}, "xhigh": {"reasoningEffort": "xhigh"}, "max": {"reasoningEffort": "max"}, "off": {"reasoningEffort": "none"}}, "modalities": {"input": ["text", "image"], "output": ["text"]}},
+        "kimi-k3": {"name": "kimi-k3", "limit": {"context": 1048576, "output": 1048576}, "reasoning": true, "options": {"reasoningEffort": "low"}, "variants": {"auto": {"reasoningEffort": "auto"}, "low": {"reasoningEffort": "low"}, "medium": {"reasoningEffort": "medium"}, "high": {"reasoningEffort": "high"}, "xhigh": {"reasoningEffort": "xhigh"}, "max": {"reasoningEffort": "max"}}, "modalities": {"input": ["text", "image"], "output": ["text"]}},
+        "glm-5.2": {"name": "glm-5.2", "limit": {"context": 1000000, "output": 128000}, "modalities": {"input": ["text", "image"], "output": ["text"]}},
+        "glm-5.3": {"name": "glm-5.3", "limit": {"context": 1000000, "output": 128000}, "reasoning": true, "options": {"reasoningEffort": "low"}, "variants": {"auto": {"reasoningEffort": "auto"}, "low": {"reasoningEffort": "low"}, "medium": {"reasoningEffort": "medium"}, "high": {"reasoningEffort": "high"}, "xhigh": {"reasoningEffort": "xhigh"}, "max": {"reasoningEffort": "max"}}, "modalities": {"input": ["text", "image"], "output": ["text"]}},
+        "deepseek-v4.1-flash": {"name": "deepseek-v4.1-flash", "limit": {"context": 1000000, "output": 384000}, "reasoning": true, "options": {"reasoningEffort": "low"}, "variants": {"auto": {"reasoningEffort": "auto"}, "low": {"reasoningEffort": "low"}, "medium": {"reasoningEffort": "medium"}, "high": {"reasoningEffort": "high"}, "xhigh": {"reasoningEffort": "xhigh"}, "max": {"reasoningEffort": "max"}, "off": {"reasoningEffort": "none"}}, "modalities": {"input": ["text", "image"], "output": ["text"]}},
+        "qwen3.8-flash": {"name": "qwen3.8-flash", "limit": {"context": 1000000, "output": 128000}, "modalities": {"input": ["text", "image"], "output": ["text"]}},
+        "qwen3.8-max": {"name": "qwen3.8-max", "limit": {"context": 1000000, "output": 128000}, "modalities": {"input": ["text", "image"], "output": ["text"]}},
+        "gemini-3.8-flash": {"name": "gemini-3.8-flash", "limit": {"context": 1048576, "output": 65536}, "reasoning": true, "options": {"reasoningEffort": "low"}, "variants": {"low": {"reasoningEffort": "low"}, "medium": {"reasoningEffort": "medium"}, "high": {"reasoningEffort": "high"}, "auto": {"reasoningEffort": "auto"}}, "modalities": {"input": ["text", "image"], "output": ["text"]}},
+        "Nemotron-3.5": {"name": "Nemotron-3.5", "limit": {"context": 1000000, "output": 128000}, "reasoning": true, "options": {"reasoningEffort": "low"}, "variants": {"auto": {"reasoningEffort": "auto"}, "low": {"reasoningEffort": "low"}, "medium": {"reasoningEffort": "medium"}, "high": {"reasoningEffort": "high"}, "xhigh": {"reasoningEffort": "xhigh"}, "max": {"reasoningEffort": "max"}, "off": {"reasoningEffort": "none"}}, "modalities": {"input": ["text", "image"], "output": ["text"]}}
+      }
+    }
+  }
+}</code></pre>
+</div></div></details><h3 class="docs-step">3. 启动，选择模型</h3><div class="docs-codebox docs-command-box" data-command-box>
+  <div class="docs-codebar docs-command-bar">
+    <div class="docs-command-tabs" role="tablist" aria-label="启动 OpenCode的操作系统">
+      <button type="button" role="tab" id="opencode-run-tab-linux" aria-controls="opencode-run-panel-linux" aria-selected="true" tabindex="0" data-command-os="linux">Linux / macOS</button>
+      <button type="button" role="tab" id="opencode-run-tab-windows" aria-controls="opencode-run-panel-windows" aria-selected="false" tabindex="-1" data-command-os="windows">Windows</button>
+    </div>
+    <button class="docs-copy btn btn-secondary" type="button" data-target="opencode-run-code">复制命令</button>
+  </div>
+  <div class="docs-command-panel" role="tabpanel" id="opencode-run-panel-linux" aria-labelledby="opencode-run-tab-linux" data-command-panel="linux"><pre><code id="opencode-run-code">opencode</code></pre></div>
+  <div class="docs-command-panel" role="tabpanel" id="opencode-run-panel-windows" aria-labelledby="opencode-run-tab-windows" data-command-panel="windows" hidden><pre><code id="opencode-run-windows-code">opencode</code></pre></div>
+</div><p>输入 <code>/models</code> 切换模型。</p>
+</section>
+<section class="docs-guide-section" id="ccswitch" data-guide-builder="config">
+<h2>CC Switch</h2>
+<h3 class="docs-step">1. 安装，选择应用</h3><p>下载安装 <a href="https://github.com/farion1231/cc-switch/releases" target="_blank" rel="noopener noreferrer">CC Switch</a>，选择已安装的 Claude Code、Codex 或 OpenCode。</p><h3 class="docs-step">2. 添加供应商</h3><p>点击 <code>+</code> → “应用专属供应商” → “自定义”，填写本站密钥，地址用 <code>https://aerisun.top/sub2api</code>。OpenCode 类型选 <code>OpenAI Compatible</code>。</p><div class="docs-tablewrap"><table class="docs-params"><thead><tr><th scope="col">应用</th><th scope="col">上游格式</th></tr></thead><tbody><tr><td>Claude Code</td><td>Anthropic Messages</td></tr><tr><td>Codex</td><td>OpenAI Responses</td></tr><tr><td>OpenCode</td><td>OpenAI Chat Completions</td></tr></tbody></table></div><h3 class="docs-step">3. 保存，启用</h3><p>保存并启用供应商，重启对应工具。</p>
+</section>
+<section class="docs-guide-section" id="embedding" data-guide-builder="embedding">
+<h2>Embedding / Rerank</h2>
+<h3 class="docs-step">Embedding · 直接调用</h3>
+<div class="docs-codebox docs-command-box" data-command-box><div class="docs-codebar docs-command-bar"><div class="docs-command-tabs" role="tablist" aria-label="Embedding调用的操作系统"><button type="button" role="tab" id="embedding-tab-linux" aria-controls="embedding-panel-linux" aria-selected="true" tabindex="0" data-command-os="linux">Linux / macOS</button><button type="button" role="tab" id="embedding-tab-windows" aria-controls="embedding-panel-windows" aria-selected="false" tabindex="-1" data-command-os="windows">Windows</button></div><button class="docs-copy btn btn-secondary" type="button" data-target="embedding-code">复制命令</button></div><div class="docs-command-panel" role="tabpanel" id="embedding-panel-linux" aria-labelledby="embedding-tab-linux" data-command-panel="linux"><pre><code id="embedding-code">export SUB2API_API_KEY='sk-REPLACE_WITH_YOUR_API_KEY'
+
+curl 'https://aerisun.top/sub2api/embeddings' \
+  -H "Authorization: Bearer $SUB2API_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "qwen3-embedding-4b",
+    "input": ["杭州西湖", "语义检索"],
+    "encoding_format": "float"
+  }'</code></pre></div><div class="docs-command-panel" role="tabpanel" id="embedding-panel-windows" aria-labelledby="embedding-tab-windows" data-command-panel="windows" hidden><pre><code id="embedding-windows-code">$env:SUB2API_API_KEY = 'sk-REPLACE_WITH_YOUR_API_KEY'
+
+$body = @{
+  model = 'qwen3-embedding-4b'
+  input = @('杭州西湖', '语义检索')
+  encoding_format = 'float'
+} | ConvertTo-Json -Depth 6
+
+$result = Invoke-RestMethod -Uri 'https://aerisun.top/sub2api/embeddings' `
+  -Method Post -Headers @{Authorization = "Bearer $env:SUB2API_API_KEY"} `
+  -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($body))
+
+$result.data | ConvertTo-Json -Depth 6</code></pre></div></div>
+<h3 class="docs-step" id="rerank">Rerank · 直接调用</h3>
+<div class="docs-codebox docs-command-box" data-command-box><div class="docs-codebar docs-command-bar"><div class="docs-command-tabs" role="tablist" aria-label="Rerank调用的操作系统"><button type="button" role="tab" id="rerank-tab-linux" aria-controls="rerank-panel-linux" aria-selected="true" tabindex="0" data-command-os="linux">Linux / macOS</button><button type="button" role="tab" id="rerank-tab-windows" aria-controls="rerank-panel-windows" aria-selected="false" tabindex="-1" data-command-os="windows">Windows</button></div><button class="docs-copy btn btn-secondary" type="button" data-target="rerank-code">复制命令</button></div><div class="docs-command-panel" role="tabpanel" id="rerank-panel-linux" aria-labelledby="rerank-tab-linux" data-command-panel="linux"><pre><code id="rerank-code">export SUB2API_API_KEY='sk-REPLACE_WITH_YOUR_API_KEY'
+
+curl 'https://aerisun.top/sub2api/rerank' \
+  -H "Authorization: Bearer $SUB2API_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "qwen3-reranker-4b",
+    "query": "杭州的景点",
+    "documents": ["北京故宫", "杭州西湖", "上海外滩"],
+    "top_n": 1
+  }'</code></pre></div><div class="docs-command-panel" role="tabpanel" id="rerank-panel-windows" aria-labelledby="rerank-tab-windows" data-command-panel="windows" hidden><pre><code id="rerank-windows-code">$env:SUB2API_API_KEY = 'sk-REPLACE_WITH_YOUR_API_KEY'
+
+$body = @{
+  model = 'qwen3-reranker-4b'
+  query = '杭州的景点'
+  documents = @('北京故宫', '杭州西湖', '上海外滩')
+  top_n = 1
+} | ConvertTo-Json -Depth 6
+
+$result = Invoke-RestMethod -Uri 'https://aerisun.top/sub2api/rerank' `
+  -Method Post -Headers @{Authorization = "Bearer $env:SUB2API_API_KEY"} `
+  -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($body))
+
+$result.results | Select-Object index, relevance_score</code></pre></div></div>
+<details class="docs-details"><summary>Python 示例</summary><div><p>保存为 <code>vectors.py</code>，运行 <code>python3 vectors.py</code>（Windows：<code>py vectors.py</code>）。无需额外依赖。</p><div class="docs-codebox"><div class="docs-codebar"><span>vectors.py · 向量与重排</span><button class="docs-copy btn btn-secondary" type="button" data-target="embedding-python-code">复制代码</button></div><pre><code id="embedding-python-code">import json
+from urllib.request import Request, urlopen
+
+API_KEY = "sk-REPLACE_WITH_YOUR_API_KEY"
+BASE_URL = "https://aerisun.top/sub2api"
+
+def post(endpoint, body):
+    request = Request(
+        f"{BASE_URL}/{endpoint}",
+        data=json.dumps(body).encode("utf-8"),
+        headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
+    )
+    with urlopen(request) as response:
+        return json.load(response)
+
+vectors = post("embeddings", {
+    "model": "qwen3-embedding-4b",
+    "input": ["杭州西湖", "语义检索"],
+})
+print(vectors["data"][0]["embedding"])
+
+ranking = post("rerank", {
+    "model": "qwen3-reranker-4b",
+    "query": "杭州的景点",
+    "documents": ["北京故宫", "杭州西湖", "上海外滩"],
+    "top_n": 1,
+})
+print(ranking["results"])</code></pre></div></div></details>
+</section>
+
+
+
+<section class="docs-guide-section" id="vision" data-guide-builder="tools"><h2>工具</h2><div class="docs-codebox docs-command-box" data-command-box><div class="docs-codebar docs-command-bar"><div class="docs-command-tabs" role="tablist" aria-label="密钥的操作系统"><button type="button" role="tab" id="tools-key-tab-linux" aria-controls="tools-key-panel-linux" aria-selected="true" tabindex="0" data-command-os="linux">Linux / macOS</button><button type="button" role="tab" id="tools-key-tab-windows" aria-controls="tools-key-panel-windows" aria-selected="false" tabindex="-1" data-command-os="windows">Windows</button></div><button class="docs-copy btn btn-secondary" type="button" data-target="tools-key-code">复制命令</button></div><div class="docs-command-panel" role="tabpanel" id="tools-key-panel-linux" aria-labelledby="tools-key-tab-linux" data-command-panel="linux"><pre><code id="tools-key-code">export SUB2API_API_KEY='sk-REPLACE_WITH_YOUR_API_KEY'</code></pre></div><div class="docs-command-panel" role="tabpanel" id="tools-key-panel-windows" aria-labelledby="tools-key-tab-windows" data-command-panel="windows" hidden><pre><code id="tools-key-windows-code">$env:SUB2API_API_KEY = 'sk-REPLACE_WITH_YOUR_API_KEY'</code></pre></div></div><div data-tool-panel="image_generation"><h3 class="docs-step">生图</h3><div class="docs-codebox docs-command-box" data-command-box><div class="docs-codebar docs-command-bar"><div class="docs-command-tabs" role="tablist" aria-label="生图的操作系统"><button type="button" role="tab" id="image-generation-tab-linux" aria-controls="image-generation-panel-linux" aria-selected="true" tabindex="0" data-command-os="linux">Linux / macOS</button><button type="button" role="tab" id="image-generation-tab-windows" aria-controls="image-generation-panel-windows" aria-selected="false" tabindex="-1" data-command-os="windows">Windows</button></div><button class="docs-copy btn btn-secondary" type="button" data-target="image-generation-code">复制命令</button></div><div class="docs-command-panel" role="tabpanel" id="image-generation-panel-linux" aria-labelledby="image-generation-tab-linux" data-command-panel="linux"><pre><code id="image-generation-code">curl -sS https://aerisun.top/sub2api/v1/tools/image_generation</code></pre></div><div class="docs-command-panel" role="tabpanel" id="image-generation-panel-windows" aria-labelledby="image-generation-tab-windows" data-command-panel="windows" hidden><pre><code id="image-generation-windows-code">Invoke-RestMethod -Method Post -Uri https://aerisun.top/sub2api/v1/tools/image_generation</code></pre></div></div><h3 class="docs-step">生图任务查询</h3><div class="docs-codebox docs-command-box" data-command-box><div class="docs-codebar docs-command-bar"><div class="docs-command-tabs" role="tablist" aria-label="生图任务查询的操作系统"><button type="button" role="tab" id="image-poll-tab-linux" aria-controls="image-poll-panel-linux" aria-selected="true" tabindex="0" data-command-os="linux">Linux / macOS</button><button type="button" role="tab" id="image-poll-tab-windows" aria-controls="image-poll-panel-windows" aria-selected="false" tabindex="-1" data-command-os="windows">Windows</button></div><button class="docs-copy btn btn-secondary" type="button" data-target="image-poll-code">复制命令</button></div><div class="docs-command-panel" role="tabpanel" id="image-poll-panel-linux" aria-labelledby="image-poll-tab-linux" data-command-panel="linux"><pre><code id="image-poll-code">{"task_id":"imgtask_…","wait_seconds":30}</code></pre></div><div class="docs-command-panel" role="tabpanel" id="image-poll-panel-windows" aria-labelledby="image-poll-tab-windows" data-command-panel="windows" hidden><pre><code id="image-poll-windows-code">@{ task_id = "imgtask_…"; wait_seconds = 30 }</code></pre></div></div><p>提交一次；查询同一任务不收费。</p></div><div data-tool-panel="image_recognition" hidden><h3 class="docs-step">识图</h3><p>每次一张图片；多图请并行调用，按 $0.002/张计费。</p><div class="docs-codebox docs-command-box" data-command-box><div class="docs-codebar docs-command-bar"><div class="docs-command-tabs" role="tablist" aria-label="识图的操作系统"><button type="button" role="tab" id="vision-tab-linux" aria-controls="vision-panel-linux" aria-selected="true" tabindex="0" data-command-os="linux">Linux / macOS</button><button type="button" role="tab" id="vision-tab-windows" aria-controls="vision-panel-windows" aria-selected="false" tabindex="-1" data-command-os="windows">Windows</button></div><button class="docs-copy btn btn-secondary" type="button" data-target="vision-code">复制命令</button></div><div class="docs-command-panel" role="tabpanel" id="vision-panel-linux" aria-labelledby="vision-tab-linux" data-command-panel="linux"><pre><code id="vision-code">curl -sS https://aerisun.top/sub2api/v1/tools/image_recognition</code></pre></div><div class="docs-command-panel" role="tabpanel" id="vision-panel-windows" aria-labelledby="vision-tab-windows" data-command-panel="windows" hidden><pre><code id="vision-windows-code">Invoke-RestMethod -Method Post -Uri https://aerisun.top/sub2api/v1/tools/image_recognition</code></pre></div></div></div><div data-tool-panel="web_search" hidden><h3 class="docs-step">联网搜索</h3><div class="docs-codebox docs-command-box" data-command-box><div class="docs-codebar docs-command-bar"><div class="docs-command-tabs" role="tablist" aria-label="联网搜索的操作系统"><button type="button" role="tab" id="tools-search-tab-linux" aria-controls="tools-search-panel-linux" aria-selected="true" tabindex="0" data-command-os="linux">Linux / macOS</button><button type="button" role="tab" id="tools-search-tab-windows" aria-controls="tools-search-panel-windows" aria-selected="false" tabindex="-1" data-command-os="windows">Windows</button></div><button class="docs-copy btn btn-secondary" type="button" data-target="tools-search-code">复制命令</button></div><div class="docs-command-panel" role="tabpanel" id="tools-search-panel-linux" aria-labelledby="tools-search-tab-linux" data-command-panel="linux"><pre><code id="tools-search-code">curl -sS https://aerisun.top/sub2api/v1/tools/web_search</code></pre></div><div class="docs-command-panel" role="tabpanel" id="tools-search-panel-windows" aria-labelledby="tools-search-tab-windows" data-command-panel="windows" hidden><pre><code id="tools-search-windows-code">Invoke-RestMethod -Method Post -Uri https://aerisun.top/sub2api/v1/tools/web_search</code></pre></div></div><p>每次实时检索。</p></div></section>
+<section class="docs-guide-section" id="supplement" data-guide-builder="key">
+<h2>补充介绍</h2>
+<h3 class="docs-step" id="cache-usage">缓存</h3>
+<p>缓存用量按上游返回；大于 0 表示命中，字段缺失表示上游未报告。同一会话保留完整历史及稳定的系统提示、工具定义。</p>
+<div class="docs-tablewrap"><table class="docs-params"><thead><tr><th>接口</th><th>缓存 Token 字段</th></tr></thead><tbody>
+<tr><td>Chat Completions</td><td><code>usage.prompt_tokens_details.cached_tokens</code></td></tr>
+<tr><td>Responses</td><td><code>usage.input_tokens_details.cached_tokens</code></td></tr>
+<tr><td>Messages</td><td><code>usage.cache_read_input_tokens</code>（读取）<br><code>usage.cache_creation_input_tokens</code>（写入）</td></tr>
+</tbody></table></div>
+<p>Embedding / Rerank 的结果缓存查看 <code>Cache-Status</code> 响应头：<code>hit</code> 命中，<code>fwd=miss</code> 未命中，<code>collapsed</code> 合并相同在途请求，<code>fwd=bypass</code> 跳过缓存。结果复用仍按完整输入 Token 计费。</p>
+<h3 class="docs-step" id="streaming">流式</h3>
+<p>请求加 <code>"stream": true</code>。Chat Completions 如需用量，同时加 <code>"stream_options": {"include_usage": true}</code>。</p>
+<p>思考增量：Chat Completions 读取 <code>delta.reasoning_content</code>，Messages 读取 <code>thinking_delta</code>，Responses 读取 <code>response.reasoning_summary_text.delta</code>。仅显示上游实际返回的内容。</p>
+<p>流式用量：Responses 读取 <code>response.completed</code> 中的 <code>response.usage</code>；Messages 合并 <code>message_start.message.usage</code> 与 <code>message_delta.usage</code>。</p>
+
+<h3 class="docs-step" id="internal-tools">内部工具</h3>
+<p>聊天可按需调用联网搜索和生图。Claude / Gemini 图片直接随消息发送，无需识图工具。</p>
+<p>工具过程通过独立的 <code>event: aerisun.tool</code> 返回；非流式查看 <code>aerisun_tools</code>。网页聊天会显示工具进度和结果。</p>
+<p>独立调用：<a href="#vision">生图、识图、联网命令</a>；<code>GET /v1/tools</code> 查看定义。MCP 地址：<code>https://aerisun.top/sub2api/v1/tools/mcp</code>，使用本站密钥 Bearer 认证。</p>
+<p>每次搜索均实时检索，不缓存搜索结果。</p>
+<h3 class="docs-step">思考强度与 Fast</h3>
+<p>用 <code>reasoning_effort</code> 设置思考强度。Claude Code / VS Code 可在模型菜单调整。</p>
+<p>Claude 默认 Low；支持 Medium、High、XHigh、Max、Auto。Sonnet 支持关闭思考；显式 <code>thinking.budget_tokens</code> 优先。</p>
+<p>Gemini 3.8 Flash 默认 Low；支持 Medium、High、Auto。XHigh / Max 映射 High，Auto 由上游动态分配。</p>
+<p>客户端工具使用 <code>tools</code>、<code>tool_choice</code>；保留工具结果后继续对话。</p>
+<p id="codex-fast">Codex Fast：请求加 <code>"service_tier": "fast"</code>，费用为标准模式的 3 倍；与思考强度分别设置。</p>
+
+</section>
+
+
+
+</main>
+  </div>
+  <div class="docs-toast" id="copy-toast" role="status" aria-live="polite"></div>
+</body>
+</html>

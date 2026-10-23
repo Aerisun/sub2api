@@ -108,51 +108,53 @@ const (
 // APIKeyMutation represents an operation that mutates the APIKey nodes in the graph.
 type APIKeyMutation struct {
 	config
-	op                 Op
-	typ                string
-	id                 *int64
-	created_at         *time.Time
-	updated_at         *time.Time
-	deleted_at         *time.Time
-	key                *string
-	name               *string
-	status             *string
-	last_used_at       *time.Time
-	ip_whitelist       *[]string
-	appendip_whitelist []string
-	ip_blacklist       *[]string
-	appendip_blacklist []string
-	quota              *float64
-	addquota           *float64
-	quota_used         *float64
-	addquota_used      *float64
-	expires_at         *time.Time
-	rate_limit_5h      *float64
-	addrate_limit_5h   *float64
-	rate_limit_1d      *float64
-	addrate_limit_1d   *float64
-	rate_limit_7d      *float64
-	addrate_limit_7d   *float64
-	usage_5h           *float64
-	addusage_5h        *float64
-	usage_1d           *float64
-	addusage_1d        *float64
-	usage_7d           *float64
-	addusage_7d        *float64
-	window_5h_start    *time.Time
-	window_1d_start    *time.Time
-	window_7d_start    *time.Time
-	clearedFields      map[string]struct{}
-	user               *int64
-	cleareduser        bool
-	group              *int64
-	clearedgroup       bool
-	usage_logs         map[int64]struct{}
-	removedusage_logs  map[int64]struct{}
-	clearedusage_logs  bool
-	done               bool
-	oldValue           func(context.Context) (*APIKey, error)
-	predicates         []predicate.APIKey
+	op                   Op
+	typ                  string
+	id                   *int64
+	created_at           *time.Time
+	updated_at           *time.Time
+	deleted_at           *time.Time
+	key                  *string
+	name                 *string
+	status               *string
+	last_used_at         *time.Time
+	ip_whitelist         *[]string
+	appendip_whitelist   []string
+	ip_blacklist         *[]string
+	appendip_blacklist   []string
+	allowed_models       *[]string
+	appendallowed_models []string
+	quota                *float64
+	addquota             *float64
+	quota_used           *float64
+	addquota_used        *float64
+	expires_at           *time.Time
+	rate_limit_5h        *float64
+	addrate_limit_5h     *float64
+	rate_limit_1d        *float64
+	addrate_limit_1d     *float64
+	rate_limit_7d        *float64
+	addrate_limit_7d     *float64
+	usage_5h             *float64
+	addusage_5h          *float64
+	usage_1d             *float64
+	addusage_1d          *float64
+	usage_7d             *float64
+	addusage_7d          *float64
+	window_5h_start      *time.Time
+	window_1d_start      *time.Time
+	window_7d_start      *time.Time
+	clearedFields        map[string]struct{}
+	user                 *int64
+	cleareduser          bool
+	group                *int64
+	clearedgroup         bool
+	usage_logs           map[int64]struct{}
+	removedusage_logs    map[int64]struct{}
+	clearedusage_logs    bool
+	done                 bool
+	oldValue             func(context.Context) (*APIKey, error)
+	predicates           []predicate.APIKey
 }
 
 var _ ent.Mutation = (*APIKeyMutation)(nil)
@@ -744,6 +746,71 @@ func (m *APIKeyMutation) ResetIPBlacklist() {
 	m.ip_blacklist = nil
 	m.appendip_blacklist = nil
 	delete(m.clearedFields, apikey.FieldIPBlacklist)
+}
+
+// SetAllowedModels sets the "allowed_models" field.
+func (m *APIKeyMutation) SetAllowedModels(s []string) {
+	m.allowed_models = &s
+	m.appendallowed_models = nil
+}
+
+// AllowedModels returns the value of the "allowed_models" field in the mutation.
+func (m *APIKeyMutation) AllowedModels() (r []string, exists bool) {
+	v := m.allowed_models
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAllowedModels returns the old "allowed_models" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldAllowedModels(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAllowedModels is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAllowedModels requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAllowedModels: %w", err)
+	}
+	return oldValue.AllowedModels, nil
+}
+
+// AppendAllowedModels adds s to the "allowed_models" field.
+func (m *APIKeyMutation) AppendAllowedModels(s []string) {
+	m.appendallowed_models = append(m.appendallowed_models, s...)
+}
+
+// AppendedAllowedModels returns the list of values that were appended to the "allowed_models" field in this mutation.
+func (m *APIKeyMutation) AppendedAllowedModels() ([]string, bool) {
+	if len(m.appendallowed_models) == 0 {
+		return nil, false
+	}
+	return m.appendallowed_models, true
+}
+
+// ClearAllowedModels clears the value of the "allowed_models" field.
+func (m *APIKeyMutation) ClearAllowedModels() {
+	m.allowed_models = nil
+	m.appendallowed_models = nil
+	m.clearedFields[apikey.FieldAllowedModels] = struct{}{}
+}
+
+// AllowedModelsCleared returns if the "allowed_models" field was cleared in this mutation.
+func (m *APIKeyMutation) AllowedModelsCleared() bool {
+	_, ok := m.clearedFields[apikey.FieldAllowedModels]
+	return ok
+}
+
+// ResetAllowedModels resets all changes to the "allowed_models" field.
+func (m *APIKeyMutation) ResetAllowedModels() {
+	m.allowed_models = nil
+	m.appendallowed_models = nil
+	delete(m.clearedFields, apikey.FieldAllowedModels)
 }
 
 // SetQuota sets the "quota" field.
@@ -1532,7 +1599,7 @@ func (m *APIKeyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *APIKeyMutation) Fields() []string {
-	fields := make([]string, 0, 23)
+	fields := make([]string, 0, 24)
 	if m.created_at != nil {
 		fields = append(fields, apikey.FieldCreatedAt)
 	}
@@ -1565,6 +1632,9 @@ func (m *APIKeyMutation) Fields() []string {
 	}
 	if m.ip_blacklist != nil {
 		fields = append(fields, apikey.FieldIPBlacklist)
+	}
+	if m.allowed_models != nil {
+		fields = append(fields, apikey.FieldAllowedModels)
 	}
 	if m.quota != nil {
 		fields = append(fields, apikey.FieldQuota)
@@ -1632,6 +1702,8 @@ func (m *APIKeyMutation) Field(name string) (ent.Value, bool) {
 		return m.IPWhitelist()
 	case apikey.FieldIPBlacklist:
 		return m.IPBlacklist()
+	case apikey.FieldAllowedModels:
+		return m.AllowedModels()
 	case apikey.FieldQuota:
 		return m.Quota()
 	case apikey.FieldQuotaUsed:
@@ -1687,6 +1759,8 @@ func (m *APIKeyMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldIPWhitelist(ctx)
 	case apikey.FieldIPBlacklist:
 		return m.OldIPBlacklist(ctx)
+	case apikey.FieldAllowedModels:
+		return m.OldAllowedModels(ctx)
 	case apikey.FieldQuota:
 		return m.OldQuota(ctx)
 	case apikey.FieldQuotaUsed:
@@ -1796,6 +1870,13 @@ func (m *APIKeyMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetIPBlacklist(v)
+		return nil
+	case apikey.FieldAllowedModels:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAllowedModels(v)
 		return nil
 	case apikey.FieldQuota:
 		v, ok := value.(float64)
@@ -2025,6 +2106,9 @@ func (m *APIKeyMutation) ClearedFields() []string {
 	if m.FieldCleared(apikey.FieldIPBlacklist) {
 		fields = append(fields, apikey.FieldIPBlacklist)
 	}
+	if m.FieldCleared(apikey.FieldAllowedModels) {
+		fields = append(fields, apikey.FieldAllowedModels)
+	}
 	if m.FieldCleared(apikey.FieldExpiresAt) {
 		fields = append(fields, apikey.FieldExpiresAt)
 	}
@@ -2065,6 +2149,9 @@ func (m *APIKeyMutation) ClearField(name string) error {
 		return nil
 	case apikey.FieldIPBlacklist:
 		m.ClearIPBlacklist()
+		return nil
+	case apikey.FieldAllowedModels:
+		m.ClearAllowedModels()
 		return nil
 	case apikey.FieldExpiresAt:
 		m.ClearExpiresAt()
@@ -2118,6 +2205,9 @@ func (m *APIKeyMutation) ResetField(name string) error {
 		return nil
 	case apikey.FieldIPBlacklist:
 		m.ResetIPBlacklist()
+		return nil
+	case apikey.FieldAllowedModels:
+		m.ResetAllowedModels()
 		return nil
 	case apikey.FieldQuota:
 		m.ResetQuota()
@@ -48712,6 +48802,8 @@ type UserMutation struct {
 	addfrozen_balance             *float64
 	concurrency                   *int
 	addconcurrency                *int
+	openai_concurrency            *int
+	addopenai_concurrency         *int
 	status                        *string
 	username                      *string
 	notes                         *string
@@ -49269,6 +49361,62 @@ func (m *UserMutation) AddedConcurrency() (r int, exists bool) {
 func (m *UserMutation) ResetConcurrency() {
 	m.concurrency = nil
 	m.addconcurrency = nil
+}
+
+// SetOpenaiConcurrency sets the "openai_concurrency" field.
+func (m *UserMutation) SetOpenaiConcurrency(i int) {
+	m.openai_concurrency = &i
+	m.addopenai_concurrency = nil
+}
+
+// OpenaiConcurrency returns the value of the "openai_concurrency" field in the mutation.
+func (m *UserMutation) OpenaiConcurrency() (r int, exists bool) {
+	v := m.openai_concurrency
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOpenaiConcurrency returns the old "openai_concurrency" field's value of the User entity.
+// If the User object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserMutation) OldOpenaiConcurrency(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOpenaiConcurrency is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOpenaiConcurrency requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOpenaiConcurrency: %w", err)
+	}
+	return oldValue.OpenaiConcurrency, nil
+}
+
+// AddOpenaiConcurrency adds i to the "openai_concurrency" field.
+func (m *UserMutation) AddOpenaiConcurrency(i int) {
+	if m.addopenai_concurrency != nil {
+		*m.addopenai_concurrency += i
+	} else {
+		m.addopenai_concurrency = &i
+	}
+}
+
+// AddedOpenaiConcurrency returns the value that was added to the "openai_concurrency" field in this mutation.
+func (m *UserMutation) AddedOpenaiConcurrency() (r int, exists bool) {
+	v := m.addopenai_concurrency
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetOpenaiConcurrency resets all changes to the "openai_concurrency" field.
+func (m *UserMutation) ResetOpenaiConcurrency() {
+	m.openai_concurrency = nil
+	m.addopenai_concurrency = nil
 }
 
 // SetStatus sets the "status" field.
@@ -50709,7 +50857,7 @@ func (m *UserMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UserMutation) Fields() []string {
-	fields := make([]string, 0, 25)
+	fields := make([]string, 0, 26)
 	if m.created_at != nil {
 		fields = append(fields, user.FieldCreatedAt)
 	}
@@ -50736,6 +50884,9 @@ func (m *UserMutation) Fields() []string {
 	}
 	if m.concurrency != nil {
 		fields = append(fields, user.FieldConcurrency)
+	}
+	if m.openai_concurrency != nil {
+		fields = append(fields, user.FieldOpenaiConcurrency)
 	}
 	if m.status != nil {
 		fields = append(fields, user.FieldStatus)
@@ -50811,6 +50962,8 @@ func (m *UserMutation) Field(name string) (ent.Value, bool) {
 		return m.FrozenBalance()
 	case user.FieldConcurrency:
 		return m.Concurrency()
+	case user.FieldOpenaiConcurrency:
+		return m.OpenaiConcurrency()
 	case user.FieldStatus:
 		return m.Status()
 	case user.FieldUsername:
@@ -50870,6 +51023,8 @@ func (m *UserMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldFrozenBalance(ctx)
 	case user.FieldConcurrency:
 		return m.OldConcurrency(ctx)
+	case user.FieldOpenaiConcurrency:
+		return m.OldOpenaiConcurrency(ctx)
 	case user.FieldStatus:
 		return m.OldStatus(ctx)
 	case user.FieldUsername:
@@ -50973,6 +51128,13 @@ func (m *UserMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetConcurrency(v)
+		return nil
+	case user.FieldOpenaiConcurrency:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOpenaiConcurrency(v)
 		return nil
 	case user.FieldStatus:
 		v, ok := value.(string)
@@ -51103,6 +51265,9 @@ func (m *UserMutation) AddedFields() []string {
 	if m.addconcurrency != nil {
 		fields = append(fields, user.FieldConcurrency)
 	}
+	if m.addopenai_concurrency != nil {
+		fields = append(fields, user.FieldOpenaiConcurrency)
+	}
 	if m.addbalance_notify_threshold != nil {
 		fields = append(fields, user.FieldBalanceNotifyThreshold)
 	}
@@ -51126,6 +51291,8 @@ func (m *UserMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedFrozenBalance()
 	case user.FieldConcurrency:
 		return m.AddedConcurrency()
+	case user.FieldOpenaiConcurrency:
+		return m.AddedOpenaiConcurrency()
 	case user.FieldBalanceNotifyThreshold:
 		return m.AddedBalanceNotifyThreshold()
 	case user.FieldTotalRecharged:
@@ -51161,6 +51328,13 @@ func (m *UserMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddConcurrency(v)
+		return nil
+	case user.FieldOpenaiConcurrency:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddOpenaiConcurrency(v)
 		return nil
 	case user.FieldBalanceNotifyThreshold:
 		v, ok := value.(float64)
@@ -51275,6 +51449,9 @@ func (m *UserMutation) ResetField(name string) error {
 		return nil
 	case user.FieldConcurrency:
 		m.ResetConcurrency()
+		return nil
+	case user.FieldOpenaiConcurrency:
+		m.ResetOpenaiConcurrency()
 		return nil
 	case user.FieldStatus:
 		m.ResetStatus()

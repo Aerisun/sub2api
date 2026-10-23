@@ -343,7 +343,7 @@ func TestNewConfiguredCodexModelDescriptorUsesProviderMetadataAndSafeFallback(t 
 	require.NotNil(t, gpt56.DefaultVerbosity)
 	require.Equal(t, "low", *gpt56.DefaultVerbosity)
 	require.True(t, gpt56.SupportsReasoningSummaryParameter)
-	require.Equal(t, "none", gpt56.DefaultReasoningSummary)
+	require.Equal(t, "auto", gpt56.DefaultReasoningSummary)
 
 	gpt56Luna := newConfiguredCodexModelDescriptor("gpt-5.6-luna")
 	require.Equal(t, []string{"low", "medium", "high", "xhigh", "max"}, effortsFromConfiguredCodexLevels(gpt56Luna.SupportedReasoningLevels))

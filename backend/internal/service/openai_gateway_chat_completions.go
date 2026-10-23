@@ -74,7 +74,7 @@ func (s *OpenAIGatewayService) forwardAsChatCompletions(
 	rememberOpenCodeInboundBody(c, body)
 	beginUpstreamResponseModelObservation(c)
 	ClearActualOpenAIUpstreamEndpoint(c)
-	if shouldForwardOpenAIResponsesViaRawChatCompletions(account) {
+	if shouldForwardOpenAIResponsesViaRawChatCompletionsForBody(account, body) {
 		SetActualOpenAIUpstreamEndpoint(c, "/v1/chat/completions")
 	}
 	setCodexToolNameReverse(c, nil)
@@ -186,7 +186,7 @@ func (s *OpenAIGatewayService) forwardAsChatCompletions(
 
 	// 固定 chat_completions 的 CN 账号，以及强制或已探测确认不支持 Responses
 	// 的其他 APIKey 账号，均走 CC 直转。
-	if shouldForwardOpenAIResponsesViaRawChatCompletions(account) {
+	if shouldForwardOpenAIResponsesViaRawChatCompletionsForBody(account, body) {
 		return s.forwardAsRawChatCompletions(ctx, c, account, body, defaultMappedModel)
 	}
 	SetActualOpenAIUpstreamEndpoint(c, openAIResponsesUpstreamEndpoint)
@@ -205,6 +205,15 @@ func (s *OpenAIGatewayService) forwardAsChatCompletions(
 	// derive a stable seed from the final upstream model family.
 	billingModel := resolveOpenAIForwardModel(account, originalModel, defaultMappedModel)
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
+	if account.UsesOpenAICodexProtocol() {
+		// Chat reasoning_content is a separately displayed summary. The generic
+		// converter embeds it as <thinking> in assistant output_text, rewriting
+		// the model's original answer and invalidating its cached prefix.
+		for index := range chatReq.Messages {
+			chatReq.Messages[index].ReasoningContent = ""
+			chatReq.Messages[index].Reasoning = ""
+		}
+	}
 
 	promptCacheKey = strings.TrimSpace(promptCacheKey)
 	compatPromptCacheInjected := false
@@ -272,6 +281,9 @@ func (s *OpenAIGatewayService) forwardAsChatCompletions(
 			return nil, fmt.Errorf("convert chat completions to responses: %w", err)
 		}
 		responsesReq.Model = upstreamModel
+		if responsesReq.Reasoning != nil && responsesReq.Reasoning.Effort != "none" && (isOpenAIGPT6Model(upstreamModel) || isOpenAIGPT56Model(upstreamModel)) {
+			responsesReq.Reasoning.Summary = "detailed"
+		}
 		normalizeResponsesRequestServiceTier(responsesReq)
 		responsesBody, err = json.Marshal(responsesReq)
 		if err != nil {
@@ -391,6 +403,19 @@ func (s *OpenAIGatewayService) forwardAsChatCompletions(
 		}
 		upstreamReq.Header.Set("session_id", generateSessionUUID(sessionKey))
 	}
+	turnStateKey := ""
+	if account.UsesOpenAICodexProtocol() && promptCacheKey != "" {
+		// A route hint belongs to one model/configuration, while the public
+		// conversation identity remains stable. Never reuse it across models.
+		turnStateKey = promptCacheKey + "\x00chat:" + upstreamModel + ":" +
+			gjson.GetBytes(responsesBody, "reasoning.effort").String() + ":" +
+			gjson.GetBytes(responsesBody, "service_tier").String()
+		if upstreamReq.Header.Get("x-codex-turn-state") == "" {
+			if state := s.getOpenAICompatSessionTurnState(ctx, c, account, turnStateKey); state != "" {
+				upstreamReq.Header.Set("x-codex-turn-state", state)
+			}
+		}
+	}
 
 	// 7. Send request
 	proxyURL := ""
@@ -442,6 +467,11 @@ func (s *OpenAIGatewayService) forwardAsChatCompletions(
 		result, handleErr = s.handleChatBufferedStreamingResponse(resp, c, account, originalModel, billingModel, upstreamModel, startTime)
 	}
 	stampOpenAIResponsesUpstreamEndpoint(c, result)
+	if handleErr == nil && turnStateKey != "" {
+		if state := strings.TrimSpace(resp.Header.Get("x-codex-turn-state")); state != "" {
+			s.bindOpenAICompatSessionTurnState(ctx, c, account, turnStateKey, state)
+		}
+	}
 
 	// cyber_policy：标记已设、error 已按 Chat Completions 格式发给客户端。丢弃 result、
 	// 返回哨兵，使 handler 落入 tokens=0 免费用量行（对齐 /v1/responses），不计费、不 failover。
@@ -1189,6 +1219,9 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 
 // writeChatCompletionsError writes an error response in OpenAI Chat Completions format.
 func writeChatCompletionsError(c *gin.Context, statusCode int, errType, message string) {
+	if writeGLMVisionStreamError(c, statusCode, errType, message) {
+		return
+	}
 	MarkResponseCommitted(c)
 	c.JSON(statusCode, gin.H{
 		"error": gin.H{

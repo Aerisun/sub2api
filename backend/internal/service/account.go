@@ -74,6 +74,7 @@ type Account struct {
 	modelMappingCacheRawLen         int
 	modelMappingCacheRawSig         uint64
 	modelMappingCacheRuntimeVersion uint64
+	modelMappingCacheStrict         bool
 
 	// header_overrides 热路径缓存（非持久化字段，同 model_mapping 缓存先例）
 	headerOverrideCache               map[string]string
@@ -91,6 +92,7 @@ const openAILongContextBillingEnabledKey = "openai_long_context_billing_enabled"
 const (
 	OpenAIEndpointCapabilityChatCompletions OpenAIEndpointCapability = "chat_completions"
 	OpenAIEndpointCapabilityEmbeddings      OpenAIEndpointCapability = "embeddings"
+	OpenAIEndpointCapabilityRerank          OpenAIEndpointCapability = "rerank"
 	OpenAIEndpointCapabilityAlphaSearch     OpenAIEndpointCapability = "alpha_search"
 	OpenAIEndpointCapabilityLive            OpenAIEndpointCapability = "live"
 	// OpenAIEndpointCapabilityGrokMediaGeneration keeps image/video generation
@@ -588,6 +590,7 @@ func stringMappingFromRaw(raw any) map[string]string {
 
 func (a *Account) GetModelMapping() map[string]string {
 	runtimeVersion := xai.RuntimeModelMappingVersion()
+	strict, _ := a.Credentials["antigravity_strict_model_mapping"].(bool)
 	credentialsPtr := mapPtr(a.Credentials)
 	rawMapping, _ := a.Credentials["model_mapping"].(map[string]any)
 	rawPtr := mapPtr(rawMapping)
@@ -599,7 +602,7 @@ func (a *Account) GetModelMapping() map[string]string {
 		a.modelMappingCacheCredentialsPtr == credentialsPtr &&
 		a.modelMappingCacheRawPtr == rawPtr &&
 		a.modelMappingCacheRawLen == rawLen &&
-		a.modelMappingCacheRuntimeVersion == runtimeVersion {
+		a.modelMappingCacheRuntimeVersion == runtimeVersion && a.modelMappingCacheStrict == strict {
 		rawSig = modelMappingSignature(rawMapping)
 		rawSigReady = true
 		if a.modelMappingCacheRawSig == rawSig {
@@ -619,6 +622,7 @@ func (a *Account) GetModelMapping() map[string]string {
 	a.modelMappingCacheRawLen = rawLen
 	a.modelMappingCacheRawSig = rawSig
 	a.modelMappingCacheRuntimeVersion = runtimeVersion
+	a.modelMappingCacheStrict = strict
 	return mapping
 }
 
@@ -655,7 +659,8 @@ func (a *Account) resolveModelMapping(rawMapping map[string]any) map[string]stri
 		}
 	}
 	if len(result) > 0 {
-		if a.Platform == domain.PlatformAntigravity {
+		strict, _ := a.Credentials["antigravity_strict_model_mapping"].(bool)
+		if a.Platform == domain.PlatformAntigravity && !strict {
 			ensureAntigravityDefaultPassthroughs(result, []string{
 				"gemini-3-flash",
 				"gemini-3.1-pro-high",
@@ -1880,7 +1885,7 @@ func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapa
 		if a.Type != AccountTypeOAuth && a.Type != AccountTypeAPIKey {
 			return false
 		}
-	case OpenAIEndpointCapabilityEmbeddings:
+	case OpenAIEndpointCapabilityEmbeddings, OpenAIEndpointCapabilityRerank:
 		if a.Type != AccountTypeAPIKey {
 			return false
 		}
@@ -1890,7 +1895,8 @@ func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapa
 
 	configured, found := a.openAIEndpointCapabilitySet()
 	if !found {
-		return true
+		// Rerank is opt-in; ordinary chat accounts must never receive it.
+		return capability != OpenAIEndpointCapabilityRerank
 	}
 	if capability == OpenAIEndpointCapabilityAlphaSearch && configured[string(OpenAIEndpointCapabilityChatCompletions)] {
 		return true

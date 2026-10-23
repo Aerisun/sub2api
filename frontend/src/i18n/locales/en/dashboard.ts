@@ -66,6 +66,18 @@ export default {
 
   // API Keys
   keys: {
+    modelAccess: "Model access",
+    allModels: "All models",
+    specificModels: "Specific models",
+    modelAccessHint: "All models permits every model available to this group, including models added later. Specific models permits only your selection.",
+    searchModels: "Search models",
+    modelsSelected: "{count} models selected",
+    selectAllModels: "Select all",
+    clearModels: "Clear",
+    failedToLoadModels: "Failed to load models.",
+    modelUnavailable: "Unavailable in this group",
+    noModelsFound: "No models found",
+    selectAtLeastOneModel: "Select at least one model or switch to All models.",
     title: 'API Keys',
     description: 'Manage your API keys and access tokens',
     searchPlaceholder: 'Search name or key...',
@@ -322,6 +334,8 @@ export default {
 
   // Usage
   usage: {
+    outputSpeed: "Output speed",
+    outputSpeedHint: "tokens/s: below 10 is red, 10 to below 20 orange, 20 to below 30 blue, and 30 or above green. Output tokens divided by duration minus the first-token wait for streams. Without first-token timing, or for non-streaming calls, uses total duration. Missing or invalid data displays —.",
     title: 'Usage Records',
     description: 'View and analyze your API usage history',
     costDetails: 'Cost Breakdown',
@@ -367,6 +381,7 @@ export default {
 	  upstreamResponseModel: 'Upstream response',
 	  upstreamModelMismatch: 'Response model mismatch',
 	  modelVariant: 'Possible version variant',
+	  modelRuntimeAlias: 'Upstream runtime name',
 	  modelMismatch: 'Different model',
     reasoningEffort: 'Reasoning Effort',
     requestedReasoningEffort: 'Requested reasoning effort',
@@ -432,6 +447,7 @@ export default {
     cacheWrite: 'Write',
     serviceTier: 'Service tier',
     serviceTierPriority: 'Fast',
+    groupRate: 'User/group multiplier',
     serviceTierUltrafast: 'Ultrafast',
     serviceTierFlex: 'Flex',
     serviceTierStandard: 'Standard',
@@ -639,6 +655,24 @@ export default {
 
   // Model Plaza (public group/model pricing showcase)
   modelPlaza: {
+    cards: {
+      otherModels: 'Other models',
+      imageModels: 'Image models',
+      imageGeneration: 'Image generation tool',
+      imageRecognition: 'Image recognition tool',
+      webSearch: 'Web search tool',
+      legacyImagePermission: 'Image tool (existing legacy permission)',
+      modelCount: '{count} models',
+      pricingLabel: 'Site pricing',
+      tokenUnit: 'USD / 1M tokens',
+      brandFilter: 'Filter models by brand',
+      cacheRead: 'Cache read',
+      cacheWrite: 'Cache write',
+      cacheWrite1h: 'Cache write · 1 hour',
+      imageInput: 'Image input',
+      imageOutput: 'Image output',
+      morePricing: 'Tiers and additional pricing'
+    },
     title: 'Model Plaza',
     description: 'Browse available models and pricing by group',
     loading: 'Loading...',

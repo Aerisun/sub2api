@@ -263,6 +263,9 @@ import Icon from '@/components/icons/Icon.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import { fetchCodexModelsManifest } from '@/api/codex'
 import type { GroupPlatform } from '@/types'
+import aerisunModels from '@/config/aerisunModels.json'
+const compositeDefaultModel = 'glm-5.3' in aerisunModels ? 'glm-5.3' : Object.keys(aerisunModels)[0] || ''
+import { claudeStreamingSetupCommand } from '@/utils/claudeStreaming'
 import {
   findCodexCatalogModel,
   formatCodexReasoningEffortTomlLine,
@@ -702,7 +705,7 @@ const currentFiles = computed((): FileConfig[] => {
     const trimmed = value.replace(/\/+$/, '')
     return trimmed.endsWith('/v1') ? trimmed : `${trimmed}/v1`
   }
-  const apiBase = ensureV1(baseRoot)
+  const apiBase = props.platform === 'composite' ? baseRoot : ensureV1(baseRoot)
   const antigravityBase = ensureV1(`${baseRoot}/antigravity`)
   const antigravityGeminiBase = (() => {
     const trimmed = `${baseRoot}/antigravity`.replace(/\/+$/, '')
@@ -728,6 +731,8 @@ const currentFiles = computed((): FileConfig[] => {
         ]
       case 'grok':
         return [generateOpenCodeConfig('grok', apiBase, apiKey)]
+      case 'composite':
+        return [generateOpenCodeConfig('composite', apiBase, apiKey)]
       default:
         return [generateOpenCodeConfig('openai', apiBase, apiKey)]
     }
@@ -797,18 +802,24 @@ function generateAnthropicFiles(baseUrl: string, apiKey: string): FileConfig[] {
       path = 'Terminal'
       content = `export ANTHROPIC_BASE_URL="${baseUrl}"
 export ANTHROPIC_AUTH_TOKEN="${apiKey}"
+export ANTHROPIC_API_KEY=""
+export CLAUDE_CODE_OAUTH_TOKEN=""
 export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
       break
     case 'cmd':
       path = 'Command Prompt'
       content = `set ANTHROPIC_BASE_URL=${baseUrl}
 set ANTHROPIC_AUTH_TOKEN=${apiKey}
+set ANTHROPIC_API_KEY=
+set CLAUDE_CODE_OAUTH_TOKEN=
 set CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
       break
     case 'powershell':
       path = 'PowerShell'
       content = `$env:ANTHROPIC_BASE_URL="${baseUrl}"
 $env:ANTHROPIC_AUTH_TOKEN="${apiKey}"
+$env:ANTHROPIC_API_KEY=""
+$env:CLAUDE_CODE_OAUTH_TOKEN=""
 $env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
       break
     default:
@@ -816,18 +827,70 @@ $env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
       content = ''
   }
 
+  const modelEnvironment = props.platform === 'composite' ? {
+    ANTHROPIC_MODEL: compositeDefaultModel,
+    ANTHROPIC_DEFAULT_OPUS_MODEL: compositeDefaultModel,
+    ANTHROPIC_DEFAULT_SONNET_MODEL: compositeDefaultModel,
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: compositeDefaultModel,
+    CLAUDE_CODE_SUBAGENT_MODEL: compositeDefaultModel,
+    ANTHROPIC_CUSTOM_MODEL_OPTION: compositeDefaultModel,
+    CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY: '1',
+    DISABLE_AUTO_COMPACT: '',
+    DISABLE_COMPACT: '',
+    CLAUDE_CODE_AUTO_COMPACT_WINDOW: '',
+    ANTHROPIC_CUSTOM_HEADERS: '',
+    CLAUDE_CODE_EFFORT_LEVEL: '',
+    NO_PROXY: `${new URL(baseUrl).hostname},localhost,127.0.0.1,::1`,
+    no_proxy: `${new URL(baseUrl).hostname},localhost,127.0.0.1,::1`
+  } : {}
+  if (props.platform === 'composite') {
+    const modelCommands = Object.entries(modelEnvironment).map(([name, value]) => {
+      if (activeTab.value === 'cmd') return `set ${name}=${value}`
+      if (activeTab.value === 'powershell') return `$env:${name}="${value}"`
+      return `export ${name}="${value}"`
+    })
+    const startCommand = activeTab.value === 'cmd'
+      ? 'set IS_SANDBOX=1\nclaude --dangerously-skip-permissions'
+      : activeTab.value === 'powershell'
+        ? '$env:IS_SANDBOX="1"\nclaude --dangerously-skip-permissions'
+        : 'IS_SANDBOX=1 claude --dangerously-skip-permissions'
+    content += '\n' + modelCommands.join('\n') + '\n' + startCommand
+  }
+
   const vscodeSettingsPath = activeTab.value === 'unix'
     ? '~/.claude/settings.json'
     : '%USERPROFILE%\\.claude\\settings.json'
 
-  const vscodeContent = `{
-  "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "env": {
-    "ANTHROPIC_BASE_URL": "${baseUrl}",
-    "ANTHROPIC_AUTH_TOKEN": "${apiKey}",
-    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
+  const environment = {
+    ANTHROPIC_BASE_URL: baseUrl,
+    ANTHROPIC_AUTH_TOKEN: apiKey,
+    ANTHROPIC_API_KEY: '',
+    CLAUDE_CODE_OAUTH_TOKEN: '',
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
+    ...modelEnvironment
   }
-}`
+  const vscodeContent = JSON.stringify({
+    $schema: 'https://json.schemastore.org/claude-code-settings.json',
+    env: environment,
+    ...(props.platform === 'composite' ? {
+      model: compositeDefaultModel,
+      autoCompactEnabled: true,
+      modelSettings: Object.fromEntries(Object.keys(aerisunModels)
+        .map(model => [model, {
+          ...('limit' in aerisunModels[model as keyof typeof aerisunModels]
+            ? {autoCompactWindow: Math.min(1000000, (aerisunModels[model as keyof typeof aerisunModels] as {limit: {context: number}}).limit.context)} : {}),
+          ...((model.startsWith('gemini-') && !model.includes('image')) || ['kimi-k3', 'kimi-k3-free', 'glm-5.3', 'deepseek-v4.1-flash'].includes(model) || model.toLowerCase().startsWith('nemotron-') || model.startsWith('step-')
+            ? {effortLevel: 'low', maxEffortLevel: 'max'} : {})
+        }])),
+      modelPicker: {
+        replaceBuiltInOptions: true,
+        options: Object.keys(aerisunModels).filter(model => !model.includes('image')).map(model => ({
+          model, label: model,
+          ...(model.startsWith('claude-') ? {} : { behavesAs: (model.startsWith('gemini-') || ['kimi-k3', 'kimi-k3-free', 'glm-5.3', 'deepseek-v4.1-flash'].includes(model) || model.toLowerCase().startsWith('nemotron-') || model.startsWith('step-')) ? 'claude-sonnet-5' : 'claude-sonnet-4-6' })
+        }))
+      }
+    } : {})
+  }, null, 2)
 
   return [
     { path, content },
@@ -835,7 +898,20 @@ $env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
       path: vscodeSettingsPath,
       content: vscodeContent,
       hint: t('keys.useKeyModal.claudeSettingsHint')
-    }
+    },
+    ...(props.platform === 'composite' ? [{
+      path: 'VS Code 用户 settings.json',
+      content: JSON.stringify({
+        'claudeCode.disableLoginPrompt': true,
+        'claudeCode.preferredLocation': 'panel',
+        'claudeCode.environmentVariables': Object.entries(environment).map(([name, value]) => ({name, value}))
+      }, null, 2),
+      hint: '同步保存上面的 Claude 用户配置和这份扩展配置，再执行下面的流式显示命令。SSH、WSL 或容器需配置到扩展运行的远端；如已有 NO_PROXY，请保留原有地址。'
+    }, {
+      path: '启用 VS Code 流式显示（保存配置后执行）',
+      content: claudeStreamingSetupCommand(baseUrl, activeTab.value),
+      hint: '需 Node.js 18+。在扩展运行的主机执行；自动备份并合并 VS Code 设置，保留注释和其他配置。完成后执行 Developer: Reload Window 并新建会话。使用启动器时，同一会话仅打开一个窗口；恢复计划会话后需重新选择 Plan 模式。'
+    }] : [])
   ]
 }
 
@@ -1239,7 +1315,7 @@ function generateRoutedCodexFiles(
     deepseek: 'deepseek-v4-pro',
     minimax: 'MiniMax-M3',
     opencode_go: 'glm-5.3',
-    composite: 'gpt-5.5'
+    composite: 'claude-sonnet-4-6'
   }
   const preferredModel = preferredModels[platform] || ''
   const model = selectCodexCatalogModel(preferredModel)
@@ -1763,40 +1839,6 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
           type: 'enabled'
         }
       }
-    },
-    'gemini-2.5-flash-image': {
-      name: 'Gemini 2.5 Flash Image',
-      limit: {
-        context: 1048576,
-        output: 65536
-      },
-      modalities: {
-        input: ['text', 'image'],
-        output: ['image']
-      },
-      options: {
-        thinking: {
-          budgetTokens: 24576,
-          type: 'enabled'
-        }
-      }
-    },
-    'gemini-3.1-flash-image': {
-      name: 'Gemini 3.1 Flash Image',
-      limit: {
-        context: 1048576,
-        output: 65536
-      },
-      modalities: {
-        input: ['text', 'image'],
-        output: ['image']
-      },
-      options: {
-        thinking: {
-          budgetTokens: 24576,
-          type: 'enabled'
-        }
-      }
     }
   }
   const claudeModels = {
@@ -1922,6 +1964,10 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
     provider[platform].models = antigravityGeminiModels
   } else if (platform === 'openai') {
     provider[platform].models = openaiModels
+  } else if (platform === 'composite') {
+    provider[platform].npm = '@ai-sdk/openai-compatible'
+    provider[platform].name = 'Aerisun-API'
+    provider[platform].models = aerisunModels
   } else if (platform === 'grok') {
     // Custom provider pointing at Sub2API OpenAI-compatible Responses/Chat endpoints.
     provider[platform].npm = '@ai-sdk/openai-compatible'
@@ -1948,6 +1994,7 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
   const content = JSON.stringify(
     {
       provider,
+      ...(platform === 'composite' ? { model: 'composite/' + compositeDefaultModel } : {}),
       ...(agent ? { agent } : {}),
       $schema: 'https://opencode.ai/config.json'
     },

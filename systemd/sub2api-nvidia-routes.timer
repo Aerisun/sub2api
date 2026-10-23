@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh NVIDIA route readiness
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec=60
+AccuracySec=5
+Unit=sub2api-nvidia-routes.service
+
+[Install]
+WantedBy=timers.target

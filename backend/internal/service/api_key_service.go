@@ -74,7 +74,8 @@ type APIKeyUpdateFields struct {
 	// 仅供"重置限流用量"路径声明；常规计费走 IncrementRateLimitUsage。
 	RateLimitUsage bool
 	// IPRules 覆盖 ip_whitelist 与 ip_blacklist。
-	IPRules bool
+	IPRules       bool
+	AllowedModels bool
 }
 
 // IsEmpty 报告该次 Update 是否不写任何列。
@@ -209,11 +210,12 @@ type APIKeyAuthCacheInvalidator interface {
 
 // CreateAPIKeyRequest 创建API Key请求
 type CreateAPIKeyRequest struct {
-	Name        string   `json:"name"`
-	GroupID     *int64   `json:"group_id"`
-	CustomKey   *string  `json:"custom_key"`   // 可选的自定义key
-	IPWhitelist []string `json:"ip_whitelist"` // IP 白名单
-	IPBlacklist []string `json:"ip_blacklist"` // IP 黑名单
+	AllowedModels []string `json:"allowed_models"`
+	Name          string   `json:"name"`
+	GroupID       *int64   `json:"group_id"`
+	CustomKey     *string  `json:"custom_key"`   // 可选的自定义key
+	IPWhitelist   []string `json:"ip_whitelist"` // IP 白名单
+	IPBlacklist   []string `json:"ip_blacklist"` // IP 黑名单
 
 	// Quota fields
 	Quota         float64 `json:"quota"`           // Quota limit in USD (0 = unlimited)
@@ -227,11 +229,12 @@ type CreateAPIKeyRequest struct {
 
 // UpdateAPIKeyRequest 更新API Key请求
 type UpdateAPIKeyRequest struct {
-	Name        *string   `json:"name"`
-	GroupID     *int64    `json:"group_id"`
-	Status      *string   `json:"status"`
-	IPWhitelist *[]string `json:"ip_whitelist"` // IP 白名单（nil 不修改，空数组清空）
-	IPBlacklist *[]string `json:"ip_blacklist"` // IP 黑名单（nil 不修改，空数组清空）
+	AllowedModels *[]string `json:"allowed_models"` // nil preserves, empty clears the restriction
+	Name          *string   `json:"name"`
+	GroupID       *int64    `json:"group_id"`
+	Status        *string   `json:"status"`
+	IPWhitelist   *[]string `json:"ip_whitelist"` // IP 白名单（nil 不修改，空数组清空）
+	IPBlacklist   *[]string `json:"ip_blacklist"` // IP 黑名单（nil 不修改，空数组清空）
 
 	// Quota fields
 	Quota           *float64   `json:"quota"`       // Quota limit in USD (nil = no change, 0 = unlimited)
@@ -397,6 +400,9 @@ func (s *APIKeyService) GenerateKey() (string, error) {
 
 // ValidateCustomKey 验证自定义API Key格式
 func (s *APIKeyService) ValidateCustomKey(key string) error {
+	if IsChatKey(key) {
+		return ErrAPIKeyInvalidChars
+	}
 	// 检查长度
 	if len(key) < 16 {
 		return ErrAPIKeyTooShort
@@ -459,6 +465,11 @@ func (s *APIKeyService) canUserBindGroup(ctx context.Context, user *User, group 
 
 // Create 创建API Key
 func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIKeyRequest) (*APIKey, error) {
+	models, err := normalizeAPIKeyAllowedModels(req.AllowedModels)
+	if err != nil {
+		return nil, err
+	}
+	req.AllowedModels = models
 	if err := validateCreateAPIKeyRequest(req); err != nil {
 		return nil, err
 	}
@@ -532,18 +543,19 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 
 	// 创建API Key记录
 	apiKey := &APIKey{
-		UserID:      userID,
-		Key:         key,
-		Name:        html.EscapeString(req.Name),
-		GroupID:     req.GroupID,
-		Status:      StatusActive,
-		IPWhitelist: req.IPWhitelist,
-		IPBlacklist: req.IPBlacklist,
-		Quota:       req.Quota,
-		QuotaUsed:   0,
-		RateLimit5h: req.RateLimit5h,
-		RateLimit1d: req.RateLimit1d,
-		RateLimit7d: req.RateLimit7d,
+		UserID:        userID,
+		Key:           key,
+		Name:          html.EscapeString(req.Name),
+		GroupID:       req.GroupID,
+		Status:        StatusActive,
+		IPWhitelist:   req.IPWhitelist,
+		IPBlacklist:   req.IPBlacklist,
+		AllowedModels: req.AllowedModels,
+		Quota:         req.Quota,
+		QuotaUsed:     0,
+		RateLimit5h:   req.RateLimit5h,
+		RateLimit1d:   req.RateLimit1d,
+		RateLimit7d:   req.RateLimit7d,
 	}
 
 	// Set expiration time if specified
@@ -757,6 +769,13 @@ func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, erro
 
 // Update 更新API Key
 func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req UpdateAPIKeyRequest) (*APIKey, error) {
+	if req.AllowedModels != nil {
+		models, err := normalizeAPIKeyAllowedModels(*req.AllowedModels)
+		if err != nil {
+			return nil, err
+		}
+		req.AllowedModels = &models
+	}
 	if err := validateUpdateAPIKeyRequest(req); err != nil {
 		return nil, err
 	}
@@ -766,6 +785,9 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 	}
 
 	// 验证所有权
+	if IsChatKey(apiKey.Key) {
+		return nil, ErrAPIKeyNotFound
+	}
 	if apiKey.UserID != userID {
 		return nil, ErrInsufficientPerms
 	}
@@ -860,6 +882,10 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 	}
 
 	// 更新 IP 限制（nil 不修改，空数组清空设置）
+	if req.AllowedModels != nil {
+		apiKey.AllowedModels = *req.AllowedModels
+		fields.AllowedModels = true
+	}
 	if req.IPWhitelist != nil {
 		apiKey.IPWhitelist = *req.IPWhitelist
 		fields.IPRules = true
@@ -921,6 +947,9 @@ func (s *APIKeyService) Delete(ctx context.Context, id int64, userID int64) erro
 	}
 
 	// 验证当前用户是否为该 API Key 的所有者
+	if IsChatKey(key) {
+		return ErrAPIKeyNotFound
+	}
 	if ownerID != userID {
 		return ErrInsufficientPerms
 	}

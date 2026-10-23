@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer"><meta name="color-scheme" content="light dark">
+  <script>const pageUrl = new URL(location.href); if (pageUrl.searchParams.has('token')) { pageUrl.searchParams.delete('token'); history.replaceState(null, '', pageUrl); }</script>
+  <link rel="icon" type="image/svg+xml" href="/sub2api/logo.svg">
+  <title>生图中枢 · Aerisun-API</title>
+  <script src="/sub2api/api-docs.js"></script>
+  <link rel="stylesheet" href="/sub2api/assets/index-B5cvKWjl.css">
+  <link rel="stylesheet" href="/sub2api/api-docs.css">
+  <link rel="stylesheet" href="/sub2api/image-studio.css?v=20261011">
+  <script src="/sub2api/image-studio.js?v=tools-model-choice-20261021" defer></script>
+</head>
+<body>
+  <a class="docs-skip" href="#main">跳到正文</a>
+  <header class="docs-topbar"><div class="docs-topbar-inner"><a class="docs-brand" href="/sub2api/home" target="_top"><img class="docs-site-logo" src="/sub2api/logo.svg" width="32" height="32" alt=""><span class="docs-site-name">Aerisun-API</span></a><a href="/sub2api/api-guide.html">使用教程</a></div></header>
+  <main class="docs-wrap studio" id="main">
+    <div class="docs-intro"><h1>生图中枢</h1><p>描述画面，提交任务。图片完成后会显示在这里，也能交给你的 agent 使用。</p></div>
+    <div class="studio-grid">
+      <section class="studio-form card" aria-labelledby="create-title">
+        <div class="studio-section-head"><h2 id="create-title">生成图片</h2><span class="studio-price" id="model-price">按图片尺寸计费</span></div>
+        <p class="studio-muted">生图工具 · 按实际生成张数收费</p>
+        <form id="image-form"><div class="studio-field"><label for="image-model">图片模型</label><select id="image-model" class="input"><option value="gpt-image-2.5-flare">gpt-image-2.5-flare</option><option value="gpt-image-2.5-sunburst">gpt-image-2.5-sunburst</option><option value="gpt-image-2">gpt-image-2</option></select></div>
+          <div class="studio-field"><label for="key-select">使用的 API 密钥</label><select id="key-select" class="input"><option value="">手动输入本站密钥</option></select><input id="api-key" class="input" type="password" placeholder="sk-…" autocomplete="off" aria-label="本站 API 密钥"><p class="studio-hint" id="key-hint">可以登录后选择已有密钥，或手动输入。<a href="/sub2api/keys" target="_top">管理密钥</a></p></div>
+          <div class="studio-field"><label for="prompt">你想生成什么？</label><textarea id="prompt" class="input" rows="6" required maxlength="32000" placeholder="例如：为一篇介绍杭州西湖的文章画一张封面，清晨薄雾中的湖面与远山，水彩风格，不要文字。"></textarea></div>
+          <div class="studio-options"><div class="studio-field"><label for="size">画面比例</label><select id="size" class="input"><option value="1024x1024">方形 1:1</option><option value="1536x1024">横向 3:2</option><option value="1024x1536">竖向 2:3</option><option value="16:9">宽屏 16:9</option><option value="9:16">竖屏 9:16</option></select></div><div class="studio-field"><label for="count">生成张数</label><select id="count" class="input"><option value="1">1 张</option><option value="2">2 张</option><option value="3">3 张</option><option value="4">4 张</option></select></div></div>
+          <div class="studio-field"><label for="reference">参考图片（可选）</label><input id="reference" class="input" type="file" accept="image/png,image/jpeg,image/webp"><p class="studio-hint" id="reference-hint">PNG、JPEG 或 WebP，最大 8 MB。参考图随请求处理，不长期存放。</p></div>
+          <div class="studio-submit"><span id="estimated-cost">按实际图片数量与尺寸计费，详见模型广场</span><button class="btn btn-primary" id="generate" type="submit">开始生成</button></div>
+          <p id="form-message" class="studio-hint" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+      <section class="studio-results" aria-labelledby="results-title"><div class="studio-section-head"><h2 id="results-title">生成任务</h2><button id="refresh" class="btn btn-secondary" type="button">刷新任务</button></div><p class="studio-muted">图片与任务保留 7 天，请及时下载。任务查询不会再次扣费。</p><div id="tasks" aria-live="polite"><div class="studio-empty card"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 4-6 5 7"/></svg><h3>你的下一张图片，从一句描述开始</h3><p>提交后可继续浏览页面，任务会在后台生成。</p></div></div></section>
+    </div>
+    <section class="docs-guide-section" id="agents"><h2>让 agent 使用工具</h2><p>统一提供生图、识图和联网搜索三个工具。使用本站 API Key 认证，按实际调用计费；生图支持选择三个图片模型。提交后通过同一工具查询任务，查询不会再次生成图片。</p>
+      <dl class="docs-facts card"><div class="docs-fact"><dt>MCP 地址</dt><dd><code>https://aerisun.top/sub2api/v1/tools/mcp</code></dd></div><div class="docs-fact"><dt>可用工具</dt><dd><code>image_generation</code> · <code>image_recognition</code> · <code>web_search</code></dd></div></dl>
+      <p><a href="/sub2api/tools.html">查看工具文档、HTTP 示例和任务查询方式</a></p>
+    </section>
+  </main>
+</body>
+</html>

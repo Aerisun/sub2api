@@ -182,15 +182,42 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 	userAgent string,
 	grokCacheIdentity string,
 ) (*http.Response, error) {
+	hasGLMImages := glmRequestHasImageInput(account, body)
+	stopVisionKeepalive := startGLMVisionKeepalive(c, account, body, stream)
+	defer stopVisionKeepalive()
+	var bridgeErr error
+	body, bridgeErr = s.bridgeGLMImageInputs(ctx, c, account, body)
+	if bridgeErr != nil {
+		if c != nil && !c.Writer.Written() {
+			if strings.Contains(c.Request.URL.Path, "/messages") {
+				writeAnthropicError(c, http.StatusBadGateway, "api_error", bridgeErr.Error())
+				MarkResponseCommitted(c)
+			} else {
+				writeChatCompletionsError(c, http.StatusBadGateway, "upstream_error", bridgeErr.Error())
+			}
+		}
+		return nil, bridgeErr
+	}
 	// DeepSeek thinking mode 要求历史 assistant 回传 reasoning_content。
 	// Responses→CC 回退在加密-only / 缺 reasoning item 且缓存未命中时会漏掉该
 	// 字段，上游 400 "The `reasoning_content` in the thinking mode must be
 	// passed back to the API"。在共用出站点补空格占位，真实明文不覆盖。
 	body = ensureDeepSeekChatReasoningPlaceholders(account, body)
 	upstreamCtx, releaseUpstreamCtx := detachUpstreamContext(ctx)
+	var headerGuard *openAIFirstOutputHeaderGuard
+	if hasGLMImages {
+		// Auxiliary vision is bounded above; also bound the subsequent GLM
+		// header wait, which otherwise inherits the long generic HTTP timeout.
+		upstreamCtx, headerGuard = newOpenAIFirstOutputHeaderGuard(ctx, releaseUpstreamCtx, time.Now().Add(45*time.Second))
+	}
 	upstreamReq, err := http.NewRequestWithContext(upstreamCtx, http.MethodPost, targetURL, bytes.NewReader(body))
-	releaseUpstreamCtx()
+	if headerGuard == nil {
+		releaseUpstreamCtx()
+	}
 	if err != nil {
+		if headerGuard != nil {
+			headerGuard.close()
+		}
 		return nil, fmt.Errorf("build upstream request: %w", err)
 	}
 	// 记录本次实际选择的协议端点，供错误日志和用量日志在没有
@@ -238,9 +265,28 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 	if account.ProxyID != nil && account.Proxy != nil {
 		proxyURL = account.Proxy.URL()
 	}
+	tracedCtx, finishGLMHeaders := traceGLMUpstreamHeaders(upstreamReq.Context(), account, body)
+	upstreamReq = upstreamReq.WithContext(tracedCtx)
 	resp, err := s.doOpenAIUpstream(upstreamReq, proxyURL, account)
+	finishGLMHeaders(resp, err)
+	if headerGuard != nil && headerGuard.stopHeaderWait() {
+		headerGuard.close()
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+		return nil, &UpstreamFailoverError{StatusCode: http.StatusGatewayTimeout,
+			SafeToFailoverAfterWrite: true,
+			ResponseBody:             []byte(`{"error":{"type":"upstream_timeout","message":"GLM did not respond after image analysis within 45 seconds"}}`)}
+	}
 	if err != nil {
+		if headerGuard != nil {
+			headerGuard.close()
+		}
 		return nil, s.handleOpenAIUpstreamTransportError(ctx, c, account, err, false)
+	}
+	if headerGuard != nil {
+		resp.Body = &openAIRequestContextReadCloser{ReadCloser: &glmVisionIdleReadCloser{
+			ReadCloser: resp.Body, cancel: headerGuard.cancel, idle: 45 * time.Second}, cleanup: headerGuard.close}
 	}
 	return resp, nil
 }

@@ -1,0 +1,11 @@
+[Unit]
+Description=Keep fallback subscription candidates current
+
+[Timer]
+OnBootSec=45
+OnUnitActiveSec=10min
+RandomizedDelaySec=30
+Unit=sub2api-egress-subscriptions.service
+
+[Install]
+WantedBy=timers.target

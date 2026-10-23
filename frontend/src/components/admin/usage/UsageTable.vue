@@ -72,19 +72,21 @@
             </div>
             <span v-else class="font-medium text-gray-900 dark:text-white">{{ row.model }}</span>
             <div
-              v-if="row.upstream_model_mismatch === true && row.upstream_response_model"
+              v-if="row.upstream_response_model && row.upstream_response_model !== sentUpstreamModel(row)"
               class="break-all pl-3 text-[11px]"
-              :class="isLikelyModelVariant(row) ? 'text-amber-600 dark:text-amber-400' : 'text-orange-600 dark:text-orange-400'"
+              :class="isRuntimeModelAlias(row) ? 'text-gray-500 dark:text-gray-400' : isLikelyModelVariant(row) ? 'text-amber-600 dark:text-amber-400' : 'text-orange-600 dark:text-orange-400'"
               :title="modelAuditTitle(row)"
             >
               <span class="mr-1">↳ {{ t('usage.upstreamResponseModel') }}:</span>{{ row.upstream_response_model }}
               <span
                 class="ml-1 inline-flex rounded px-1 py-px text-[10px] font-medium ring-1 ring-inset"
-                :class="isLikelyModelVariant(row)
+                :class="isRuntimeModelAlias(row)
+                  ? 'bg-gray-50 text-gray-600 ring-gray-200 dark:bg-gray-500/10 dark:text-gray-300 dark:ring-gray-500/30'
+                  : isLikelyModelVariant(row)
                   ? 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/30'
                   : 'bg-orange-50 text-orange-700 ring-orange-200 dark:bg-orange-500/10 dark:text-orange-300 dark:ring-orange-500/30'"
               >
-                {{ isLikelyModelVariant(row) ? t('usage.modelVariant') : t('usage.modelMismatch') }}
+                {{ isRuntimeModelAlias(row) ? t('usage.modelRuntimeAlias') : isLikelyModelVariant(row) ? t('usage.modelVariant') : t('usage.modelMismatch') }}
               </span>
             </div>
           </div>
@@ -249,6 +251,12 @@
               <span class="font-medium tabular-nums" :class="LATENCY_TEXT_CLASSES[durationSeverity(row.duration_ms ?? 0)]">{{ formatDuration(row.duration_ms) }}</span>
             </div>
           </div>
+        </template>
+
+        <template #cell-output_speed="{ row }">
+          <span class="whitespace-nowrap text-sm font-medium tabular-nums" :class="getUsageOutputSpeedClass(getUsageOutputSpeed(row))" :title="t('usage.outputSpeedHint')">
+            {{ formatUsageOutputSpeed(row) }}<span v-if="getUsageOutputSpeed(row) != null" class="ml-1 text-xs text-gray-400">tokens/s</span>
+          </span>
         </template>
 
         <template #cell-created_at="{ value }">
@@ -496,7 +504,7 @@
             <span class="font-semibold text-cyan-300">{{ getUsageServiceTierLabel(tooltipData?.service_tier, t) }}</span>
           </div>
           <div class="flex items-center justify-between gap-6">
-            <span class="text-gray-400">{{ t('usage.rate') }}</span>
+            <span class="text-gray-400">{{ t('usage.groupRate') }}</span>
             <span class="font-semibold text-blue-400">{{ formatMultiplier(tooltipData?.rate_multiplier || 1) }}x</span>
           </div>
           <div class="flex items-center justify-between gap-6">
@@ -540,6 +548,8 @@ import { formatCacheTokens, formatMultiplier } from '@/utils/formatters'
 import { formatTokenPricePerMillion } from '@/utils/usagePricing'
 import { getUsageServiceTierLabel } from '@/utils/usageServiceTier'
 import { resolveUsageRequestType } from '@/utils/usageRequestType'
+import { formatUsageOutputSpeed, getUsageOutputSpeed, getUsageOutputSpeedClass } from '@/utils/usageOutputSpeed'
+import { isGemini38RuntimeAlias } from '@/utils/upstreamModelAlias'
 import {
   LATENCY_BAR_CLASSES,
   LATENCY_BAR_FROM_CLASSES,
@@ -629,6 +639,9 @@ const hasReasoningEffortMapping = (row: AdminUsageLog): boolean => {
 }
 
 const sentUpstreamModel = (row: AdminUsageLog): string => row.upstream_model?.trim() || row.model?.trim() || ''
+
+const isRuntimeModelAlias = (row: AdminUsageLog): boolean =>
+  isGemini38RuntimeAlias(sentUpstreamModel(row), row.upstream_response_model || '')
 
 const normalizeModelVariant = (model: string): string => model
   .trim()

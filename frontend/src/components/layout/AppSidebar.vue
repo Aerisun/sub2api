@@ -347,21 +347,6 @@ const GiftIcon = {
     )
 }
 
-const UserIcon = {
-  render: () =>
-    h(
-      'svg',
-      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' },
-      [
-        h('path', {
-          'stroke-linecap': 'round',
-          'stroke-linejoin': 'round',
-          d: 'M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z'
-        })
-      ]
-    )
-}
-
 const UsersIcon = {
   render: () =>
     h(
@@ -390,6 +375,18 @@ const FolderIcon = {
         })
       ]
     )
+}
+
+const ChatIcon = {
+  render: () => h('svg', {
+    class: 'chat-nav-icon', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor',
+    'stroke-width': '1.6', 'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+  }, [
+    h('path', { d: 'M12 4H7a4 4 0 0 0-4 4v7a4 4 0 0 0 4 4h1v3l4-3h5a4 4 0 0 0 4-4v-4' }),
+    h('path', { class: 'chat-nav-sparkle', d: 'M18 2l1.2 3.3 3.3 1.2-3.3 1.2L18 11l-1.2-3.3-3.3-1.2 3.3-1.2L18 2Z' }),
+    h('circle', { cx: '7.5', cy: '12', r: '0.8', fill: 'currentColor', stroke: 'none' }),
+    h('circle', { cx: '11.5', cy: '12', r: '0.8', fill: 'currentColor', stroke: 'none' }),
+  ])
 }
 
 const ChannelIcon = {
@@ -723,6 +720,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
     items.push({ path: '/dashboard', label: t('nav.dashboard'), icon: DashboardIcon })
   }
   items.push(
+    { path: '/chat', label: t('nav.chat'), icon: ChatIcon },
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
     { path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon, hideInSimpleMode: true, featureFlag: flagBatchImageAccess },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
@@ -733,7 +731,6 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
     { path: '/orders', label: t('nav.myOrders'), icon: OrderListIcon, hideInSimpleMode: true, featureFlag: flagPayment },
     { path: '/redeem', label: t('nav.redeem'), icon: GiftIcon, hideInSimpleMode: true },
     { path: '/affiliate', label: t('nav.affiliate'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: flagAffiliate },
-    { path: '/profile', label: t('nav.profile'), icon: UserIcon },
     ...customMenuItemsForUser.value.map((item): NavItem => ({
       path: `/custom/${item.id}`,
       label: item.label,
@@ -762,13 +759,13 @@ const personalNavItems = computed((): NavItem[] => finalizeNav(buildSelfNavItems
 const customMenuItemsForUser = computed(() => {
   const items = appStore.cachedPublicSettings?.custom_menu_items ?? []
   return items
-    .filter((item) => item.visibility === 'user')
+    .filter((item) => item.visibility === 'user' && item.id !== 'api-guide')
     .sort((a, b) => a.sort_order - b.sort_order)
 })
 
 const customMenuItemsForAdmin = computed(() => {
   return adminSettingsStore.customMenuItems
-    .filter((item) => item.visibility === 'admin')
+    .filter((item) => item.visibility === 'admin' && item.id !== 'api-guide')
     .sort((a, b) => a.sort_order - b.sort_order)
 })
 
@@ -874,6 +871,9 @@ function closeMobile() {
 }
 
 function handleMenuItemClick(itemPath: string) {
+  if (itemPath === '/chat' && !sidebarCollapsed.value) {
+    appStore.setSidebarCollapsed(true)
+  }
   if (mobileOpen.value) {
     setTimeout(() => {
       appStore.setMobileOpen(false)
@@ -1102,4 +1102,26 @@ onBeforeUnmount(() => {
   width: 1.25rem;
   height: 1.25rem;
 }
+
+:deep(.chat-nav-icon) {
+  overflow: visible;
+  animation: chat-bubble-float 4s ease-in-out infinite;
+}
+:deep(.chat-nav-sparkle) {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: chat-sparkle-glow 3s ease-in-out infinite;
+}
+@keyframes chat-bubble-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1.2px); }
+}
+@keyframes chat-sparkle-glow {
+  0%, 100% { opacity: .6; transform: scale(.88); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :deep(.chat-nav-icon), :deep(.chat-nav-sparkle) { animation: none; }
+}
+
 </style>

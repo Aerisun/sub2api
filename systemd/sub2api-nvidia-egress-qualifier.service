@@ -1,0 +1,17 @@
+[Unit]
+Description=Automatically qualify NVIDIA proxy nodes after Clash subscription updates
+After=network-online.target sub2api-nvidia-egress.service
+Wants=network-online.target sub2api-nvidia-egress.service
+
+[Service]
+WorkingDirectory=@ROOT@
+ExecStart=/usr/bin/python3 -m nvidia_pool.egress
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=45
+UMask=0077
+Nice=15
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

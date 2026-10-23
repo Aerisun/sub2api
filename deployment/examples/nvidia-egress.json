@@ -1,0 +1,20 @@
+{
+  "subscription_file": "@ROOT@/secrets/network/combined-candidates.yaml",
+  "mihomo_binary": "/home/wenbo/.local/bin/mihomo",
+  "probe_port": 17996,
+  "probe_controller_port": 19196,
+  "max_candidates": 6,
+  "pool_size": 3,
+  "poll_seconds": 5,
+  "debounce_seconds": 5,
+  "health_seconds": 10,
+  "refresh_seconds": 900,
+  "state_file": "@ROOT@/data/nvidia-egress-state.json",
+  "role": {
+    "name": "nvidia",
+    "group": "NVIDIA egress",
+    "provider_file": "@ROOT@/deployment/private/egress/mihomo-nvidia/qualified-nodes.yaml",
+    "mihomo_config": "@ROOT@/deployment/private/egress/mihomo-nvidia/config.yaml",
+    "route_state_file": "@ROOT@/data/nvidia-egress-route.json"
+  }
+}

@@ -66,6 +66,18 @@ export default {
 
   // API Keys
   keys: {
+    modelAccess: "模型权限",
+    allModels: "全部模型",
+    specificModels: "指定模型",
+    modelAccessHint: "全部模型：可调用当前分组开放的所有模型，包含以后新增的模型。指定模型：仅可调用勾选的模型。",
+    searchModels: "搜索模型",
+    modelsSelected: "已选 {count} 个模型",
+    selectAllModels: "全选",
+    clearModels: "清空",
+    failedToLoadModels: "模型列表加载失败。",
+    modelUnavailable: "当前分组不可用",
+    noModelsFound: "没有匹配的模型",
+    selectAtLeastOneModel: "请至少选择一个模型，或切换为全部模型。",
     title: 'API 密钥',
     description: '管理您的 API 密钥和访问令牌',
     searchPlaceholder: '搜索名称或Key...',
@@ -327,6 +339,8 @@ export default {
 
   // Usage
   usage: {
+    outputSpeed: "输出速度",
+    outputSpeedHint: "单位：tokens/s。低于 10 为红色，10 至不足 20 为橙色，20 至不足 30 为蓝色，30 及以上为绿色。流式请求按输出 token 数 ÷（总耗时 − 首 token 耗时）计算；未记录首 token 耗时或非流式请求按总耗时计算。缺少有效数据时显示 —。",
     title: '使用记录',
     description: '查看和分析您的 API 使用历史',
     costDetails: '费用明细',
@@ -372,6 +386,7 @@ export default {
 	  upstreamResponseModel: '上游响应',
 	  upstreamModelMismatch: '上游响应模型不一致',
 	  modelVariant: '疑似版本变体',
+	  modelRuntimeAlias: '上游内部名称',
 	  modelMismatch: '模型不一致',
     reasoningEffort: '推理强度',
     requestedReasoningEffort: '请求推理强度',
@@ -437,6 +452,7 @@ export default {
     cacheWrite: '写入',
     serviceTier: '服务档位',
     serviceTierPriority: 'Fast',
+    groupRate: '用户／分组倍率',
     serviceTierUltrafast: 'Ultrafast',
     serviceTierFlex: 'Flex',
     serviceTierStandard: 'Standard',
@@ -644,6 +660,24 @@ export default {
 
   // Model Plaza (public group/model pricing showcase)
   modelPlaza: {
+    cards: {
+      otherModels: '其他模型',
+      imageModels: '图片模型',
+      imageGeneration: '生图工具',
+      imageRecognition: '识图工具',
+      webSearch: '联网搜索工具',
+      legacyImagePermission: '生图工具（已有兼容权限）',
+      modelCount: '{count} 个模型',
+      pricingLabel: '本站定价',
+      tokenUnit: 'USD / 百万 tokens',
+      brandFilter: '按品牌筛选模型',
+      cacheRead: '缓存读取',
+      cacheWrite: '缓存写入',
+      cacheWrite1h: '缓存写入 · 1 小时',
+      imageInput: '图片输入',
+      imageOutput: '图片输出',
+      morePricing: '阶梯与其他定价'
+    },
     title: '模型广场',
     description: '按分组浏览可用模型与价格',
     loading: '加载中...',

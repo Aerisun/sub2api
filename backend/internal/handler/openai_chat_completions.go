@@ -271,6 +271,10 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 			if res == nil {
 				return
 			}
+			res.ImageRecognition = c.GetInt("standard_tool.image_recognition_count") > 0
+			if res.ImageRecognition && err == nil {
+				res.ImageRecognitionCount = c.GetInt("standard_tool.image_recognition_count")
+			}
 			stampOpenAIRequestedReasoningEffort(res, c)
 			userAgent := c.GetHeader("User-Agent")
 			clientIP := ip.GetClientIP(c)

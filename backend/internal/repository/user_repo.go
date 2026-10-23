@@ -148,6 +148,7 @@ func (r *userRepository) create(ctx context.Context, userIn *service.User, guard
 		SetRole(userIn.Role).
 		SetBalance(userIn.Balance).
 		SetConcurrency(userIn.Concurrency).
+		SetOpenaiConcurrency(userIn.OpenAIConcurrency).
 		SetStatus(userIn.Status).
 		SetSignupSource(userSignupSourceOrDefault(userIn.SignupSource)).
 		SetNillableLastLoginAt(userIn.LastLoginAt).
@@ -310,6 +311,9 @@ func (r *userRepository) Update(ctx context.Context, userIn *service.User, field
 	}
 	if fields.Concurrency {
 		updateOp = updateOp.SetConcurrency(userIn.Concurrency)
+	}
+	if fields.OpenAIConcurrency {
+		updateOp = updateOp.SetOpenaiConcurrency(userIn.OpenAIConcurrency)
 	}
 	if fields.RPMLimit {
 		updateOp = updateOp.SetRpmLimit(userIn.RPMLimit)
@@ -1102,7 +1106,11 @@ func (r *userRepository) BatchAddConcurrency(ctx context.Context, userIDs []int6
 }
 
 func (r *userRepository) BatchUpdateLimits(ctx context.Context, userIDs []int64, concurrency, rpmLimit *int) (int, error) {
-	if len(userIDs) == 0 || (concurrency == nil && rpmLimit == nil) {
+	return r.BatchUpdateLimitsWithOpenAI(ctx, userIDs, concurrency, nil, rpmLimit)
+}
+
+func (r *userRepository) BatchUpdateLimitsWithOpenAI(ctx context.Context, userIDs []int64, concurrency, openAIConcurrency, rpmLimit *int) (int, error) {
+	if len(userIDs) == 0 || (concurrency == nil && openAIConcurrency == nil && rpmLimit == nil) {
 		return 0, nil
 	}
 
@@ -1112,6 +1120,13 @@ func (r *userRepository) BatchUpdateLimits(ctx context.Context, userIDs []int64,
 		value := max(*concurrency, 0)
 		args = append(args, value)
 		setClauses = append(setClauses, fmt.Sprintf("concurrency = $%d", len(args)))
+	}
+	if openAIConcurrency != nil {
+		if *openAIConcurrency < 0 {
+			return 0, fmt.Errorf("openai_concurrency must be non-negative")
+		}
+		args = append(args, *openAIConcurrency)
+		setClauses = append(setClauses, fmt.Sprintf("openai_concurrency = $%d", len(args)))
 	}
 	if rpmLimit != nil {
 		value := max(*rpmLimit, 0)

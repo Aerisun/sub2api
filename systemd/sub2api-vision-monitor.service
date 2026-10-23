@@ -1,0 +1,13 @@
+[Unit]
+Description=NVIDIA image recognition health and automatic recovery
+After=sub2api-nvidia-pool.service
+Requires=sub2api-nvidia-pool.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=@ROOT@
+Environment=PYTHONPATH=@ROOT@/runtime/python-site:@ROOT@
+ExecStart=/usr/bin/python3 -m internal_tools.vision_monitor
+TimeoutStartSec=40
+UMask=0077
+NoNewPrivileges=true

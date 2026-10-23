@@ -144,6 +144,12 @@ export default defineConfig(({ mode }) => {
               return 'vendor-stripe'
             }
 
+            // The SDK boots external payment scripts on import. Keep it out
+            // of vendor-misc, which every console page downloads eagerly.
+            if (id.includes('/@airwallex/')) {
+              return 'vendor-airwallex'
+            }
+
             // 其他小型第三方库合并
             return 'vendor-misc'
           }

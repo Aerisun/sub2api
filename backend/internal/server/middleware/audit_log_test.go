@@ -33,6 +33,41 @@ func TestDeriveAuditAction(t *testing.T) {
 	}
 }
 
+func TestChatRecognitionAuditKeepsMetadataWithoutReadingImageInputs(t *testing.T) {
+	for _, route := range []struct{ template, path, field string }{
+		{"/api/v1/user/chat/conversations/:id/generations", "/api/v1/user/chat/conversations/test/generations", "imageInputs"},
+		{"/api/v1/user/chat/generations/:id/image-inputs", "/api/v1/user/chat/generations/test/image-inputs", "images"},
+	} {
+		t.Run(route.field, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+			repository := &auditCaptureRepository{}
+			auditService := service.NewAuditLogService(repository, nil)
+			auditService.Start()
+			router := gin.New()
+			router.Use(func(c *gin.Context) { c.Set(string(ContextKeyUser), AuthSubject{UserID: 77}); c.Next() })
+			router.Use(gin.HandlerFunc(NewAuditLogMiddleware(auditService)))
+			router.POST(route.template, func(c *gin.Context) {
+				var body map[string]map[string]string
+				require.NoError(t, c.ShouldBindJSON(&body))
+				require.Equal(t, "data:image/png;base64,private-image-fixture", body[route.field]["local"])
+				c.Status(http.StatusAccepted)
+			})
+			request := httptest.NewRequest(http.MethodPost, route.path, bytes.NewBufferString(`{"`+route.field+`":{"local":"data:image/png;base64,private-image-fixture"}}`))
+			request.Header.Set("Content-Type", "application/json")
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, request)
+			require.Equal(t, http.StatusAccepted, recorder.Code)
+			auditService.Stop()
+			repository.mu.Lock()
+			defer repository.mu.Unlock()
+			require.Len(t, repository.logs, 1)
+			require.Equal(t, "<image input omitted>", repository.logs[0].RequestBody)
+			require.Equal(t, http.StatusAccepted, repository.logs[0].StatusCode)
+			require.NotContains(t, repository.logs[0].RequestBody, "base64")
+		})
+	}
+}
+
 type auditCaptureRepository struct {
 	mu   sync.Mutex
 	logs []*service.AuditLog

@@ -72,6 +72,14 @@ type modelPlazaModel struct {
 	LongContextBasis string `json:"long_context_basis,omitempty"`
 	// TimePricing 分时倍率时段，落在时段内的请求整单乘倍率；无分时省略。
 	TimePricing *modelPlazaTimePricing `json:"time_pricing,omitempty"`
+	ToolName    string                 `json:"tool_name,omitempty"`
+	Endpoint    string                 `json:"endpoint,omitempty"`
+	ToolModels  []modelPlazaToolModel  `json:"tool_models,omitempty"`
+}
+
+type modelPlazaToolModel struct {
+	Name    string                     `json:"name"`
+	Pricing *userSupportedModelPricing `json:"pricing"`
 }
 
 // modelPlazaGroup 广场分组条目（白名单字段）。
@@ -188,6 +196,10 @@ func toModelPlazaGroupDTO(g *service.PlazaGroup, userRates map[int64]float64) mo
 	models := make([]modelPlazaModel, 0, len(g.Models))
 	for i := range g.Models {
 		m := &g.Models[i]
+		var toolModels []modelPlazaToolModel
+		for _, option := range m.ToolModels {
+			toolModels = append(toolModels, modelPlazaToolModel{Name: option.Name, Pricing: toUserPricing(option.Pricing)})
+		}
 		models = append(models, modelPlazaModel{
 			Name:             m.Name,
 			Platform:         m.Platform,
@@ -195,6 +207,9 @@ func toModelPlazaGroupDTO(g *service.PlazaGroup, userRates map[int64]float64) mo
 			OfficialPricing:  toModelPlazaOfficialPricing(m.OfficialPricing),
 			LongContextBasis: string(m.LongContextBasis),
 			TimePricing:      toModelPlazaTimePricing(m.TimePricing),
+			ToolName:         m.ToolName,
+			Endpoint:         m.Endpoint,
+			ToolModels:       toolModels,
 		})
 	}
 	dto := modelPlazaGroup{

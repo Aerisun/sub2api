@@ -321,6 +321,47 @@ func TestListPlazaGroups_GroupImagePriceIgnoredForNonImageModes(t *testing.T) {
 	require.Nil(t, p.PerRequestPrice)
 }
 
+func TestListGroups_ModelImageCardsOverrideGenericGroupResolutionPrices(t *testing.T) {
+	channels := []Channel{{
+		ID: 1, Status: StatusActive, GroupIDs: []int64{10},
+		ModelMapping: map[string]map[string]string{PlatformOpenAI: {
+			"gpt-image-2": "gpt-image-2", "gpt-image-2.5-sunburst": "gpt-image-2.5-sunburst",
+		}},
+	}}
+	group := Group{ID: 10, Platform: PlatformOpenAI, RateMultiplier: 1,
+		ImagePrice1K: testPtrFloat64(.067), ImagePrice2K: testPtrFloat64(.101), ImagePrice4K: testPtrFloat64(.151)}
+	for model, prices := range map[string][]float64{
+		"gpt-image-2": {.10, .20, .35}, "gpt-image-2.5-sunburst": {.20, .40, .70},
+	} {
+		card := ChannelModelPricing{Platform: PlatformOpenAI, Models: []string{model},
+			BillingMode: BillingModeImage, PerRequestPrice: testPtrFloat64(prices[0])}
+		for i, label := range []string{"1K", "2K", "4K"} {
+			card.Intervals = append(card.Intervals, PricingInterval{
+				TierLabel: label, PerRequestPrice: testPtrFloat64(prices[i]), SortOrder: i,
+			})
+		}
+		group.ModelPricing = append(group.ModelPricing, card)
+	}
+	for _, billing := range []bool{false, true} {
+		svc := newPlazaService(channels, []Group{group}, nil)
+		if billing {
+			svc = newPlazaServiceWithBilling(channels, []Group{group}, map[int64]string{10: PlatformOpenAI}, nil)
+		}
+		out, err := svc.ListGroups(context.Background())
+		require.NoError(t, err)
+		require.Len(t, out, 1)
+		require.Len(t, out[0].Models, 1)
+		require.Equal(t, ToolImageGeneration, out[0].Models[0].Name)
+		require.Len(t, out[0].Models[0].ToolModels, 2)
+		for _, model := range out[0].Models[0].ToolModels {
+			expected := matchGroupModelPricing(&group, model.Name)
+			require.Equal(t, expected.PerRequestPrice, model.Pricing.PerRequestPrice)
+			require.Equal(t, expected.Intervals, model.Pricing.Intervals,
+				"model-specific resolution prices must match billing, with billing service enabled=%v", billing)
+		}
+	}
+}
+
 func TestListPlazaGroups_RepoErrorsPropagate(t *testing.T) {
 	sentinel := errors.New("boom")
 	repo := &mockChannelRepository{

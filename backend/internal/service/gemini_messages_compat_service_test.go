@@ -166,7 +166,7 @@ func TestGeminiForwardAsChatCompletions_StreamsOpenAIChunksFromGeminiSSE(t *test
 	require.Contains(t, out, `"role":"assistant"`)
 	require.Contains(t, out, `"content":"hel"`)
 	require.Contains(t, out, `"content":"lo"`)
-	require.Contains(t, out, `"usage":{"prompt_tokens":2,"completion_tokens":2,"total_tokens":4}`)
+	require.Contains(t, out, `"usage":{"prompt_tokens":2,"completion_tokens":2,"total_tokens":4,"prompt_tokens_details":{"cached_tokens":0}}`)
 	require.Contains(t, out, "data: [DONE]")
 }
 

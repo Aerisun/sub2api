@@ -1,5 +1,6 @@
 const DEFAULT_API_BASE_URL = '/api/v1'
-const API_BASE_URL = normalizeAPIBaseURL(import.meta.env.VITE_API_BASE_URL)
+const deploymentBase = String(import.meta.env.BASE_URL || '/').replace(/\/+$/, '')
+const API_BASE_URL = normalizeAPIBaseURL(import.meta.env.VITE_API_BASE_URL || `${deploymentBase}${DEFAULT_API_BASE_URL}`)
 
 function normalizePath(path: string): string {
   return path.startsWith('/') ? path : `/${path}`
@@ -32,11 +33,12 @@ export function buildApiUrl(path: string): string {
 export function buildGatewayUrl(path: string): string {
   const suffix = normalizePath(path)
   try {
-    const origin =
+    const apiURL =
       typeof window === 'undefined'
-        ? new URL(getAPIBaseURL()).origin
-        : new URL(getAPIBaseURL(), window.location.origin).origin
-    return `${origin}${suffix}`
+        ? new URL(getAPIBaseURL())
+        : new URL(getAPIBaseURL(), window.location.origin)
+    const mount = apiURL.pathname.replace(/\/api\/v1\/?$/, '').replace(/\/+$/, '')
+    return `${apiURL.origin}${mount}${suffix}`
   } catch {
     return suffix
   }

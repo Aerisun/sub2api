@@ -284,7 +284,11 @@ func (h *ConcurrencyHelper) acquireUserSlotWithWaitTimeout(c *gin.Context, userI
 		return h.withAPIKeySlotFromGin(c, releaseFunc), nil
 	}
 
-	queueLimit := service.CalculateMaxWait(maxConcurrency) - maxConcurrency
+	queueConcurrency := maxConcurrency
+	if cap, openAI := service.UserOpenAIConcurrencyFromContext(ctx); openAI && cap > 0 && (queueConcurrency <= 0 || cap < queueConcurrency) {
+		queueConcurrency = cap
+	}
+	queueLimit := service.CalculateMaxWait(queueConcurrency) - queueConcurrency
 	if queueLimit < 1 {
 		queueLimit = 1
 	}
@@ -399,7 +403,13 @@ func (h *ConcurrencyHelper) waitForSlotWithPingTimeout(c *gin.Context, slotType 
 		pingCh = pingTicker.C
 	}
 
+	// Native Codex turns are short. A two-second poll cap leaves available
+	// slots idle after a burst; bounded jitter spreads Redis admission attempts.
+	_, openAI := service.UserOpenAIConcurrencyFromContext(ctx)
 	backoff := initialBackoff
+	if openAI {
+		backoff = 20 * time.Millisecond
+	}
 	timer := time.NewTimer(backoff)
 	defer timer.Stop()
 
@@ -440,7 +450,12 @@ func (h *ConcurrencyHelper) waitForSlotWithPingTimeout(c *gin.Context, slotType 
 			if result.Acquired {
 				return result.ReleaseFunc, nil
 			}
-			backoff = nextBackoff(backoff)
+			if openAI {
+				backoff = time.Duration(float64(min(time.Duration(float64(backoff)*backoffMultiplier), 100*time.Millisecond)) * (0.8 + rand.Float64()*0.4))
+				backoff = max(20*time.Millisecond, min(backoff, 100*time.Millisecond))
+			} else {
+				backoff = nextBackoff(backoff)
+			}
 			timer.Reset(backoff)
 		}
 	}

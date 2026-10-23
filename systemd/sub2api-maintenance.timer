@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Sub2API file retention every 15 minutes
+
+[Timer]
+OnCalendar=*-*-* *:00/15:00
+RandomizedDelaySec=30
+AccuracySec=30
+Persistent=true
+Unit=sub2api-maintenance.service
+
+[Install]
+WantedBy=timers.target

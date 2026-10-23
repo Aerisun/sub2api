@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import PlazaGroupSection from '../PlazaGroupSection.vue'
-import PlazaModelPricingTable from '../PlazaModelPricingTable.vue'
+import PlazaModelCard from '../PlazaModelCard.vue'
 import type { ModelPlazaGroup, PlazaModel } from '@/api/modelPlaza'
 
 vi.mock('vue-i18n', async () => {
@@ -9,13 +9,13 @@ vi.mock('vue-i18n', async () => {
   return {
     ...actual,
     useI18n: () => ({
-      t: (key: string) => key
-    })
+      t: (key: string) => key,
+    }),
   }
 })
 
 vi.mock('@/stores/app', () => ({
-  useAppStore: () => ({ cachedPublicSettings: null })
+  useAppStore: () => ({ cachedPublicSettings: null }),
 }))
 
 function ladderModel(tiers: number): PlazaModel {
@@ -27,7 +27,7 @@ function ladderModel(tiers: number): PlazaModel {
     output_price: 3e-5,
     cache_write_price: null,
     cache_read_price: null,
-    per_request_price: null
+    per_request_price: null,
   }))
   return {
     name: 'gpt-5.6-sol',
@@ -41,15 +41,15 @@ function ladderModel(tiers: number): PlazaModel {
       image_input_price: null,
       image_output_price: null,
       per_request_price: null,
-      intervals: []
+      intervals: [],
     },
     official_pricing: {
       input_price: 5e-6,
       output_price: 3e-5,
       cache_write_price: null,
       cache_read_price: null,
-      intervals
-    }
+      intervals,
+    },
   }
 }
 
@@ -70,7 +70,7 @@ function group(overrides: Partial<ModelPlazaGroup> = {}): ModelPlazaGroup {
     image_rate_multiplier: 1,
     long_context_pricing_enabled: true,
     models: [ladderModel(2)],
-    ...overrides
+    ...overrides,
   }
 }
 
@@ -79,20 +79,18 @@ function mountSection(g: ModelPlazaGroup) {
     props: { group: g },
     global: {
       stubs: {
-        GroupBadge: true,
-        Icon: true,
-        PlazaModelPricingTable: true
-      }
-    }
+        PlazaModelCard: true,
+      },
+    },
   })
 }
 
 const NOTE = 'modelPlaza.detail.longContextDisabledNote'
 
 describe('PlazaGroupSection 长上下文说明', () => {
-  it('分组关闭阶梯且组内有官方阶梯模型时显示说明', () => {
+  it('分组关闭阶梯时也不显示官方价格说明', () => {
     const wrapper = mountSection(group({ long_context_pricing_enabled: false }))
-    expect(wrapper.text()).toContain(NOTE)
+    expect(wrapper.text()).not.toContain(NOTE)
   })
 
   it('分组开启阶梯时不显示', () => {
@@ -102,7 +100,7 @@ describe('PlazaGroupSection 长上下文说明', () => {
 
   it('分组关闭但没有官方阶梯模型时不显示', () => {
     const wrapper = mountSection(
-      group({ long_context_pricing_enabled: false, models: [ladderModel(1)] })
+      group({ long_context_pricing_enabled: false, models: [ladderModel(1)] }),
     )
     expect(wrapper.text()).not.toContain(NOTE)
   })
@@ -115,25 +113,32 @@ describe('PlazaGroupSection 长上下文说明', () => {
   })
 })
 
-describe('PlazaGroupSection 高峰配置传递', () => {
-  it('分组启用高峰时把窗口描述与倍率传给价格表', () => {
+describe('PlazaGroupSection 模型卡片和计费说明', () => {
+  it('为每个模型展示卡片，并传入实际分组配置', () => {
+    const g = group({ name: '大一统' })
+    const wrapper = mountSection(g)
+    const cards = wrapper.findAllComponents(PlazaModelCard)
+    expect(cards).toHaveLength(g.models.length)
+    expect(cards[0].props('model')).toEqual(g.models[0])
+    expect(cards[0].props('group')).toEqual(g)
+    expect(wrapper.find('table').exists()).toBe(false)
+  })
+
+  it('分组启用高峰时显示本站高峰计费说明', () => {
     const wrapper = mountSection(
       group({
         subscription_type: 'subscription',
         peak_rate_enabled: true,
         peak_start: '14:00',
         peak_end: '18:00',
-        peak_rate_multiplier: 1.5
-      })
+        peak_rate_multiplier: 1.5,
+      }),
     )
-    const table = wrapper.findComponent(PlazaModelPricingTable)
-    // appStore mock 无 server_utc_offset,窗口描述不带时区标注
-    expect(table.props('peakWindow')).toBe('14:00-18:00 ×1.5')
-    expect(table.props('peakRateMultiplier')).toBe(1.5)
+    expect(wrapper.text()).toContain('modelPlaza.detail.peakNote')
   })
 
-  it('分组未启用高峰时窗口描述为空串', () => {
+  it('分组未启用高峰时不显示高峰计费说明', () => {
     const wrapper = mountSection(group())
-    expect(wrapper.findComponent(PlazaModelPricingTable).props('peakWindow')).toBe('')
+    expect(wrapper.text()).not.toContain('modelPlaza.detail.peakNote')
   })
 })

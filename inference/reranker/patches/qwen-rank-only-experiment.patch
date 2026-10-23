@@ -1,0 +1,23 @@
+--- a/src/models/qwen3.cpp
++++ b/src/models/qwen3.cpp
+@@ -1,4 +1,5 @@
+ #include "models.h"
++#include <cstdlib>
+ 
+ void llama_model_qwen3::load_arch_hparams(llama_model_loader & ml) {
+     ml.get_key(LLM_KV_ATTENTION_LAYERNORM_RMS_EPS, hparams.f_norm_rms_eps);
+@@ -149,6 +150,14 @@
+     cb(cur, "result_norm", -1);
+     res->t_embd = cur;
+ 
++    const char * rank_only = std::getenv("GGML_QWEN_RANK_ONLY");
++    if (cparams.embeddings && pooling_type == LLAMA_POOLING_TYPE_RANK && model.cls_out &&
++            rank_only && std::strcmp(rank_only, "1") == 0) {
++        // The rank head reads embeddings; vocabulary logits are unused.
++        ggml_build_forward_expand(gf, cur);
++        return;
++    }
++
+     // lm_head
+     cur = build_lora_mm(model.output, cur, model.output_s);
+ 

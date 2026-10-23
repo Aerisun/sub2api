@@ -28,6 +28,7 @@ func RegisterGatewayRoutes(
 	settingService *service.SettingService,
 	compositeResolver *service.CompositeRouteResolver,
 	cfg *config.Config,
+	chatJWT ...middleware.JWTAuthMiddleware,
 ) {
 	bodyLimit := middleware.RequestBodyLimit(cfg.Gateway.MaxBodySize)
 	textBodyLimit := middleware.RequestBodyLimit(cfg.Gateway.TextMaxBodySize)
@@ -44,6 +45,7 @@ func RegisterGatewayRoutes(
 	// 分组级模型白名单准入：在 apiKeyAuth 之后、compositeTarget 之前，
 	// 保证校验发生在合成路由改写与调度之前，且只看客户端书写的模型名。
 	groupModelAllowlist := middleware.GroupModelAllowlist()
+	groupImageGeneration := middleware.GroupImageGeneration()
 
 	isOpenAIResponsesCompatibleGatewayPlatform := func(c *gin.Context) bool {
 		switch getGroupPlatform(c) {
@@ -55,6 +57,14 @@ func RegisterGatewayRoutes(
 		default:
 			return false
 		}
+	}
+	rerankHandler := func(c *gin.Context) {
+		if getGroupPlatform(c) != service.PlatformOpenAI {
+			service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"type": "not_found_error", "message": "Rerank API is not supported for this platform"}})
+			return
+		}
+		h.OpenAIGateway.Rerank(c)
 	}
 	countTokensHandler := func(c *gin.Context) {
 		switch getGroupPlatform(c) {
@@ -182,6 +192,62 @@ func RegisterGatewayRoutes(
 		}
 	}
 
+	// Browser chat authenticates the current login first, then uses the regular
+	// gateway middleware/handlers, preserving billing, limits and usage records.
+	if len(chatJWT) > 0 {
+		// The optional tool bridge holds only the login JWT; reserved API keys stay
+		// inside the final gateway route and are never exposed to the browser.
+		r.POST("/api/v1/chat/completions", bodyLimit, gin.HandlerFunc(chatJWT[0]), middleware.BackendModeUserGuard(settingService), chatImageAgentProxy())
+		chat := r.Group("/api/v1/chat")
+		chat.Use(bodyLimit, gin.HandlerFunc(chatJWT[0]), middleware.BackendModeUserGuard(settingService))
+		chat.Use(func(c *gin.Context) {
+			subject, ok := middleware.GetAuthSubjectFromContext(c)
+			if !ok {
+				c.AbortWithStatus(http.StatusUnauthorized)
+				return
+			}
+			credential, err := apiKeyService.ChatCredential(c.Request.Context(), subject.UserID)
+			if err != nil {
+				c.AbortWithStatusJSON(503, gin.H{"error": gin.H{"message": "暂无可用的对话渠道，请稍后重试"}})
+				return
+			}
+			// Normalize before endpoint detection and routing. No caller-supplied key,
+			// user ID or group ID can change the credential selected above.
+			if c.Request.Method == http.MethodGet {
+				c.Request.URL.Path = "/v1/models"
+			} else if strings.HasSuffix(c.Request.URL.Path, "/images/generations") {
+				c.Request.URL.Path = "/v1/images/generations"
+			} else if strings.HasSuffix(c.Request.URL.Path, "/alpha/search") {
+				c.Request.URL.Path = "/v1/alpha/search"
+			} else if strings.HasSuffix(c.Request.URL.Path, "/images/recognitions") {
+				c.Request.URL.Path = "/v1/images/recognitions"
+			} else {
+				c.Request.URL.Path = "/v1/chat/completions"
+			}
+			originalAuth := c.Request.Header.Get("Authorization")
+			c.Request.Header.Set("Authorization", "Bearer "+credential)
+			c.Request.Header.Del("x-api-key")
+			c.Request.Header.Del("x-goog-api-key")
+			c.Set("internal_chat_authenticated", true)
+			c.Header("Cache-Control", "no-store")
+			defer c.Request.Header.Set("Authorization", originalAuth)
+			c.Next()
+		})
+		chat.Use(clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth))
+		chat.GET("/models", modelsHandler)
+		chat.Use(groupImageGeneration, groupModelAllowlist, compositeTarget, requireGroupAnthropic)
+		chat.POST("/images/generations", imagesHandler)
+		chat.POST("/alpha/search", h.OpenAIGateway.AlphaSearch)
+		chat.POST("/images/recognitions", h.OpenAIGateway.ImageRecognition)
+		chat.POST("/model/completions", func(c *gin.Context) {
+			if isOpenAIResponsesCompatibleGatewayPlatform(c) {
+				h.OpenAIGateway.ChatCompletions(c)
+				return
+			}
+			h.Gateway.ChatCompletions(c)
+		})
+	}
+
 	// API网关（Claude API兼容）
 	gateway := r.Group("/v1")
 	gateway.Use(bodyLimit)
@@ -190,7 +256,7 @@ func RegisterGatewayRoutes(
 	gateway.Use(endpointNorm)
 	gateway.Use(gin.HandlerFunc(apiKeyAuth))
 	gateway.GET("/sub2api/billing", h.Gateway.KeyBillingInfo)
-	gateway.Use(groupModelAllowlist)
+	gateway.Use(groupImageGeneration, groupModelAllowlist)
 	gateway.Use(compositeTarget)
 	gateway.Use(requireGroupAnthropic)
 	{
@@ -230,6 +296,7 @@ func RegisterGatewayRoutes(
 			h.Gateway.Responses(c)
 		}))
 		gateway.POST("/alpha/search", textBodyLimit, h.OpenAIGateway.AlphaSearch)
+		gateway.POST("/images/recognitions", h.OpenAIGateway.ImageRecognition)
 		gateway.GET("/responses", func(c *gin.Context) {
 			h.OpenAIGateway.ResponsesWebSocket(c)
 		})
@@ -241,6 +308,8 @@ func RegisterGatewayRoutes(
 			}
 			h.Gateway.ChatCompletions(c)
 		})
+		gateway.POST("/rerank", textBodyLimit, rerankHandler)
+		gateway.POST("/reranking", textBodyLimit, rerankHandler)
 		gateway.POST("/embeddings", textBodyLimit, func(c *gin.Context) {
 			if !isOpenAIOnlyEndpointGatewayPlatform(c) {
 				service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
@@ -345,7 +414,7 @@ func RegisterGatewayRoutes(
 	gemini.Use(opsErrorLogger)
 	gemini.Use(endpointNorm)
 	gemini.Use(middleware.APIKeyAuthWithSubscriptionGoogle(apiKeyService, subscriptionService, cfg))
-	gemini.Use(groupModelAllowlist)
+	gemini.Use(groupImageGeneration, groupModelAllowlist)
 	gemini.Use(compositeGeminiTarget)
 	gemini.Use(requireGroupGoogle)
 	{
@@ -366,7 +435,7 @@ func RegisterGatewayRoutes(
 	// 根路径别名共用中间件链：白名单准入在 apiKeyAuth 之后、compositeTarget
 	// 之前，避免逐条路由手工维护链导致漏挂。
 	rootRoute := func(method, path string, limit gin.HandlerFunc, handler gin.HandlerFunc) {
-		r.Handle(method, path, limit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), groupModelAllowlist, compositeTarget, requireGroupAnthropic, handler)
+		r.Handle(method, path, limit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), groupImageGeneration, groupModelAllowlist, compositeTarget, requireGroupAnthropic, handler)
 	}
 	for _, prefix := range []string{"/api/v3", "/v3", "/v1", ""} {
 		rootRoute(http.MethodPost, prefix+"/contents/generations/tasks", bodyLimit, h.OpenAIGateway.SeedanceTasks)
@@ -376,6 +445,7 @@ func RegisterGatewayRoutes(
 	rootRoute(http.MethodPost, "/responses", bodyLimit, responsesHandler)
 	rootRoute(http.MethodPost, "/responses/*subpath", bodyLimit, guardResponsesSubpath(responsesHandler))
 	rootRoute(http.MethodPost, "/alpha/search", textBodyLimit, h.OpenAIGateway.AlphaSearch)
+	rootRoute(http.MethodPost, "/images/recognitions", bodyLimit, h.OpenAIGateway.ImageRecognition)
 	rootRoute(http.MethodGet, "/responses", bodyLimit, func(c *gin.Context) {
 		h.OpenAIGateway.ResponsesWebSocket(c)
 	})
@@ -383,7 +453,7 @@ func RegisterGatewayRoutes(
 	rootRoute(http.MethodGet, "/models/:model", bodyLimit, h.Gateway.Models)
 	rootRoute(http.MethodPost, "/messages/count_tokens", bodyLimit, countTokensHandler)
 	codexDirect := r.Group("/backend-api/codex")
-	codexDirect.Use(bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), groupModelAllowlist, compositeTarget, requireGroupAnthropic)
+	codexDirect.Use(bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), groupImageGeneration, groupModelAllowlist, compositeTarget, requireGroupAnthropic)
 	{
 		codexDirect.POST("/realtime/calls", h.OpenAIGateway.Live)
 		codexDirect.GET("/:call_id", h.OpenAIGateway.LiveSideband)
@@ -403,6 +473,8 @@ func RegisterGatewayRoutes(
 		}
 		h.Gateway.ChatCompletions(c)
 	})
+	rootRoute(http.MethodPost, "/rerank", textBodyLimit, rerankHandler)
+	rootRoute(http.MethodPost, "/reranking", textBodyLimit, rerankHandler)
 	rootRoute(http.MethodPost, "/embeddings", textBodyLimit, func(c *gin.Context) {
 		if !isOpenAIOnlyEndpointGatewayPlatform(c) {
 			service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
@@ -496,7 +568,7 @@ func RegisterGatewayRoutes(
 	antigravityV1.Use(endpointNorm)
 	antigravityV1.Use(middleware.ForcePlatform(service.PlatformAntigravity))
 	antigravityV1.Use(gin.HandlerFunc(apiKeyAuth))
-	antigravityV1.Use(groupModelAllowlist)
+	antigravityV1.Use(groupImageGeneration, groupModelAllowlist)
 	antigravityV1.Use(requireGroupAnthropic)
 	{
 		antigravityV1.POST("/messages", h.Gateway.Messages)
@@ -512,7 +584,7 @@ func RegisterGatewayRoutes(
 	antigravityV1Beta.Use(endpointNorm)
 	antigravityV1Beta.Use(middleware.ForcePlatform(service.PlatformAntigravity))
 	antigravityV1Beta.Use(middleware.APIKeyAuthWithSubscriptionGoogle(apiKeyService, subscriptionService, cfg))
-	antigravityV1Beta.Use(groupModelAllowlist)
+	antigravityV1Beta.Use(groupImageGeneration, groupModelAllowlist)
 	antigravityV1Beta.Use(requireGroupGoogle)
 	{
 		antigravityV1Beta.GET("/models", h.Gateway.GeminiV1BetaListModels)
@@ -673,6 +745,8 @@ func compositeRouteEndpointForPath(path string) string {
 		return service.CompositeRouteEndpointResponses
 	case strings.Contains(path, "/chat/completions"):
 		return service.CompositeRouteEndpointChatCompletions
+	case strings.Contains(path, "/rerank"):
+		return service.CompositeRouteEndpointRerank
 	case strings.Contains(path, "/embeddings"):
 		return service.CompositeRouteEndpointEmbeddings
 	case strings.Contains(path, "/images/"):

@@ -95,6 +95,11 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			return
 		}
 
+		if service.IsChatKey(apiKeyString) && !c.GetBool("internal_chat_authenticated") {
+			AbortWithError(c, 401, "INVALID_API_KEY", "Invalid API key")
+			return
+		}
+
 		// ── 2. 验证 Key 存在 ─────────────────────────────────────────
 
 		apiKey, err := apiKeyService.GetByKey(c.Request.Context(), apiKeyString)
@@ -164,12 +169,16 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			return
 		}
 		ctx := context.WithValue(c.Request.Context(), ctxkey.UserID, apiKey.User.ID)
+		ctx = context.WithValue(ctx, ctxkey.UserOpenAIConcurrency, apiKey.User.OpenAIConcurrency)
 		c.Request = c.Request.WithContext(ctx)
 		billingInfoRequest := c.Request.URL.Path == "/v1/sub2api/billing"
 		// Async image task polling only reads data that already belongs to the
 		// authenticated key and must remain available after the completed
 		// generation consumes the key's remaining balance.
-		skipBilling := c.Request.URL.Path == "/v1/usage" || billingInfoRequest || isAsyncImageTaskRead(c.Request.Method, c.Request.URL.Path)
+		// The image worker authenticates task reads through model discovery.
+		// Metadata must remain readable when a finished image exhausts quota;
+		// every paid POST still performs the full billing checks below.
+		skipBilling := c.Request.URL.Path == "/v1/usage" || billingInfoRequest || isAsyncImageTaskRead(c.Request.Method, c.Request.URL.Path) || isReadOnlyModelCatalogue(c.Request.Method, c.Request.URL.Path)
 
 		// ── 4. SimpleMode → early return ─────────────────────────────
 
@@ -331,6 +340,10 @@ func isOpenAICompatibleAPIKeyRequest(c *gin.Context) bool {
 		}
 	}
 	return false
+}
+
+func isReadOnlyModelCatalogue(method, path string) bool {
+	return method == http.MethodGet && (path == "/v1/models" || path == "/models")
 }
 
 func isAsyncImageTaskRead(method, path string) bool {

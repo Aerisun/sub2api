@@ -72,6 +72,22 @@ func RegisterUserRoutes(
 			}
 		}
 
+		// Account-scoped history uses panel authentication, independently of model availability.
+		chat := authenticated.Group("/user/chat")
+		{
+			chat.GET("/conversations", h.ChatHistory.List)
+			chat.GET("/conversations/:id", h.ChatHistory.Get)
+			chat.PUT("/conversations/:id", h.ChatHistory.Put)
+			chat.DELETE("/conversations/:id", h.ChatHistory.Delete)
+			chat.POST("/conversations/:id/generations", h.ChatHistory.Generate)
+			chat.GET("/generations/:id/events", h.ChatHistory.GenerationEvents)
+			chat.GET("/generations/:id", h.ChatHistory.Generation)
+			chat.POST("/generations/:id/stop", h.ChatHistory.StopGeneration)
+			chat.POST("/generations/:id/image-inputs", h.ChatHistory.ImageInputs)
+			chat.POST("/images", h.ChatHistory.UploadImage)
+			chat.GET("/images/:id", h.ChatHistory.Image)
+		}
+
 		// API Key管理
 		keys := authenticated.Group("/keys")
 		{

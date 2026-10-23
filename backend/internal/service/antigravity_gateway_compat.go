@@ -211,11 +211,17 @@ func (s *AntigravityGatewayService) prepareAntigravityCompatCall(
 	if json.Unmarshal(request.claudeBody, &claudeRequest) != nil {
 		return nil, s.writeAntigravityCompatError(c, http.StatusBadRequest, "invalid_request_error", "Invalid request body")
 	}
+	// OpenAI `none` is an off switch, not an unknown effort that should
+	// receive the converter's default 10240-token thinking budget.
+	if strings.HasPrefix(request.originalModel, "claude-sonnet-") &&
+		request.reasoningEffort != nil && *request.reasoningEffort == "none" {
+		claudeRequest.Thinking = &antigravity.ThinkingConfig{Type: "disabled"}
+	}
 
 	mappedModel := s.getMappedModelForThinkingLevel(
 		account,
 		request.originalModel,
-		geminiThinkingLevelFromClaudeThinking(claudeRequest.Thinking),
+		geminiRequestedThinkingLevel(request.originalBody),
 	)
 	if mappedModel == "" {
 		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalFeatureGate)
@@ -225,6 +231,9 @@ func (s *AntigravityGatewayService) prepareAntigravityCompatCall(
 	thinkingEnabled := claudeRequest.Thinking != nil &&
 		(claudeRequest.Thinking.Type == "enabled" || claudeRequest.Thinking.Type == "adaptive")
 	mappedModel = applyThinkingModelSuffix(mappedModel, thinkingEnabled)
+	if err := applyAntigravityClaudeReasoning(&claudeRequest, request.originalBody, mappedModel); err != nil {
+		return nil, s.writeAntigravityCompatError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+	}
 
 	if s.tokenProvider == nil {
 		return nil, s.writeAntigravityCompatError(c, http.StatusBadGateway, "api_error", "Antigravity token provider not configured")
@@ -243,11 +252,25 @@ func (s *AntigravityGatewayService) prepareAntigravityCompatCall(
 		return nil, err
 	}
 	geminiBody, err := s.buildAntigravityCompatGeminiBody(ctx, request.claudeBody, &claudeRequest, projectID, mappedModel)
+	if err == nil {
+		geminiBody, err = applyAntigravityGeminiRequestReasoning(geminiBody, request.originalBody, request.originalModel, account)
+	}
+	if err == nil {
+		geminiBody, err = applyAntigravityClaudeThinkingOff(geminiBody, request.originalBody, mappedModel)
+	}
+	if err == nil {
+		geminiBody, err = applyAntigravityClientToolChoice(geminiBody, request.originalBody, mappedModel)
+	}
 	if err != nil {
-		return nil, s.writeAntigravityCompatError(c, http.StatusBadRequest, "invalid_request_error", "Invalid request")
+		return nil, s.writeAntigravityCompatError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 	}
 
 	request.reasoningEffort = ApplyThinkingEnabledFallback(request.reasoningEffort, request.originalBody, mappedModel)
+	if strings.HasPrefix(request.originalModel, "gemini-") {
+		request.reasoningEffort = antigravityGeminiReasoningMetadata(request.originalBody, account, request.originalModel)
+	} else if strings.HasPrefix(request.originalModel, "claude-") {
+		request.reasoningEffort = antigravityClaudeReasoningMetadata(request.originalBody)
+	}
 	return &antigravityCompatUpstreamCall{
 		request:      request,
 		billingModel: mappedModel,
@@ -403,7 +426,7 @@ func (s *AntigravityGatewayService) consumeAntigravityCompatResponse(
 		streamResult.usage = &ClaudeUsage{}
 	}
 
-	return &ForwardResult{
+	result := &ForwardResult{
 		RequestID:                     requestID,
 		UpstreamHeaders:               resp.Header,
 		Usage:                         *streamResult.usage,
@@ -416,7 +439,11 @@ func (s *AntigravityGatewayService) consumeAntigravityCompatResponse(
 		FirstTokenMs:                  streamResult.firstTokenMs,
 		ReasoningEffort:               call.request.reasoningEffort,
 		ClientDisconnect:              streamResult.clientDisconnect,
-	}, nil
+	}
+	if strings.HasPrefix(call.request.originalModel, "gemini-") {
+		result.RequestedReasoningEffort = geminiClientReasoningMetadata(call.request.originalBody)
+	}
+	return result, nil
 }
 
 func (s *AntigravityGatewayService) consumeAntigravityCompatSuccess(

@@ -160,5 +160,10 @@ func firstUsageBillingModel(candidates []string) string {
 }
 
 func isOpenAIGPT6Model(model string) bool {
-	return isOpenAIGPT6AstraModel(model) || openai.IsGPT6SolOrLunaModelSpelling(model)
+	return isOpenAIGPT6AstraModel(model) || isOpenAIGPT61SolModel(model) || openai.IsGPT6SolOrLunaModelSpelling(model)
+}
+
+func isOpenAIGPT61SolModel(model string) bool {
+	normalized := canonicalizeOpenAIModelAliasSpelling(model)
+	return normalized == "gpt-6.1-sol" || strings.HasPrefix(normalized, "gpt-6.1-sol-")
 }

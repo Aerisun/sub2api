@@ -70,6 +70,13 @@ type PricingInput struct {
 // 1. 获取基础定价（LiteLLM → Fallback）
 // 2. 如果指定了 GroupID，查找渠道定价并覆盖
 func (r *ModelPricingResolver) Resolve(ctx context.Context, input PricingInput) *ResolvedPricing {
+	// Private Gemini effort routes share the public family's configured price.
+	// Keep UpstreamModel intact in usage records while avoiding a stale fallback
+	// price for a hidden routing variant.
+	if family := geminiPublicModelFamily(input.Model); family != input.Model &&
+		matchGroupModelPricing(input.Group, input.Model) == nil && matchGroupModelPricing(input.Group, family) != nil {
+		input.Model = family
+	}
 	longContextPricingEnabled := input.Group == nil || input.Group.LongContextPricingEnabled
 	if groupPricing := matchGroupModelPricing(input.Group, input.Model); groupPricing != nil {
 		// Group token cards only override the first-tier / flat rates.

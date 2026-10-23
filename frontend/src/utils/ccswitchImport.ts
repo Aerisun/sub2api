@@ -53,6 +53,12 @@ export function resolveCcSwitchImportConfig(
         endpoint: withV1Endpoint(baseUrl),
         model: GROK_CC_SWITCH_MODEL
       }
+    case 'composite':
+      return {
+        app: 'claude',
+        endpoint: baseUrl.replace(/\/v1\/?$/, '').replace(/\/+$/, ''),
+        model: 'claude-sonnet-4-6'
+      }
     default:
       return {
         app: 'claude',

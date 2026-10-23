@@ -513,11 +513,19 @@ func newConfiguredCodexModelDescriptor(modelID string) configuredCodexModelDescr
 			descriptor.DefaultReasoningLevel = &defaultReasoningLevel
 			descriptor.SupportedReasoningLevels = configuredCodexGPTReasoningLevels(modelID)
 			descriptor.DefaultReasoningSummary = "none"
+			if isOpenAIGPT6Model(modelID) || isOpenAIGPT56Model(modelID) {
+				descriptor.DefaultReasoningSummary = "auto"
+			}
 			descriptor.TruncationPolicy = configuredCodexTruncationPolicy{Mode: "tokens", Limit: configuredCodexToolOutputMaxTokens}
 			// GPT-6 Sol/Luna retain the existing 5.6 Codex window as an offline
 			// compatibility template; live account metadata remains authoritative.
-			if isOpenAIGPT56Model(modelID) || openai.IsGPT6SolOrLunaModelSpelling(modelID) {
+			if isOpenAIGPT56Model(modelID) || openai.IsGPT6SolOrLunaModelSpelling(modelID) || isOpenAIGPT61SolModel(modelID) {
 				descriptor.MaxContextWindow = configuredCodexGPT56MaxContext
+			}
+			if isOpenAIGPT61SolModel(modelID) {
+				descriptor.ContextWindow = 1_050_000
+				descriptor.MaxContextWindow = 1_050_000
+				descriptor.DefaultReasoningSummary = "auto"
 			}
 			if isOpenAIGPT6AstraModel(modelID) {
 				// Codex resolves the Ultra workflow to this effort before inference.
@@ -1260,6 +1268,9 @@ func codexExplicitModelMappingClaims(account Account, modelID string) bool {
 func accountCodexModelSupportsImageInput(account *Account, upstreamModel string) bool {
 	if account == nil {
 		return false
+	}
+	if glmImageBridgeEnabled(account, upstreamModel) {
+		return true
 	}
 	switch account.Platform {
 	case PlatformOpenAI, PlatformDeepseek, PlatformOpenCodeGo:

@@ -1,0 +1,35 @@
+{
+  "mihomo_config": "@ROOT@/deployment/private/egress/mihomo-sub2api/config.yaml",
+  "group": "Sub2API egress",
+  "providers": [
+    "existing-nodes"
+  ],
+  "node_pattern": "^(?:NA-UnitedStates-|ASIA-Japan-|ASIA-Singapore-).+$",
+  "interval": 5,
+  "timeout_ms": 4000,
+  "failure_threshold": 3,
+  "cooldown_seconds": 180,
+  "recovery_interval": 60,
+  "state_file": "@ROOT@/data/egress-watchdog-state.json",
+  "probes": [
+    {
+      "url": "https://oauth2.googleapis.com/token",
+      "expected": "404"
+    },
+    {
+      "url": "https://daily-cloudcode-pa.googleapis.com/",
+      "expected": "404"
+    }
+  ],
+  "account_recovery": {
+    "base_url": "http://127.0.0.1:8080",
+    "env_file": "@ROOT@/.env",
+    "account_ids": [
+      54
+    ],
+    "proxy_id": 3,
+    "timeout": 8
+  },
+  "max_healthy_delay_ms": 0,
+  "latency_probe_interval": 300
+}

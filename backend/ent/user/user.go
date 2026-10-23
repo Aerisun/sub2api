@@ -33,6 +33,8 @@ const (
 	FieldFrozenBalance = "frozen_balance"
 	// FieldConcurrency holds the string denoting the concurrency field in the database.
 	FieldConcurrency = "concurrency"
+	// FieldOpenaiConcurrency holds the string denoting the openai_concurrency field in the database.
+	FieldOpenaiConcurrency = "openai_concurrency"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// FieldUsername holds the string denoting the username field in the database.
@@ -205,6 +207,7 @@ var Columns = []string{
 	FieldBalance,
 	FieldFrozenBalance,
 	FieldConcurrency,
+	FieldOpenaiConcurrency,
 	FieldStatus,
 	FieldUsername,
 	FieldNotes,
@@ -267,6 +270,10 @@ var (
 	DefaultFrozenBalance float64
 	// DefaultConcurrency holds the default value on creation for the "concurrency" field.
 	DefaultConcurrency int
+	// DefaultOpenaiConcurrency holds the default value on creation for the "openai_concurrency" field.
+	DefaultOpenaiConcurrency int
+	// OpenaiConcurrencyValidator is a validator for the "openai_concurrency" field. It is called by the builders before save.
+	OpenaiConcurrencyValidator func(int) error
 	// DefaultStatus holds the default value on creation for the "status" field.
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
@@ -348,6 +355,11 @@ func ByFrozenBalance(opts ...sql.OrderTermOption) OrderOption {
 // ByConcurrency orders the results by the concurrency field.
 func ByConcurrency(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldConcurrency, opts...).ToFunc()
+}
+
+// ByOpenaiConcurrency orders the results by the openai_concurrency field.
+func ByOpenaiConcurrency(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldOpenaiConcurrency, opts...).ToFunc()
 }
 
 // ByStatus orders the results by the status field.

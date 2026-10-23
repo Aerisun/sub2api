@@ -36,6 +36,16 @@
 
         <div class="space-y-3 py-4">
           <div class="flex items-center justify-between gap-4">
+            <label for="bulk-openai-concurrency" class="input-label mb-0">{{ t('admin.users.form.openaiConcurrency') }}</label>
+            <Toggle v-model="enableOpenAIConcurrency" :aria-label="t('admin.users.bulkLimits.enableOpenAIConcurrency')" />
+          </div>
+          <div v-if="enableOpenAIConcurrency">
+            <input id="bulk-openai-concurrency" v-model="openaiConcurrencyValue" type="number" min="0" step="1" class="input" />
+            <p class="input-hint">{{ t('admin.users.form.openaiConcurrencyHint') }}</p>
+          </div>
+        </div>
+        <div class="space-y-3 py-4">
+          <div class="flex items-center justify-between gap-4">
             <label for="bulk-rpm-limit" class="input-label mb-0">
               {{ t('admin.users.form.rpmLimit') }}
             </label>
@@ -112,6 +122,8 @@ const { t } = useI18n()
 const appStore = useAppStore()
 const enableConcurrency = ref(false)
 const enableRPMLimit = ref(false)
+const enableOpenAIConcurrency = ref(false)
+const openaiConcurrencyValue = ref<string | number>('')
 const concurrencyValue = ref<string | number>('')
 const rpmLimitValue = ref<string | number>('')
 const submitting = ref(false)
@@ -128,14 +140,18 @@ const parseLimit = (value: string | number): number | null | undefined => {
 const parsedConcurrency = computed(() =>
   enableConcurrency.value ? parseLimit(concurrencyValue.value) : undefined
 )
+const parsedOpenAIConcurrency = computed(() =>
+  enableOpenAIConcurrency.value ? parseLimit(openaiConcurrencyValue.value) : undefined
+)
 const parsedRPMLimit = computed(() =>
   enableRPMLimit.value ? parseLimit(rpmLimitValue.value) : undefined
 )
 const hasInvalidValue = computed(() =>
-  parsedConcurrency.value === null || parsedRPMLimit.value === null
+  parsedConcurrency.value === null || parsedOpenAIConcurrency.value === null || parsedRPMLimit.value === null
 )
 const hasUpdate = computed(() =>
-  (parsedConcurrency.value !== undefined && parsedConcurrency.value !== null)
+  (parsedOpenAIConcurrency.value !== undefined && parsedOpenAIConcurrency.value !== null)
+  || (parsedConcurrency.value !== undefined && parsedConcurrency.value !== null)
   || (parsedRPMLimit.value !== undefined && parsedRPMLimit.value !== null)
 )
 const selectionTooLarge = computed(() => props.selectedIds.length > MAX_BATCH_USER_IDS)
@@ -149,6 +165,8 @@ const canSubmit = computed(() =>
 
 const reset = () => {
   enableConcurrency.value = false
+  enableOpenAIConcurrency.value = false
+  openaiConcurrencyValue.value = ''
   enableRPMLimit.value = false
   concurrencyValue.value = ''
   rpmLimitValue.value = ''
@@ -175,6 +193,10 @@ const handleSubmit = async () => {
     fields.push(
       t('admin.users.bulkLimits.concurrencyValue', { value: parsedConcurrency.value })
     )
+  }
+  if (parsedOpenAIConcurrency.value !== undefined && parsedOpenAIConcurrency.value !== null) {
+    request.openai_concurrency = parsedOpenAIConcurrency.value
+    fields.push(t('admin.users.bulkLimits.openaiConcurrencyValue', { value: parsedOpenAIConcurrency.value }))
   }
   if (parsedRPMLimit.value !== undefined && parsedRPMLimit.value !== null) {
     request.rpm_limit = parsedRPMLimit.value

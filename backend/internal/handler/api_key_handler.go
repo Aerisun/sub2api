@@ -32,6 +32,7 @@ func NewAPIKeyHandler(apiKeyService *service.APIKeyService) *APIKeyHandler {
 
 // CreateAPIKeyRequest represents the create API key request payload
 type CreateAPIKeyRequest struct {
+	AllowedModels []string `json:"allowed_models"`
 	Name          string   `json:"name" binding:"required"`
 	GroupID       *int64   `json:"group_id"`        // nullable
 	CustomKey     *string  `json:"custom_key"`      // 可选的自定义key
@@ -48,14 +49,15 @@ type CreateAPIKeyRequest struct {
 
 // UpdateAPIKeyRequest represents the update API key request payload
 type UpdateAPIKeyRequest struct {
-	Name        string    `json:"name"`
-	GroupID     *int64    `json:"group_id"`
-	Status      string    `json:"status" binding:"omitempty,oneof=active inactive"`
-	IPWhitelist *[]string `json:"ip_whitelist"` // IP 白名单（nil 不修改，空数组清空）
-	IPBlacklist *[]string `json:"ip_blacklist"` // IP 黑名单（nil 不修改，空数组清空）
-	Quota       *float64  `json:"quota"`        // 配额限制 (USD), 0=无限制
-	ExpiresAt   *string   `json:"expires_at"`   // 过期时间 (ISO 8601)
-	ResetQuota  *bool     `json:"reset_quota"`  // 重置已用配额
+	AllowedModels *[]string `json:"allowed_models"`
+	Name          string    `json:"name"`
+	GroupID       *int64    `json:"group_id"`
+	Status        string    `json:"status" binding:"omitempty,oneof=active inactive"`
+	IPWhitelist   *[]string `json:"ip_whitelist"` // IP 白名单（nil 不修改，空数组清空）
+	IPBlacklist   *[]string `json:"ip_blacklist"` // IP 黑名单（nil 不修改，空数组清空）
+	Quota         *float64  `json:"quota"`        // 配额限制 (USD), 0=无限制
+	ExpiresAt     *string   `json:"expires_at"`   // 过期时间 (ISO 8601)
+	ResetQuota    *bool     `json:"reset_quota"`  // 重置已用配额
 
 	// Rate limit fields (nil = no change, 0 = unlimited)
 	RateLimit5h         *float64 `json:"rate_limit_5h"`
@@ -169,7 +171,7 @@ func (h *APIKeyHandler) GetByID(c *gin.Context) {
 	}
 
 	// 验证所有权
-	if key.UserID != subject.UserID {
+	if key.UserID != subject.UserID || service.IsChatKey(key.Key) {
 		response.NotFound(c, "API key not found")
 		return
 	}
@@ -202,6 +204,7 @@ func (h *APIKeyHandler) Create(c *gin.Context) {
 		CustomKey:     req.CustomKey,
 		IPWhitelist:   req.IPWhitelist,
 		IPBlacklist:   req.IPBlacklist,
+		AllowedModels: req.AllowedModels,
 		ExpiresInDays: req.ExpiresInDays,
 	}
 	if req.Quota != nil {
@@ -254,6 +257,7 @@ func (h *APIKeyHandler) Update(c *gin.Context) {
 	svcReq := service.UpdateAPIKeyRequest{
 		IPWhitelist:         req.IPWhitelist,
 		IPBlacklist:         req.IPBlacklist,
+		AllowedModels:       req.AllowedModels,
 		Quota:               req.Quota,
 		ResetQuota:          req.ResetQuota,
 		RateLimit5h:         req.RateLimit5h,
@@ -332,9 +336,15 @@ func (h *APIKeyHandler) GetAvailableGroups(c *gin.Context) {
 		return
 	}
 
-	out := make([]dto.Group, 0, len(groups))
+	// The key editor needs public model permissions for each bindable group.
+	// Other administrative group configuration stays in the admin DTO.
+	type availableGroup struct {
+		dto.Group
+		ModelAllowlist service.GroupModelAllowlist `json:"model_allowlist"`
+	}
+	out := make([]availableGroup, 0, len(groups))
 	for i := range groups {
-		out = append(out, *dto.GroupFromService(&groups[i]))
+		out = append(out, availableGroup{Group: *dto.GroupFromService(&groups[i]), ModelAllowlist: groups[i].ModelAllowlist})
 	}
 	response.Success(c, out)
 }

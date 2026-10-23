@@ -133,6 +133,9 @@ func resolveGeminiThinkingVariantForLevel(account *Account, requestedModel strin
 		return "", false
 	}
 	model := strings.TrimSpace(strings.TrimPrefix(requestedModel, "models/"))
+	if mapped, ok := configuredGeminiReasoningModel(account, model, preferred); ok {
+		return mapped, true
+	}
 	if !strings.HasPrefix(model, "gemini-") || hasGeminiThinkingVariantSuffix(model) {
 		return "", false
 	}

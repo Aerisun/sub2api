@@ -1162,6 +1162,8 @@ type GatewayLiveConfig struct {
 type GatewayOpenAIHTTP2Config struct {
 	// Enabled: 是否启用 OpenAI HTTP/2 优先策略
 	Enabled bool `mapstructure:"enabled"`
+	// IdleConnTimeoutSeconds: H2-only warm connection retention; 0 inherits the generic limit.
+	IdleConnTimeoutSeconds int `mapstructure:"idle_conn_timeout_seconds"`
 	// AllowProxyFallbackToHTTP1: HTTP/HTTPS 代理出现明确 H2 兼容错误时，临时回退 HTTP/1.1
 	AllowProxyFallbackToHTTP1 bool `mapstructure:"allow_proxy_fallback_to_http1"`
 	// FallbackErrorThreshold: 回退窗口内累计多少次兼容错误后触发回退
@@ -1388,6 +1390,9 @@ type GatewayOpenAISchedulerConfig struct {
 
 // GatewayUsageRecordConfig 使用量记录异步队列配置
 type GatewayUsageRecordConfig struct {
+	// ExcludedAPIKeyIDs suppresses usage log writes for server-managed keys.
+	// Billing, quota enforcement and channel-monitor results remain independent.
+	ExcludedAPIKeyIDs []int64 `mapstructure:"excluded_api_key_ids"`
 	// WorkerCount: worker 初始数量（自动扩缩容开启时作为初始并发上限）
 	WorkerCount int `mapstructure:"worker_count"`
 	// QueueSize: 队列容量（有界）
@@ -2452,6 +2457,7 @@ func setDefaults() {
 	viper.SetDefault("gateway.openai_ws.scheduler_score_weights.session_sticky", 3.0)
 	// OpenAI HTTP upstream protocol strategy
 	viper.SetDefault("gateway.openai_http2.enabled", true)
+	viper.SetDefault("gateway.openai_http2.idle_conn_timeout_seconds", 0)
 	viper.SetDefault("gateway.openai_http2.allow_proxy_fallback_to_http1", true)
 	viper.SetDefault("gateway.openai_http2.fallback_error_threshold", 2)
 	viper.SetDefault("gateway.openai_http2.fallback_window_seconds", 60)
@@ -2521,6 +2527,7 @@ func setDefaults() {
 	viper.SetDefault("gateway.scheduling.outbox_lag_rebuild_failures", 3)
 	viper.SetDefault("gateway.scheduling.outbox_backlog_rebuild_rows", 10000)
 	viper.SetDefault("gateway.scheduling.full_rebuild_interval_seconds", 300)
+	viper.SetDefault("gateway.usage_record.excluded_api_key_ids", []int64{})
 	viper.SetDefault("gateway.usage_record.worker_count", 128)
 	viper.SetDefault("gateway.usage_record.queue_size", 16384)
 	viper.SetDefault("gateway.usage_record.task_timeout_seconds", 5)
@@ -3518,6 +3525,9 @@ func (c *Config) Validate() error {
 	if c.Gateway.OpenAIWS.StickyPreviousResponseTTLSeconds < 0 {
 		return fmt.Errorf("gateway.openai_ws.sticky_previous_response_ttl_seconds must be non-negative")
 	}
+	if c.Gateway.OpenAIHTTP2.IdleConnTimeoutSeconds < 0 || c.Gateway.OpenAIHTTP2.IdleConnTimeoutSeconds > 900 {
+		return fmt.Errorf("gateway.openai_http2.idle_conn_timeout_seconds must be between 0 and 900")
+	}
 	if c.Gateway.OpenAIHTTP2.FallbackErrorThreshold < 0 {
 		return fmt.Errorf("gateway.openai_http2.fallback_error_threshold must be non-negative")
 	}
@@ -3567,6 +3577,11 @@ func (c *Config) Validate() error {
 	}
 	if c.Gateway.MaxLineSize != 0 && c.Gateway.MaxLineSize < 1024*1024 {
 		return fmt.Errorf("gateway.max_line_size must be at least 1MB")
+	}
+	for _, id := range c.Gateway.UsageRecord.ExcludedAPIKeyIDs {
+		if id <= 0 {
+			return fmt.Errorf("gateway.usage_record.excluded_api_key_ids must contain positive API key IDs")
+		}
 	}
 	if c.Gateway.UsageRecord.WorkerCount <= 0 {
 		return fmt.Errorf("gateway.usage_record.worker_count must be positive")

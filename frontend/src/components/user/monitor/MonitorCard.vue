@@ -8,9 +8,9 @@
     <div class="flex items-start gap-3">
       <span
         class="w-9 h-9 rounded-xl ring-1 ring-black/5 dark:ring-white/10 grid place-items-center flex-shrink-0"
-        :class="[providerGradient(item.provider), providerTintClass]"
+        :class="[providerGradient(brand.provider), providerTintClass]"
       >
-        <ProviderIcon :provider="item.provider" :size="20" />
+        <ProviderIcon :provider="brand.provider" :size="20" />
       </span>
       <div class="flex-1 min-w-0">
         <div class="text-base font-semibold truncate text-gray-900 dark:text-gray-100">
@@ -19,12 +19,12 @@
         <div class="mt-0.5 flex items-center gap-1.5 min-w-0">
           <span
             class="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium flex-shrink-0"
-            :class="providerBadgeClass(item.provider)"
+            :class="providerBadgeClass(brand.provider)"
           >
-            {{ providerLabel(item.provider) }}
+            {{ brand.label }}
           </span>
           <!-- 纯配额模式主模型是占位符 "quota"，展示层替换为本地化「配额」标签 -->
-          <span class="font-mono text-xs truncate text-gray-500 dark:text-gray-400">
+          <span v-if="item.name !== item.primary_model" class="font-mono text-xs truncate text-gray-500 dark:text-gray-400">
             {{ formatMonitorModel(item.primary_model) }}
           </span>
           <span
@@ -85,6 +85,7 @@ import {
   providerGradient,
 } from '@/composables/useChannelMonitorFormat'
 import { isChannelMonitorQuotaVisible } from '@/utils/featureFlags'
+import { modelBrand } from '@/utils/modelBrand'
 import ProviderIcon from './ProviderIcon.vue'
 import MonitorMetricPair from './MonitorMetricPair.vue'
 import MonitorAvailabilityRow from './MonitorAvailabilityRow.vue'
@@ -100,6 +101,7 @@ const PROVIDER_TINT: Record<string, string> = {
   antigravity: 'text-purple-600 dark:text-purple-300',
   kimi: 'text-pink-600 dark:text-pink-300',
   zhipu: 'text-indigo-600 dark:text-indigo-300',
+  qwen: 'text-violet-600 dark:text-violet-300',
   deepseek: 'text-teal-600 dark:text-teal-300',
   opencode_go: 'text-amber-700 dark:text-amber-300',
 }
@@ -119,14 +121,17 @@ const { t } = useI18n()
 const {
   statusLabel,
   statusBadgeClass,
-  providerLabel,
   providerBadgeClass,
   formatLatency,
   formatMonitorModel,
 } = useChannelMonitorFormat()
 
+const brand = computed(() => {
+  const resolved = modelBrand(props.item.primary_model)
+  return resolved.provider ? resolved : { provider: props.item.provider, label: props.item.provider }
+})
 const providerTintClass = computed(() =>
-  PROVIDER_TINT[props.item.provider] ?? 'text-gray-500 dark:text-gray-300'
+  PROVIDER_TINT[brand.value.provider] ?? 'text-gray-500 dark:text-gray-300'
 )
 
 const quotaVisible = computed(

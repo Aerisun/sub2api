@@ -403,13 +403,10 @@ func chatUsageFromResponsesUsage(u *ResponsesUsage) *ChatUsage {
 }
 
 // promptDetailsFromResponses maps Responses-API input_tokens_details into a
-// Chat-Completions prompt_tokens_details. Returns nil when nothing would be
-// emitted, so upstreams that do not break down prompt usage stay clean.
+// Chat-Completions prompt_tokens_details. A reported zero cache count is
+// meaningful; nil alone means the upstream did not provide a breakdown.
 func promptDetailsFromResponses(src *ResponsesInputTokensDetails) *ChatTokenDetails {
 	if src == nil {
-		return nil
-	}
-	if src.CachedTokens == 0 && src.AudioTokens == 0 && src.CacheCreationTokens == 0 && src.CacheWriteTokens == 0 {
 		return nil
 	}
 	return &ChatTokenDetails{

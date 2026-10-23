@@ -88,6 +88,7 @@ export interface User {
   balance: number // User balance for API usage
   frozen_balance?: number // Balance currently held by async batch jobs
   concurrency: number // Allowed concurrent requests
+  openai_concurrency?: number // Additional OpenAI cap; 0 retains the global cap
   rpm_limit?: number // User-level RPM cap (0 = unlimited); effective as fallback when group has no rpm_limit
   status: 'active' | 'disabled' // Account status
   allowed_groups: number[] | null // Allowed group IDs (null = all non-exclusive groups)
@@ -112,6 +113,7 @@ export interface AdminUser extends User {
   restrict_public_groups?: boolean
   // 当前并发数（仅管理员列表接口返回）
   current_concurrency?: number
+  current_openai_concurrency?: number
 }
 
 export interface LoginRequest {
@@ -561,6 +563,7 @@ export interface ReasoningEffortMapping {
 }
 
 export interface Group {
+  model_allowlist?: ModelAllowlist
   id: number
   name: string
   description: string | null
@@ -727,6 +730,7 @@ export interface CompositeRouteDecision {
 }
 
 export interface ApiKey {
+	allowed_models?: string[] | null
   id: number
   user_id: number
   key: string
@@ -759,6 +763,7 @@ export interface ApiKey {
 }
 
 export interface CreateApiKeyRequest {
+	allowed_models?: string[]
   name: string
   group_id?: number | null
   custom_key?: string // Optional custom API Key
@@ -772,6 +777,7 @@ export interface CreateApiKeyRequest {
 }
 
 export interface UpdateApiKeyRequest {
+	allowed_models?: string[]
   name?: string
   group_id?: number | null
   status?: 'active' | 'inactive'
@@ -2077,6 +2083,7 @@ export interface UpdateUserRequest {
   role?: 'admin' | 'user'
   balance?: number
   concurrency?: number
+  openai_concurrency?: number
   rpm_limit?: number
   status?: 'active' | 'disabled'
   allowed_groups?: number[] | null

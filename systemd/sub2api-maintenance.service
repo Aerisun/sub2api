@@ -1,0 +1,15 @@
+[Unit]
+Description=Sub2API upload cache, log and backup retention
+After=sub2api-web.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=@ROOT@
+ExecStart=/usr/bin/python3 -m ops.maintenance --apply
+ExecStart=/usr/sbin/logrotate --state @ROOT@/data/logrotate.status @ROOT@/deployment/generated/logrotate.conf
+Environment=PYTHONDONTWRITEBYTECODE=1
+UMask=0077
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=120
+NoNewPrivileges=true

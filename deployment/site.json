@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "installed_root": "/data/238_2/wenbo/Service/sub2api",
+  "public_url": "https://aerisun.top/sub2api",
+  "ports": {
+    "gateway": 8080,
+    "web": 8081,
+    "image_hub": 8092,
+    "tools": 8094,
+    "qiniu": 8095,
+    "nvidia": 8096,
+    "postgres": 55432,
+    "redis": 56379,
+    "gemini_proxy": 17991,
+    "codex_proxy": 17995,
+    "nvidia_proxy": 17896
+  },
+  "config_directory": "deployment/private/config",
+  "private_directory": "deployment/private",
+  "public_directory": "var/www",
+  "python_site": "runtime/python-site",
+  "upstream": "https://github.com/Wei-Shaw/sub2api",
+  "branch": "aerisun",
+  "model_configuration_policy": "Preserve deployed model IDs, inference controls, prices and provider mappings; user-retired models remain absent.",
+  "operator_environment": "deployment/private/config/operator.env",
+  "customer_group_id": 9,
+  "configuration": {
+    "proxy-qualifier": "deployment/private/config/proxy-qualifier.json",
+    "nvidia-egress": "deployment/private/config/nvidia-egress.json",
+    "egress-watchdog": "deployment/private/config/egress-watchdog.json",
+    "egress-subscriptions": "deployment/private/config/egress-subscriptions.json",
+    "nvidia-pool": "deployment/private/config/nvidia-pool.json",
+    "qiniu-pool": "deployment/private/config/qiniu-pool.json"
+  }
+}

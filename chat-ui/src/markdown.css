@@ -1,0 +1,236 @@
+/* Reading typography stays on the page. Code gets one faint outline. */
+.chat-message.is-assistant > .message-content {
+  width: 100%;
+}
+.composer > [data-slot="input-group"] { box-shadow: none; }
+.markdown-body {
+  --markdown-heading: var(--foreground);
+  --markdown-hairline: color-mix(in srgb, var(--border) 72%, transparent);
+  width: 100%;
+  min-width: 0;
+  font-size: 15px;
+  line-height: 1.9;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+.markdown-prose {
+  min-width: 0;
+  max-width: 100%;
+  color: inherit;
+}
+.markdown-prose > :first-child { margin-top: 0; }
+.markdown-prose > :last-child { margin-bottom: 0; }
+.markdown-body :where(p) {
+  margin-block: 0 1em;
+  line-height: inherit;
+}
+.markdown-body :where(h1, h2, h3, h4, h5, h6) {
+  color: var(--markdown-heading);
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: -0.025em;
+  text-wrap: pretty;
+  scroll-margin-top: 24px;
+}
+.markdown-body h1 { margin-block: 1.6em .65em; font-size: 1.8em; }
+.markdown-body h2 { margin-block: 1.65em .65em; font-size: 1.45em; }
+.markdown-body h3 { margin-block: 1.5em .6em; font-size: 1.2em; }
+.markdown-body :where(h4, h5, h6) { margin-block: 1.35em .55em; font-size: 1em; }
+.markdown-body :where(h1, h2, h3, h4, h5, h6) + :where(p, ul, ol) { margin-top: 0; }
+.markdown-body :where(strong) { color: inherit; font-weight: 600; }
+.markdown-body :where(ul, ol) { margin-block: .8em 1.1em; padding-inline-start: 1.5em; }
+.markdown-body :where(ul) { list-style-type: disc; }
+.markdown-body :where(ol) { list-style-type: decimal; }
+.markdown-body :where(li) { margin-block: .3em; padding-inline-start: .2em; }
+.markdown-body li::marker { color: var(--muted-foreground); font-weight: 400; }
+.markdown-body li :where(ul, ol) { margin-block: .35em .55em; }
+.markdown-body li :where(p) { margin-block: .35em; }
+.markdown-body :where(input[type="checkbox"]) {
+  width: 13px;
+  height: 13px;
+  margin-inline: 0 .5em;
+  accent-color: var(--primary);
+  vertical-align: -.1em;
+}
+.markdown-body :where(blockquote) {
+  margin-block: 1.3em;
+  padding: 0 0 0 1em;
+  border: 0;
+  border-inline-start: 2px solid var(--border);
+  border-radius: 0;
+  color: var(--muted-foreground);
+  background: transparent;
+  font-style: normal;
+}
+.markdown-body blockquote > :last-child { margin-bottom: 0; }
+.markdown-body :where(hr) { height: 0; margin-block: 1.8em; border: 0; border-top: 1px solid var(--markdown-hairline); }
+.markdown-body a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--primary) 35%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: text-decoration-color 150ms ease;
+}
+.markdown-body a:hover { text-decoration-color: currentColor; }
+.markdown-body :where(code, pre) { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; font-variant-ligatures: none; }
+.markdown-body :where([data-streamdown="inline-code"]) {
+  padding: .16em .38em;
+  border: 0;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--muted) 70%, transparent);
+  color: inherit;
+  font-size: .86em;
+  font-weight: 450;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.markdown-body [data-streamdown="code-block"] {
+  min-width: 0;
+  max-width: 100%;
+  margin-block: 1.25em 1.5em;
+  overflow: visible;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.markdown-body [data-streamdown="code-block-header"] > span { margin-inline: 0; }
+.markdown-body :is([data-streamdown="code-block-actions"], [data-streamdown="mermaid-block-actions"]) {
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.markdown-body [data-streamdown="code-block-header"] {
+  display: none;
+}
+.markdown-body [data-streamdown="code-block-body"] {
+  padding: 0;
+  border: 1px solid var(--markdown-hairline);
+  border-radius: 6px;
+  background: transparent;
+  scrollbar-width: thin;
+}
+.markdown-body [data-streamdown="code-block"] pre {
+  margin: 0;
+  padding: 16px 44px 16px 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent !important;
+  font-size: 12.5px;
+  line-height: 1.85;
+  tab-size: 2;
+}
+.markdown-body [data-streamdown="code-block"] code { background: none; font-size: inherit; font-weight: 400; }
+.markdown-body :is([data-streamdown="code-block-actions"], [data-streamdown="mermaid-block-actions"]) button {
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted-foreground);
+  box-shadow: none;
+}
+.markdown-body :is([data-streamdown="code-block-actions"], [data-streamdown="mermaid-block-actions"]) button:hover {
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+  color: var(--foreground);
+}
+.markdown-body [data-streamdown="table-wrapper"] {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+  margin-block: 1.3em 1.6em;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  scrollbar-width: thin;
+}
+.markdown-body [data-streamdown="table-wrapper"] > div:first-child {
+  position: static;
+}
+.markdown-body [data-streamdown="table-wrapper"] > div:first-child:not(:last-child) {
+  position: absolute;
+  inset-block-start: -22px;
+  inset-inline-end: 0;
+}
+.markdown-body [data-streamdown="table-wrapper"] > div:last-child {
+  max-width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  scrollbar-width: thin;
+}
+.markdown-body [data-streamdown="table"] {
+  width: 100%;
+  min-width: 30rem;
+  border: 0;
+  border-collapse: collapse;
+  border-spacing: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: .9em;
+  line-height: 1.8;
+}
+.markdown-body [data-streamdown="table"] :where(th, td) {
+  padding: 11px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--markdown-hairline);
+  background: transparent;
+  vertical-align: top;
+  font-size: inherit;
+  line-height: inherit;
+}
+.markdown-body [data-streamdown="table"] :where(thead, tbody) { border: 0; background: transparent; }
+.markdown-body [data-streamdown="table"] th { color: var(--markdown-heading); font-weight: 600; }
+.markdown-body [data-streamdown="table"] tr { border: 0; background: transparent; }
+.markdown-body [data-streamdown="table"] tbody tr:last-child td { border-bottom: 0; }
+.markdown-body [data-streamdown="table"] :where(th, td):first-child { padding-inline-start: 0; }
+.markdown-body [data-streamdown="table"] :where(th, td):last-child { padding-inline-end: 0; }
+.markdown-body [data-streamdown="table"] :where(p) { margin: 0; }
+.markdown-body .katex { color: inherit; font-size: 1.08em; line-height: 1.4; }
+.markdown-body .katex-display {
+  max-width: 100%;
+  margin-block: 1.45em;
+  padding-block: .25em;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 0;
+  background: none;
+  scrollbar-width: thin;
+}
+.markdown-body [data-streamdown="mermaid-block"] {
+  max-width: 100%;
+  margin-block: 1.4em;
+  padding: 8px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.markdown-body [data-streamdown="mermaid"] { max-width: 100%; background: transparent; }
+.markdown-body [data-streamdown="mermaid-block"] > div:last-child { border: 0; border-radius: 0; background: transparent; }
+[data-message-thinking] .markdown-body { --markdown-heading: currentColor; font-size: 13px; line-height: 1.85; }
+[data-message-thinking] .markdown-body h1 { font-size: 1.35em; }
+[data-message-thinking] .markdown-body h2 { font-size: 1.2em; }
+[data-message-thinking] .markdown-body h3 { font-size: 1.05em; }
+@media (max-width: 640px) {
+  .markdown-body { font-size: 14px; line-height: 1.9; }
+  .markdown-body h1 { font-size: 1.6em; }
+  .markdown-body h2 { font-size: 1.35em; }
+  .markdown-body h3 { font-size: 1.15em; }
+  .markdown-body [data-streamdown="code-block"] pre { padding-inline: 12px 40px; font-size: 12px; }
+  .markdown-body [data-streamdown="table"] :where(th, td) { padding-inline: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .markdown-body [data-sd-animate], .markdown-body [data-sd-animate-marker]::marker { animation: none !important; }
+}

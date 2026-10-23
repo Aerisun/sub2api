@@ -1,4 +1,4 @@
-.PHONY: build build-backend build-frontend test test-backend test-frontend test-frontend-critical
+.PHONY: build build-backend build-frontend build-chat-ui test test-backend test-frontend test-frontend-critical
 
 FRONTEND_CRITICAL_VITEST := \
 	src/i18n/__tests__/localeKeyCompleteness.spec.ts \
@@ -31,8 +31,11 @@ build-backend:
 	@$(MAKE) -C backend build
 
 # 编译前端（需要已安装依赖）
-build-frontend:
+build-frontend: build-chat-ui
 	@pnpm --dir frontend run build
+
+build-chat-ui:
+	@pnpm --dir chat-ui run build
 
 # 运行测试（后端 + 前端）
 test: test-backend test-frontend

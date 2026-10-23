@@ -44,7 +44,12 @@ func AnthropicToChatCompletionsRequest(req *AnthropicRequest) (*ChatCompletionsR
 		return nil, fmt.Errorf("anthropic request is nil")
 	}
 
-	messages, err := anthropicToChatMessages(req.System, req.Messages)
+	modelName := strings.ToLower(req.Model)
+	if i := strings.LastIndex(modelName, "/"); i >= 0 {
+		modelName = modelName[i+1:]
+	}
+	preserveThinking := strings.HasPrefix(modelName, "deepseek-") || strings.HasPrefix(modelName, "kimi-") || strings.HasPrefix(modelName, "glm-") || strings.HasPrefix(modelName, "nemotron-") || strings.HasPrefix(modelName, "step-")
+	messages, err := anthropicToChatMessages(req.System, req.Messages, preserveThinking)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +121,7 @@ func AnthropicToChatCompletionsRequest(req *AnthropicRequest) (*ChatCompletionsR
 // anthropicToChatMessages converts the Anthropic system field + message list
 // into Chat Completions messages. It mirrors convertAnthropicToResponsesInput +
 // responsesInputToChatMessages but produces ChatMessage directly.
-func anthropicToChatMessages(system json.RawMessage, msgs []AnthropicMessage) ([]ChatMessage, error) {
+func anthropicToChatMessages(system json.RawMessage, msgs []AnthropicMessage, preserveThinking ...bool) ([]ChatMessage, error) {
 	var messages []ChatMessage
 
 	// System prompt → system message. parseAnthropicSystemContentParts handles
@@ -136,7 +141,7 @@ func anthropicToChatMessages(system json.RawMessage, msgs []AnthropicMessage) ([
 	}
 
 	for _, m := range msgs {
-		converted, err := anthropicMsgToChatMessages(m)
+		converted, err := anthropicMsgToChatMessages(m, preserveThinking...)
 		if err != nil {
 			return nil, err
 		}
@@ -150,10 +155,10 @@ func anthropicToChatMessages(system json.RawMessage, msgs []AnthropicMessage) ([
 // Chat messages. tool_result blocks become standalone "tool" role messages
 // (the Chat Completions convention); text/image blocks stay in a user message;
 // assistant tool_use blocks become tool_calls on the assistant message.
-func anthropicMsgToChatMessages(m AnthropicMessage) ([]ChatMessage, error) {
+func anthropicMsgToChatMessages(m AnthropicMessage, preserveThinking ...bool) ([]ChatMessage, error) {
 	switch m.Role {
 	case "assistant":
-		return anthropicAssistantToChatMessages(m.Content)
+		return anthropicAssistantToChatMessages(m.Content, preserveThinking...)
 	default: // "user" and any unknown role
 		return anthropicUserToChatMessages(m.Content)
 	}
@@ -251,7 +256,7 @@ func anthropicUserToChatMessages(raw json.RawMessage) ([]ChatMessage, error) {
 // Text content → assistant message content; tool_use blocks → tool_calls on the
 // same assistant message; thinking blocks → reasoning_content, but only on a
 // message that carries tool calls (see anthropicThinkingToReasoningContent).
-func anthropicAssistantToChatMessages(raw json.RawMessage) ([]ChatMessage, error) {
+func anthropicAssistantToChatMessages(raw json.RawMessage, preserveThinking ...bool) ([]ChatMessage, error) {
 	// Plain string → single assistant message.
 	var s string
 	if err := json.Unmarshal(raw, &s); err == nil {
@@ -289,7 +294,10 @@ func anthropicAssistantToChatMessages(raw json.RawMessage) ([]ChatMessage, error
 		})
 	}
 
-	msg.ReasoningContent = anthropicThinkingToReasoningContent(blocks, len(msg.ToolCalls) > 0)
+	// DeepSeek's tool-enabled conversations require thinking from every
+	// assistant turn, including turns that did not themselves call a tool.
+	keepReasoning := len(msg.ToolCalls) > 0 || (len(preserveThinking) > 0 && preserveThinking[0])
+	msg.ReasoningContent = anthropicThinkingToReasoningContent(blocks, keepReasoning)
 
 	return []ChatMessage{msg}, nil
 }

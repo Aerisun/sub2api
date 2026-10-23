@@ -107,7 +107,21 @@ func openAIReasoningEffortToClaudeOutputEffort(effort string) string {
 // normally translated to OpenAI xhigh, but GPT-5.6 accepts the original max
 // value on Responses and Chat Completions.
 func openAICompatAnthropicReasoningEffort(req *apicompat.AnthropicRequest, upstreamModel, convertedEffort string) string {
-	if req == nil || req.OutputConfig == nil || !strings.EqualFold(strings.TrimSpace(req.OutputConfig.Effort), "max") {
+	if req == nil {
+		return convertedEffort
+	}
+	// An explicit off switch takes precedence over the effort slider. Astra
+	// cannot disable reasoning; use its lowest supported level without claiming
+	// that reasoning has been disabled.
+	if req.Thinking != nil && strings.EqualFold(strings.TrimSpace(req.Thinking.Type), "disabled") {
+		if isOpenAIGPT6AstraModel(upstreamModel) || isOpenAIGPT61SolModel(upstreamModel) {
+			return "low"
+		}
+		if isOpenAIGPT6Model(upstreamModel) || isOpenAIGPT56Model(upstreamModel) {
+			return "none"
+		}
+	}
+	if req.OutputConfig == nil || strings.TrimSpace(req.OutputConfig.Effort) == "" {
 		return convertedEffort
 	}
 	if normalized := normalizeOpenAIReasoningEffortForModel(req.OutputConfig.Effort, upstreamModel); normalized != "" {

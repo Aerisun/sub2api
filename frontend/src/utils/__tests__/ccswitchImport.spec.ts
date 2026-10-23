@@ -27,6 +27,17 @@ describe('ccswitchImport utils', () => {
     usageScript: 'return true'
   }
 
+  it('imports the composite site entry with an available Claude model', () => {
+    const params = paramsFromDeeplink(buildCcSwitchImportDeeplink({
+      ...baseInput,
+      baseUrl: 'https://aerisun.top/sub2api',
+      platform: 'composite',
+      clientType: 'claude'
+    }))
+    expect(params.get('endpoint')).toBe('https://aerisun.top/sub2api')
+    expect(params.get('model')).toBe('claude-sonnet-4-6')
+  })
+
   it('adds the Codex model parameter for OpenAI imports', () => {
     const params = paramsFromDeeplink(
       buildCcSwitchImportDeeplink({

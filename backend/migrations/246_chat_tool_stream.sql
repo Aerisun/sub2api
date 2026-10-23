@@ -1,0 +1,1 @@
+ALTER TABLE chat_generations ADD COLUMN IF NOT EXISTS tools JSONB NOT NULL DEFAULT '[]'::jsonb;

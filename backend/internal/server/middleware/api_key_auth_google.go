@@ -1,8 +1,10 @@
 package middleware
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -130,6 +132,10 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			abortWithGoogleError(c, 403, "API Key 所属专属分组不再允许当前用户使用")
 			return
 		}
+
+		ctx := context.WithValue(c.Request.Context(), ctxkey.UserID, apiKey.User.ID)
+		ctx = context.WithValue(ctx, ctxkey.UserOpenAIConcurrency, apiKey.User.OpenAIConcurrency)
+		c.Request = c.Request.WithContext(ctx)
 
 		// 简易模式：跳过余额和订阅检查
 		if cfg.RunMode == config.RunModeSimple {

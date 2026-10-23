@@ -258,12 +258,12 @@ func TestGatewayModels_UnmappedOpenAIAccountsSupplementMappedModels(t *testing.T
 		{
 			name:     "unmapped parent and Spark shadow retain defaults and aliases",
 			accounts: accounts,
-			want:     append(openai.DefaultModelIDs(), alias),
+			want:     append(openai.DefaultModelIDs(), alias, "image_generation", "web_search"),
 		},
 		{
 			name:     "unmapped API key account also contributes defaults",
 			accounts: append([]service.Account{{ID: 4, Platform: service.PlatformOpenAI, Type: service.AccountTypeAPIKey}}, accounts[1:]...),
-			want:     append(openai.DefaultModelIDs(), alias),
+			want:     append(openai.DefaultModelIDs(), alias, "image_generation", "web_search"),
 		},
 		{
 			name:     "unmapped accounts alone retain default response shape",

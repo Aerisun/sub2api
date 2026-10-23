@@ -1,0 +1,40 @@
+# Measured low-latency SSH forward to vcl-qiyu-0825; verified HTTPS relay remains fallback.
+# serino-route-schema: 3
+# serino-route-name: AI
+# serino-route-source: custom
+# serino-route-path: /sub2api
+# serino-route-upstream: http://127.0.0.1:18081
+@serino_user_route_7fa626e82ff6e33f path /sub2api /sub2api/*
+@aerisun_recognition64_connection {
+    protocol http/1.1
+    path /sub2api/v1/tools/image_recognition /sub2api/v1/tools/mcp /sub2api/v1/tools/call /sub2api/tools/image_recognition /sub2api/tools/mcp /sub2api/tools/call
+}
+handle @serino_user_route_7fa626e82ff6e33f {
+    header @aerisun_recognition64_connection >Connection close
+    uri strip_prefix /sub2api
+    reverse_proxy 127.0.0.1:18081 127.0.0.1:18082 {
+        lb_policy first
+        health_uri /health
+        health_interval 5s
+        health_timeout 2s
+        health_status 200
+        health_body status.*ok
+        health_passes 1
+        health_fails 2
+        fail_duration 10s
+        max_fails 1
+        lb_try_duration 3s
+        lb_try_interval 250ms
+        lb_retry_match {
+            method GET HEAD OPTIONS
+        }
+        flush_interval -1
+        stream_close_delay 5m
+        transport http {
+            dial_timeout 2s
+            response_header_timeout 330s
+            keepalive 60s
+            keepalive_idle_conns_per_host 256
+        }
+    }
+}

@@ -163,6 +163,7 @@ export default {
 
   // Navigation
   nav: {
+    chat: 'Chat',
     dashboard: 'Dashboard',
     announcements: 'Announcements',
     apiKeys: 'API Keys',
@@ -199,7 +200,7 @@ export default {
     buySubscription: 'Recharge / Subscription',
     recharge: 'Recharge',
     subscribe: 'Subscription',
-    docs: 'Docs',
+    docs: 'User Guide',
     myOrders: 'My Orders',
     orderManagement: 'Orders',
     paymentDashboard: 'Payment Dashboard',

@@ -28,7 +28,8 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 	c *gin.Context,
 	account *Account,
 	body []byte,
-) (*OpenAIForwardResult, error) {
+) (result *OpenAIForwardResult, err error) {
+	defer func() { attachGLMVisionUsage(c, result) }()
 	startTime := time.Now()
 
 	var responsesReq apicompat.ResponsesRequest
@@ -83,6 +84,28 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 	if err != nil {
 		return nil, fmt.Errorf("marshal chat completions fallback request: %w", err)
 	}
+	if isGLMClientThinkingModel(upstreamModel) {
+		if thinking := gjson.GetBytes(body, "thinking"); thinking.IsObject() {
+			chatBody, err = sjson.SetRawBytes(chatBody, "thinking", []byte(thinking.Raw))
+			if err != nil {
+				return nil, fmt.Errorf("preserve GLM thinking controls: %w", err)
+			}
+		}
+		if effort := gjson.GetBytes(body, "reasoning_effort"); effort.Type == gjson.String && !gjson.GetBytes(body, "reasoning.effort").Exists() {
+			chatBody, err = sjson.SetRawBytes(chatBody, "reasoning_effort", []byte(effort.Raw))
+			if err != nil {
+				return nil, fmt.Errorf("preserve GLM reasoning effort: %w", err)
+			}
+		}
+		chatBody, _ = NormalizeGLMOpenAIReasoningEffort(chatBody, upstreamModel)
+		reasoningEffort = extractOpenAIReasoningEffortFromBody(chatBody, upstreamModel, billingModel, originalModel)
+	}
+	chatBody, err = prepareDomesticChatControls(chatBody, body, upstreamModel, "responses", account)
+	if err != nil {
+		writeOpenAIResponsesFallbackError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		return nil, err
+	}
+	reasoningEffort = extractOpenAIReasoningEffortFromBody(chatBody, upstreamModel, billingModel, originalModel)
 	chatBody, err = s.applyOpenAIFastPolicyToBody(ctx, account, upstreamModel, chatBody)
 	if err != nil {
 		var blocked *OpenAIFastBlockedError
@@ -125,6 +148,9 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 		}
 		return s.handleErrorResponse(ctx, resp, c, account, chatBody, billingModel)
 	}
+
+	upstreamModel = resolvePoolUpstreamModel(account, resp.Header, upstreamModel)
+	SetOpsUpstreamModel(c, upstreamModel)
 
 	if clientStream {
 		return s.streamChatCompletionsAsResponses(c, resp, originalModel, customTools, functionTools, toolSearch, namespaceTools, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)

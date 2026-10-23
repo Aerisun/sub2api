@@ -1,0 +1,17 @@
+[Unit]
+Description=Fast Claude/Gemini node failover and network hold recovery
+After=network-online.target sub2api-gemini-egress.service sub2api.service
+Wants=sub2api-gemini-egress.service
+StartLimitIntervalSec=0
+
+[Service]
+WorkingDirectory=@ROOT@
+ExecStart=/usr/bin/python3 -m image_hub.egress_watchdog
+Restart=always
+RestartSec=1
+TimeoutStopSec=25
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

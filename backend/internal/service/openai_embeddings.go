@@ -24,6 +24,19 @@ func (s *OpenAIGatewayService) ForwardEmbeddings(
 	body []byte,
 	defaultMappedModel string,
 ) (*OpenAIForwardResult, error) {
+	return s.ForwardVectorRequest(ctx, c, account, body, defaultMappedModel, OpenAIEndpointCapabilityEmbeddings)
+}
+
+// ForwardVectorRequest forwards native embedding/rerank JSON and captures token usage.
+func (s *OpenAIGatewayService) ForwardVectorRequest(ctx context.Context, c *gin.Context, account *Account,
+	body []byte, defaultMappedModel string, capability OpenAIEndpointCapability) (*OpenAIForwardResult, error) {
+	endpoint := "/v1/embeddings"
+	if capability == OpenAIEndpointCapabilityRerank {
+		endpoint = "/v1/rerank"
+	} else if capability != OpenAIEndpointCapabilityEmbeddings {
+		return nil, fmt.Errorf("unsupported vector endpoint capability: %s", capability)
+	}
+	SetActualOpenAIUpstreamEndpoint(c, endpoint)
 	startTime := time.Now()
 
 	originalModel := strings.TrimSpace(gjson.GetBytes(body, "model").String())
@@ -40,7 +53,8 @@ func (s *OpenAIGatewayService) ForwardEmbeddings(
 		upstreamBody = ReplaceModelInBody(body, upstreamModel)
 	}
 
-	logger.L().Debug("openai embeddings: forwarding",
+	logger.L().Debug("openai vector request: forwarding",
+		zap.String("endpoint", endpoint),
 		zap.Int64("account_id", account.ID),
 		zap.String("original_model", originalModel),
 		zap.String("billing_model", billingModel),
@@ -61,7 +75,7 @@ func (s *OpenAIGatewayService) ForwardEmbeddings(
 	if err != nil {
 		return nil, fmt.Errorf("invalid base_url: %w", err)
 	}
-	targetURL := buildOpenAIEmbeddingsURL(validatedURL)
+	targetURL := buildOpenAIEndpointURL(validatedURL, endpoint)
 
 	upstreamCtx, releaseUpstreamCtx := detachUpstreamContext(ctx)
 	upstreamReq, err := http.NewRequestWithContext(upstreamCtx, http.MethodPost, targetURL, bytes.NewReader(upstreamBody))

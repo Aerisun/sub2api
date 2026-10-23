@@ -1328,6 +1328,11 @@ func (s *RateLimitService) apply429FallbackRateLimit(ctx context.Context, accoun
 }
 
 func (s *RateLimitService) get429FallbackCooldown(ctx context.Context, account *Account) (time.Duration, bool) {
+	// Subscription gateways may prefer returning a clear limit to retrying
+	// inside a long request. Use a short account-wide circuit breaker instead.
+	if openAIOAuth429RetriesDisabled(account) {
+		return 30 * time.Second, true
+	}
 	if s.settingService != nil {
 		settings, err := s.settingService.GetRateLimit429CooldownSettings(ctx)
 		if err == nil && settings != nil {

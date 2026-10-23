@@ -45,7 +45,7 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	rememberOpenCodeInboundBody(c, body)
 	beginUpstreamResponseModelObservation(c)
 	ClearActualOpenAIUpstreamEndpoint(c)
-	if shouldForwardOpenAIResponsesViaRawChatCompletions(account) {
+	if shouldForwardOpenAIResponsesViaRawChatCompletionsForBody(account, body) {
 		SetActualOpenAIUpstreamEndpoint(c, "/v1/chat/completions")
 	}
 	setCodexToolNameReverse(c, nil)
@@ -75,7 +75,7 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 
 	// 固定 chat_completions 的 CN 账号，以及不支持 Responses 的其他 APIKey
 	// 账号，均将 Messages 转为 CC；固定 responses 的 CN 账号不受探针旧值覆盖。
-	if shouldForwardOpenAIResponsesViaRawChatCompletions(account) {
+	if shouldForwardOpenAIResponsesViaRawChatCompletionsForBody(account, body) {
 		return s.forwardAnthropicViaRawChatCompletions(ctx, c, account, body, defaultMappedModel)
 	}
 	SetActualOpenAIUpstreamEndpoint(c, openAIResponsesUpstreamEndpoint)
@@ -158,14 +158,23 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	responsesReq.Stream = true
 	isStream := true
 
-	// 3b. Handle BetaFastMode → service_tier: "priority"
-	if containsBetaToken(c.GetHeader("anthropic-beta"), claude.BetaFastMode) {
+	// The explicit common API field takes precedence over client speed hints.
+	tier, tierErr := ValidateOpenAIServiceTierField(body)
+	if tierErr != nil {
+		writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", tierErr.Error())
+		return nil, tierErr
+	}
+	responsesReq.ServiceTier = tier
+	if tier == "" && (containsBetaToken(c.GetHeader("anthropic-beta"), claude.BetaFastMode) || strings.EqualFold(gjson.GetBytes(body, "speed").String(), "fast")) {
 		responsesReq.ServiceTier = "priority"
 	}
 
 	responsesReq.Model = upstreamModel
 	if responsesReq.Reasoning != nil {
 		responsesReq.Reasoning.Effort = openAICompatAnthropicReasoningEffort(&anthropicReq, upstreamModel, responsesReq.Reasoning.Effort)
+		if (isOpenAIGPT6Model(upstreamModel) || isOpenAIGPT56Model(upstreamModel)) && responsesReq.Reasoning.Effort != "none" {
+			responsesReq.Reasoning.Summary = "detailed"
+		}
 	}
 	if previousResponseID != "" {
 		responsesReq.PreviousResponseID = previousResponseID
@@ -1346,6 +1355,9 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 
 // writeAnthropicError writes an error response in Anthropic Messages API format.
 func writeAnthropicError(c *gin.Context, statusCode int, errType, message string) {
+	if writeGLMVisionStreamError(c, statusCode, errType, message) {
+		return
+	}
 	c.JSON(statusCode, gin.H{
 		"type": "error",
 		"error": gin.H{

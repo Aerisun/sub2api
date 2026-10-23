@@ -29,6 +29,14 @@ type PlazaModel struct {
 	LongContextBasis ContextPricingBasis
 	// TimePricing 计费会生效的分时倍率时段；无分时为 nil。
 	TimePricing *TimePricingSchedule
+	ToolName    string
+	Endpoint    string
+	ToolModels  []PlazaToolModel
+}
+
+type PlazaToolModel struct {
+	Name    string
+	Pricing *ChannelModelPricing
 }
 
 // PlazaGroup 模型广场中以分组为顶层的条目。
@@ -208,6 +216,10 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 			s.fillDisplayPricing(ctx, &pg.Models[j], g)
 			pg.Models[j].OfficialPricing = s.lookupOfficialPricing(ctx, pg.Models[j].Name, officialMemo)
 		}
+		pg.Models = s.standardToolEntries(pg.Models, g)
+		if len(pg.Models) == 0 {
+			continue
+		}
 		out = append(out, *pg)
 	}
 
@@ -220,12 +232,72 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 	return out, nil
 }
 
+// Keep provider image models internal. Public tools use the exact prices of
+// their backing operation, including the dedicated Codex search billing rule.
+func (s *ModelPlazaService) standardToolEntries(models []PlazaModel, group *Group) []PlazaModel {
+	byName := make(map[string]PlazaModel, len(models))
+	out := make([]PlazaModel, 0, len(models)+3)
+	for _, model := range models {
+		byName[model.Name] = model
+		if !strings.HasPrefix(strings.ToLower(model.Name), "gpt-image-") && model.Name != ToolImageGeneration && model.Name != ToolImageRecognition && model.Name != ToolWebSearch {
+			out = append(out, model)
+		}
+	}
+	appendTool := func(name string, source PlazaModel) {
+		if !group.ModelAllowlist.Allows(name) {
+			return
+		}
+		source.Name, source.ToolName, source.Endpoint = name, name, "/v1/tools/"+name
+		source.OfficialPricing = nil
+		if source.Pricing != nil {
+			price := *source.Pricing
+			price.Models = []string{name}
+			source.Pricing = &price
+		}
+		out = append(out, source)
+	}
+	for _, name := range ToolImageModels {
+		if model, ok := byName[name]; ok {
+			for _, imageModel := range ToolImageModels {
+				if option, found := byName[imageModel]; found {
+					model.ToolModels = append(model.ToolModels, PlazaToolModel{Name: imageModel, Pricing: option.Pricing})
+				}
+			}
+			appendTool(ToolImageGeneration, model)
+			break
+		}
+	}
+	for _, visionModel := range ToolVisionModels {
+		if model, ok := byName[visionModel]; ok {
+			price := imageRecognitionUnitPrice(group)
+			model.Pricing = &ChannelModelPricing{Platform: PlatformOpenAI, Models: []string{ToolImageRecognition}, BillingMode: BillingModeImage, PerRequestPrice: &price}
+			model.LongContextBasis, model.TimePricing = "", nil
+			appendTool(ToolImageRecognition, model)
+			break
+		}
+	}
+	for _, name := range ToolSearchModels {
+		if _, ok := byName[name]; ok {
+			price := (&BillingService{}).CalculateWebSearchCost(1, group.WebSearchPricePerCall, 1).TotalCost
+			appendTool(ToolWebSearch, PlazaModel{Platform: PlatformOpenAI, Pricing: &ChannelModelPricing{Platform: PlatformOpenAI, Models: []string{ToolWebSearch}, BillingMode: BillingModePerRequest, PerRequestPrice: &price}})
+			break
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
 // fillDisplayPricing 把模型的展示定价换成实收口径：
 // token 模型取计费阶梯表（单价与档位均由真实计费函数得出），
 // 图片/按次模型（或阶梯表不可用时）沿用渠道定价与分组图片档位价。
 func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaModel, g *Group) {
 	if groupPricing := matchGroupModelPricing(g, m.Name); groupPricing != nil {
 		m.Pricing = groupPricing
+		// Billing uses a model's group image card before the generic group
+		// resolution prices. Preserve that same precedence in the plaza.
+		if groupPricing.BillingMode == BillingModeImage {
+			return
+		}
 	}
 	if s.billingService != nil && s.resolver != nil {
 		sched, err := s.billingService.ResolveContextPricingSchedule(ctx, s.resolver, ContextPricingScheduleInput{

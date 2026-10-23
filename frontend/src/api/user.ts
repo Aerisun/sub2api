@@ -4,6 +4,7 @@
  */
 
 import { apiClient } from './client'
+import { getAPIBaseURL } from './url'
 import {
   resolveWeChatOAuthStartStrict,
   prepareOAuthBindAccessTokenCookie,
@@ -143,7 +144,7 @@ export function buildOAuthBindingStartURL(
   options: BuildOAuthBindingStartURLOptions = {}
 ): string | null {
   const redirectTo = options.redirectTo?.trim() || '/profile'
-  const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api/v1'
+  const apiBase = getAPIBaseURL()
   const normalized = apiBase.replace(/\/$/, '')
   const params = new URLSearchParams({
     redirect: redirectTo,

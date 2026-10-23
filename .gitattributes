@@ -20,3 +20,6 @@ backend/migrations/*.sql text eol=lf
 
 # Dockerfile
 Dockerfile text eol=lf
+
+# Preserve context whitespace and pinned hashes in upstream CPU patches.
+inference/*/patches/* -whitespace

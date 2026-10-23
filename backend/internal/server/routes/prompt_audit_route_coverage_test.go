@@ -28,10 +28,16 @@ func TestEveryGatewayPOSTRouteIsClassifiedForPromptAuditCoverage(t *testing.T) {
 	}
 
 	audited := map[string][]string{
-		"/messages":                 {"gateway_handler.go", "openai_gateway_handler.go"},
-		"/responses":                {"gateway_handler_responses.go", "openai_gateway_handler.go"},
-		"/responses/*subpath":       {"gateway_handler_responses.go", "openai_gateway_handler.go"},
-		"/chat/completions":         {"gateway_handler_chat_completions.go", "openai_chat_completions.go"},
+		"/messages":           {"gateway_handler.go", "openai_gateway_handler.go"},
+		"/responses":          {"gateway_handler_responses.go", "openai_gateway_handler.go"},
+		"/responses/*subpath": {"gateway_handler_responses.go", "openai_gateway_handler.go"},
+		"/chat/completions":   {"gateway_handler_chat_completions.go", "openai_chat_completions.go"},
+		// The tool bridge and recognition adapter delegate to the authenticated
+		// chat handlers; vector aliases share handleVectorRequest.
+		"/api/v1/chat/completions":  {"gateway_handler_chat_completions.go", "openai_chat_completions.go"},
+		"/images/recognitions":      {"openai_chat_completions.go"},
+		"/rerank":                   {"openai_embeddings.go"},
+		"/reranking":                {"openai_embeddings.go"},
 		"/embeddings":               {"openai_embeddings.go"},
 		"/alpha/search":             {"openai_alpha_search.go"},
 		"/live":                     {"openai_live.go"},

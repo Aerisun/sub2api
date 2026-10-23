@@ -255,7 +255,7 @@ func TestHandleSmartRetry_ShortDelay_SmartRetrySuccess(t *testing.T) {
 
 // TestHandleSmartRetry_ShortDelay_SmartRetryFailed_ReturnsSwitchError 测试智能重试失败后返回 switchError
 func TestHandleSmartRetry_ShortDelay_SmartRetryFailed_ReturnsSwitchError(t *testing.T) {
-	// 智能重试后仍然返回 429（需要提供 1 个响应，因为智能重试最多 1 次）
+	// Gemini subsecond resets may retry three times before switching accounts.
 	failRespBody := `{
 		"error": {
 			"status": "RESOURCE_EXHAUSTED",
@@ -271,8 +271,9 @@ func TestHandleSmartRetry_ShortDelay_SmartRetryFailed_ReturnsSwitchError(t *test
 		Body:       io.NopCloser(strings.NewReader(failRespBody)),
 	}
 	upstream := &mockSmartRetryUpstream{
-		responses: []*http.Response{failResp1},
-		errors:    []error{nil},
+		responses:  []*http.Response{failResp1},
+		errors:     []error{nil},
+		repeatLast: true,
 	}
 
 	repo := &stubAntigravityAccountRepo{}
@@ -332,7 +333,7 @@ func TestHandleSmartRetry_ShortDelay_SmartRetryFailed_ReturnsSwitchError(t *test
 	require.Len(t, repo.modelRateLimitCalls, 2)
 	require.Equal(t, "gemini-3-flash", repo.modelRateLimitCalls[0].modelKey)
 	require.Equal(t, antigravityGeminiModelRateLimitKey, repo.modelRateLimitCalls[1].modelKey)
-	require.Len(t, upstream.calls, 1, "should have made one retry call (max attempts)")
+	require.Len(t, upstream.calls, 3, "Gemini subsecond resets use at most three bounded retries")
 }
 
 // TestHandleSmartRetry_503_ModelCapacityExhausted_RetrySuccess 测试 503 MODEL_CAPACITY_EXHAUSTED 重试成功

@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 24 // v24: group model_allowlist field (renamed from models_list_config, enforcing semantics)
+const apiKeyAuthSnapshotVersion = 26 // v26: user OpenAI concurrency cap
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -336,26 +336,28 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 		return nil
 	}
 	snapshot := &APIKeyAuthSnapshot{
-		Version:     apiKeyAuthSnapshotVersion,
-		APIKeyID:    apiKey.ID,
-		UserID:      apiKey.UserID,
-		GroupID:     apiKey.GroupID,
-		Name:        apiKey.Name,
-		Status:      apiKey.Status,
-		IPWhitelist: apiKey.IPWhitelist,
-		IPBlacklist: apiKey.IPBlacklist,
-		Quota:       apiKey.Quota,
-		QuotaUsed:   apiKey.QuotaUsed,
-		ExpiresAt:   apiKey.ExpiresAt,
-		RateLimit5h: apiKey.RateLimit5h,
-		RateLimit1d: apiKey.RateLimit1d,
-		RateLimit7d: apiKey.RateLimit7d,
+		Version:       apiKeyAuthSnapshotVersion,
+		APIKeyID:      apiKey.ID,
+		UserID:        apiKey.UserID,
+		GroupID:       apiKey.GroupID,
+		Name:          apiKey.Name,
+		Status:        apiKey.Status,
+		IPWhitelist:   apiKey.IPWhitelist,
+		IPBlacklist:   apiKey.IPBlacklist,
+		AllowedModels: apiKey.AllowedModels,
+		Quota:         apiKey.Quota,
+		QuotaUsed:     apiKey.QuotaUsed,
+		ExpiresAt:     apiKey.ExpiresAt,
+		RateLimit5h:   apiKey.RateLimit5h,
+		RateLimit1d:   apiKey.RateLimit1d,
+		RateLimit7d:   apiKey.RateLimit7d,
 		User: APIKeyAuthUserSnapshot{
 			ID:                         apiKey.User.ID,
 			Status:                     apiKey.User.Status,
 			Role:                       apiKey.User.Role,
 			Balance:                    apiKey.User.Balance,
 			Concurrency:                apiKey.User.Concurrency,
+			OpenAIConcurrency:          apiKey.User.OpenAIConcurrency,
 			AllowedGroups:              apiKey.User.AllowedGroups,
 			Email:                      apiKey.User.Email,
 			Username:                   apiKey.User.Username,
@@ -445,26 +447,28 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 		return nil
 	}
 	apiKey := &APIKey{
-		ID:          snapshot.APIKeyID,
-		UserID:      snapshot.UserID,
-		GroupID:     snapshot.GroupID,
-		Key:         key,
-		Name:        snapshot.Name,
-		Status:      snapshot.Status,
-		IPWhitelist: snapshot.IPWhitelist,
-		IPBlacklist: snapshot.IPBlacklist,
-		Quota:       snapshot.Quota,
-		QuotaUsed:   snapshot.QuotaUsed,
-		ExpiresAt:   snapshot.ExpiresAt,
-		RateLimit5h: snapshot.RateLimit5h,
-		RateLimit1d: snapshot.RateLimit1d,
-		RateLimit7d: snapshot.RateLimit7d,
+		ID:            snapshot.APIKeyID,
+		UserID:        snapshot.UserID,
+		GroupID:       snapshot.GroupID,
+		Key:           key,
+		Name:          snapshot.Name,
+		Status:        snapshot.Status,
+		IPWhitelist:   snapshot.IPWhitelist,
+		IPBlacklist:   snapshot.IPBlacklist,
+		AllowedModels: snapshot.AllowedModels,
+		Quota:         snapshot.Quota,
+		QuotaUsed:     snapshot.QuotaUsed,
+		ExpiresAt:     snapshot.ExpiresAt,
+		RateLimit5h:   snapshot.RateLimit5h,
+		RateLimit1d:   snapshot.RateLimit1d,
+		RateLimit7d:   snapshot.RateLimit7d,
 		User: &User{
 			ID:                         snapshot.User.ID,
 			Status:                     snapshot.User.Status,
 			Role:                       snapshot.User.Role,
 			Balance:                    snapshot.User.Balance,
 			Concurrency:                snapshot.User.Concurrency,
+			OpenAIConcurrency:          snapshot.User.OpenAIConcurrency,
 			AllowedGroups:              snapshot.User.AllowedGroups,
 			Email:                      snapshot.User.Email,
 			Username:                   snapshot.User.Username,

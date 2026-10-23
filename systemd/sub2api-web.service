@@ -1,0 +1,15 @@
+[Unit]
+Description=Sub2API custom web console and API proxy
+After=network-online.target sub2api.service
+Wants=network-online.target sub2api.service
+
+[Service]
+WorkingDirectory=@ROOT@
+ExecStart=@ROOT@/runtime/bin/nginx -c @ROOT@/deployment/private/config/nginx.conf -p @ROOT@/ -g "daemon off;"
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

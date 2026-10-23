@@ -83,3 +83,21 @@ deploy/redis_data/
 .claude/
 issues/
 CLAUDE.md
+# Aerisun production state and local runtimes never enter a build context.
+secrets/
+data/
+backups/
+var/
+bin/
+runtime/
+runtime-redis/
+postgres_data/
+postgres_socket/
+redis_data/
+deployment/private/
+deployment/generated/
+frontend/public/chat-ui/
+frontend/node_modules
+chat-ui/node_modules
+tunnel/keys/
+tunnel/known_hosts

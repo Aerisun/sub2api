@@ -144,6 +144,20 @@ func (_c *UserCreate) SetNillableConcurrency(v *int) *UserCreate {
 	return _c
 }
 
+// SetOpenaiConcurrency sets the "openai_concurrency" field.
+func (_c *UserCreate) SetOpenaiConcurrency(v int) *UserCreate {
+	_c.mutation.SetOpenaiConcurrency(v)
+	return _c
+}
+
+// SetNillableOpenaiConcurrency sets the "openai_concurrency" field if the given value is not nil.
+func (_c *UserCreate) SetNillableOpenaiConcurrency(v *int) *UserCreate {
+	if v != nil {
+		_c.SetOpenaiConcurrency(*v)
+	}
+	return _c
+}
+
 // SetStatus sets the "status" field.
 func (_c *UserCreate) SetStatus(v string) *UserCreate {
 	_c.mutation.SetStatus(v)
@@ -630,6 +644,10 @@ func (_c *UserCreate) defaults() error {
 		v := user.DefaultConcurrency
 		_c.mutation.SetConcurrency(v)
 	}
+	if _, ok := _c.mutation.OpenaiConcurrency(); !ok {
+		v := user.DefaultOpenaiConcurrency
+		_c.mutation.SetOpenaiConcurrency(v)
+	}
 	if _, ok := _c.mutation.Status(); !ok {
 		v := user.DefaultStatus
 		_c.mutation.SetStatus(v)
@@ -717,6 +735,14 @@ func (_c *UserCreate) check() error {
 	}
 	if _, ok := _c.mutation.Concurrency(); !ok {
 		return &ValidationError{Name: "concurrency", err: errors.New(`ent: missing required field "User.concurrency"`)}
+	}
+	if _, ok := _c.mutation.OpenaiConcurrency(); !ok {
+		return &ValidationError{Name: "openai_concurrency", err: errors.New(`ent: missing required field "User.openai_concurrency"`)}
+	}
+	if v, ok := _c.mutation.OpenaiConcurrency(); ok {
+		if err := user.OpenaiConcurrencyValidator(v); err != nil {
+			return &ValidationError{Name: "openai_concurrency", err: fmt.Errorf(`ent: validator failed for field "User.openai_concurrency": %w`, err)}
+		}
 	}
 	if _, ok := _c.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "User.status"`)}
@@ -828,6 +854,10 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Concurrency(); ok {
 		_spec.SetField(user.FieldConcurrency, field.TypeInt, value)
 		_node.Concurrency = value
+	}
+	if value, ok := _c.mutation.OpenaiConcurrency(); ok {
+		_spec.SetField(user.FieldOpenaiConcurrency, field.TypeInt, value)
+		_node.OpenaiConcurrency = value
 	}
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(user.FieldStatus, field.TypeString, value)
@@ -1277,6 +1307,24 @@ func (u *UserUpsert) AddConcurrency(v int) *UserUpsert {
 	return u
 }
 
+// SetOpenaiConcurrency sets the "openai_concurrency" field.
+func (u *UserUpsert) SetOpenaiConcurrency(v int) *UserUpsert {
+	u.Set(user.FieldOpenaiConcurrency, v)
+	return u
+}
+
+// UpdateOpenaiConcurrency sets the "openai_concurrency" field to the value that was provided on create.
+func (u *UserUpsert) UpdateOpenaiConcurrency() *UserUpsert {
+	u.SetExcluded(user.FieldOpenaiConcurrency)
+	return u
+}
+
+// AddOpenaiConcurrency adds v to the "openai_concurrency" field.
+func (u *UserUpsert) AddOpenaiConcurrency(v int) *UserUpsert {
+	u.Add(user.FieldOpenaiConcurrency, v)
+	return u
+}
+
 // SetStatus sets the "status" field.
 func (u *UserUpsert) SetStatus(v string) *UserUpsert {
 	u.Set(user.FieldStatus, v)
@@ -1699,6 +1747,27 @@ func (u *UserUpsertOne) AddConcurrency(v int) *UserUpsertOne {
 func (u *UserUpsertOne) UpdateConcurrency() *UserUpsertOne {
 	return u.Update(func(s *UserUpsert) {
 		s.UpdateConcurrency()
+	})
+}
+
+// SetOpenaiConcurrency sets the "openai_concurrency" field.
+func (u *UserUpsertOne) SetOpenaiConcurrency(v int) *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.SetOpenaiConcurrency(v)
+	})
+}
+
+// AddOpenaiConcurrency adds v to the "openai_concurrency" field.
+func (u *UserUpsertOne) AddOpenaiConcurrency(v int) *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.AddOpenaiConcurrency(v)
+	})
+}
+
+// UpdateOpenaiConcurrency sets the "openai_concurrency" field to the value that was provided on create.
+func (u *UserUpsertOne) UpdateOpenaiConcurrency() *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateOpenaiConcurrency()
 	})
 }
 
@@ -2330,6 +2399,27 @@ func (u *UserUpsertBulk) AddConcurrency(v int) *UserUpsertBulk {
 func (u *UserUpsertBulk) UpdateConcurrency() *UserUpsertBulk {
 	return u.Update(func(s *UserUpsert) {
 		s.UpdateConcurrency()
+	})
+}
+
+// SetOpenaiConcurrency sets the "openai_concurrency" field.
+func (u *UserUpsertBulk) SetOpenaiConcurrency(v int) *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.SetOpenaiConcurrency(v)
+	})
+}
+
+// AddOpenaiConcurrency adds v to the "openai_concurrency" field.
+func (u *UserUpsertBulk) AddOpenaiConcurrency(v int) *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.AddOpenaiConcurrency(v)
+	})
+}
+
+// UpdateOpenaiConcurrency sets the "openai_concurrency" field to the value that was provided on create.
+func (u *UserUpsertBulk) UpdateOpenaiConcurrency() *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateOpenaiConcurrency()
 	})
 }
 

@@ -1,0 +1,15 @@
+[Unit]
+Description=Dedicated NVIDIA low latency proxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=@ROOT@/bin/mihomo -d @ROOT@/deployment/private/egress/mihomo-nvidia -f @ROOT@/deployment/private/egress/mihomo-nvidia/config.yaml
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=20
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

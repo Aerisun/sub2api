@@ -40,6 +40,105 @@ describe('UseKeyModal', () => {
     saveAsMock.mockClear()
   })
 
+  it('uses the same site entry in each composite client configuration', async () => {
+    const wrapper = mount(UseKeyModal, {
+      props: { show: true, apiKey: 'sk-site-test', baseUrl: 'https://aerisun.top/sub2api', platform: 'composite' },
+      global: { stubs: {
+        BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' },
+        Icon: { template: '<span />' }
+      } }
+    })
+    expect(wrapper.findAll('pre code').map(code => code.text()).join('\n'))
+      .toContain('ANTHROPIC_BASE_URL="https://aerisun.top/sub2api"')
+    for (const client of ['codexCli', 'opencode']) {
+      await wrapper.findAll('button').find(button => button.text().includes(`keys.useKeyModal.cliTabs.${client}`))!.trigger('click')
+      const content = wrapper.findAll('pre code').map(code => code.text()).join('\n')
+      expect(content).toContain('https://aerisun.top/sub2api')
+      expect(content).not.toContain('https://aerisun.top/sub2api/v1')
+      if (client === 'codexCli') {
+        expect(content).toContain('model = "claude-sonnet-4-6"')
+      } else {
+        const config = JSON.parse(content)
+        expect(config.provider.composite.npm).toBe('@ai-sdk/openai-compatible')
+        expect(Object.keys(config.provider.composite.models)).toHaveLength(9)
+        expect(config.provider.composite.models['kimi-k3-free']).toBeUndefined()
+        for (const model of ['kimi-k3', 'glm-5.3', 'deepseek-v4.1-flash', 'glm-5.3-flash', 'Nemotron-3.5', 'step-5-preview']) {
+          const entry = config.provider.composite.models[model]
+          expect(entry.reasoning).toBe(true)
+          expect(entry.options.reasoningEffort).toBe('low')
+          expect(entry.variants.xhigh.reasoningEffort).toBe('xhigh')
+          expect(entry.variants.max.reasoningEffort).toBe('max')
+          expect(config.provider.composite.models[`${model}-max`]).toBeUndefined()
+        }
+        expect(config.provider.composite.models['deepseek-v4.1-flash']).toBeDefined()
+        expect(config.provider.composite.models['qwen3.8-flash']).toBeDefined()
+        expect(config.provider.composite.models['qwen3.8-max']).toBeDefined()
+        expect(config.provider.composite.models['glm-5.3-flash']).toBeDefined()
+        expect(config.provider.composite.models['glm-5.3']).toBeDefined()
+        expect(config.provider.composite.models['gemini-3.8-flash']).toBeUndefined()
+        expect(config.provider.composite.models['gemini-3.7-flash']).toBeUndefined()
+        expect(config.provider.composite.models['gemini-3.6-flash']).toBeUndefined()
+        expect(config.provider.composite.models['gemini-3.1-pro']).toBeUndefined()
+        expect(config.provider.composite.models['gemini-3.5-flash-lite']).toBeUndefined()
+        expect(config.provider.composite.models['gemini-3.1-flash-image']).toBeUndefined()
+        expect(config.provider.composite.models['gemini-3.8-flash-low']).toBeUndefined()
+        expect(config.provider.composite.models['qwen3-embedding-4b']).toBeUndefined()
+        expect(config.provider.composite.models['kimi-k3']).toBeDefined()
+        for (const model of ['kimi-k3', 'deepseek-v4.1-flash', 'qwen3.8-flash', 'qwen3.8-max']) {
+          expect(config.provider.composite.models[model].modalities).toEqual({input: ['text', 'image'], output: ['text']})
+        }
+        expect(config.provider.composite.models['glm-5.3'].modalities).toEqual({input: ['text', 'image'], output: ['text']})
+        expect(config.provider.composite.models['claude-sonnet-4-6']).toBeUndefined()
+        expect(config.provider.composite.models['gpt-5.5']).toBeUndefined()
+      }
+    }
+  })
+
+  it('starts composite Claude with an available model in every shell', async () => {
+    const wrapper = mount(UseKeyModal, {
+      props: { show: true, apiKey: 'sk-site-test', baseUrl: 'https://aerisun.top/sub2api', platform: 'composite' },
+      global: { stubs: {
+        BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' },
+        Icon: { template: '<span />' }
+      } }
+    })
+    for (const shell of ['macOS / Linux', 'Windows CMD', 'PowerShell']) {
+      await wrapper.findAll('button').find(button => button.text().trim() === shell)!.trigger('click')
+      const blocks = wrapper.findAll('pre code').map(code => code.text())
+      expect(blocks[0]).toContain('claude --dangerously-skip-permissions')
+      expect(blocks[0]).toContain('IS_SANDBOX')
+      const settings = JSON.parse(blocks.find(content => content.includes('"$schema"'))!)
+      for (const name of ['ANTHROPIC_MODEL', 'ANTHROPIC_DEFAULT_OPUS_MODEL', 'ANTHROPIC_DEFAULT_HAIKU_MODEL', 'ANTHROPIC_DEFAULT_SONNET_MODEL', 'CLAUDE_CODE_SUBAGENT_MODEL']) {
+        expect(settings.env[name]).toBe('glm-5.3')
+      }
+      expect(settings.env.ANTHROPIC_API_KEY).toBe('')
+      expect(settings.env.CLAUDE_CODE_OAUTH_TOKEN).toBe('')
+      expect(settings.env.CLAUDE_CODE_EFFORT_LEVEL).toBe('')
+      expect(settings.autoCompactEnabled).toBe(true)
+      expect(settings.autoCompactWindow).toBeUndefined()
+      expect(settings.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('')
+      for (const model of ['kimi-k3', 'glm-5.3', 'deepseek-v4.1-flash', 'glm-5.3-flash', 'Nemotron-3.5', 'step-5-preview']) {
+        expect(settings.modelSettings[model]).toEqual({effortLevel: 'low', maxEffortLevel: 'max', autoCompactWindow: 1000000})
+        expect(settings.modelPicker.options.find((option: {model: string}) => option.model === model).behavesAs).toBe('claude-sonnet-5')
+        expect(settings.modelPicker.options.map((option: {model: string}) => option.model)).not.toContain(`${model}-max`)
+      }
+      expect(settings.env.NO_PROXY.split(',')).toContain('aerisun.top')
+      expect(settings.modelPicker.options.map((option: {model: string}) => option.model)).toContain('glm-5.3-flash')
+      expect(settings.modelPicker.options.map((option: {model: string}) => option.model)).not.toContain('gemini-3.8-flash-high')
+      expect(settings.modelPicker.options.find((option: {model: string}) => option.model === 'glm-5.3-flash').behavesAs).toBe('claude-sonnet-5')
+      const extension = JSON.parse(blocks.find(content => content.includes('"claudeCode.environmentVariables"'))!)
+      expect(extension['claudeCode.selectedModel']).toBeUndefined()
+      const environment = Object.fromEntries(extension['claudeCode.environmentVariables'].map((variable: {name: string, value: string}) => [variable.name, variable.value]))
+      expect(environment.ANTHROPIC_AUTH_TOKEN).toBe(settings.env.ANTHROPIC_AUTH_TOKEN)
+      expect(environment.ANTHROPIC_BASE_URL).toBe(settings.env.ANTHROPIC_BASE_URL)
+      const installer = blocks.find(content => content.includes('--install'))!
+      expect(installer).toContain('https://aerisun.top/sub2api/client-streaming/claude-stream-wrapper.cjs')
+      expect(installer).toContain('node ')
+      expect(installer).not.toContain('sk-site-test')
+      expect(wrapper.text()).toContain('启用 VS Code 流式显示')
+    }
+  })
+
   it('omits the attribution override from every standard Claude Code setup form', async () => {
     const wrapper = mount(UseKeyModal, {
       props: {
@@ -900,7 +999,7 @@ describe('UseKeyModal', () => {
       json: async () => ({
         models: [
           { slug: 'claude-opus-4-8' },
-          { slug: 'gpt-5.5' }
+          { slug: 'claude-sonnet-4-6' }
         ]
       })
     }))
@@ -935,8 +1034,8 @@ describe('UseKeyModal', () => {
     const config = wrapper.findAll('pre code')
       .map((code) => code.text())
       .find((content) => content.includes('[model_providers.sub2api]'))
-    expect(config).toContain('model = "gpt-5.5"')
-    expect(config).toContain('review_model = "gpt-5.5"')
+    expect(config).toContain('model = "claude-sonnet-4-6"')
+    expect(config).toContain('review_model = "claude-sonnet-4-6"')
   })
 
   it('derives OpenAI Codex reasoning effort from the selected catalog descriptor', async () => {

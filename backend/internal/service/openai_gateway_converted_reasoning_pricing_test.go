@@ -79,12 +79,12 @@ func TestOpenAIMessagesGLMReasoningPricingUsesForwardedEffort(t *testing.T) {
 			wantEffort string
 			wantCost   float64
 		}{
-			{"medium", "", "high", 2},
-			{"xhigh", "", "max", 3},
+			{"medium", "", "medium", 1.5},
+			{"xhigh", "", "xhigh", 2},
 			{"xhigh", "medium", "medium", 1.5},
 		} {
 			t.Run(fmt.Sprintf("stream=%t/effort=%s/policy=%s", stream, tc.effort, tc.maxPolicy), func(t *testing.T) {
-				body := []byte(fmt.Sprintf(`{"model":"glm-5.2","stream":%t,"max_tokens":32,"output_config":{"effort":%q},"messages":[{"role":"user","content":"hello"}]}`, stream, tc.effort))
+				body := []byte(fmt.Sprintf(`{"model":"glm-5.2","stream":%t,"max_tokens":32,"thinking":{"type":"enabled","budget_tokens":1024},"output_config":{"effort":%q},"messages":[{"role":"user","content":"hello"}]}`, stream, tc.effort))
 				responseBody := `{"id":"chatcmpl_glm","object":"chat.completion","model":"glm-5.2","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1000000,"completion_tokens":2,"total_tokens":1000002}}`
 				contentType := "application/json"
 				if stream {

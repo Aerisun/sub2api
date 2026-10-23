@@ -163,6 +163,7 @@ export default {
 
   // Navigation
   nav: {
+    chat: '对话聊天',
     dashboard: '仪表盘',
     announcements: '公告',
     apiKeys: 'API 密钥',
@@ -199,7 +200,7 @@ export default {
     buySubscription: '充值/订阅',
     recharge: '充值',
     subscribe: '订阅',
-    docs: '文档',
+    docs: '使用指南',
     myOrders: '我的订单',
     orderManagement: '订单管理',
     paymentDashboard: '支付概览',

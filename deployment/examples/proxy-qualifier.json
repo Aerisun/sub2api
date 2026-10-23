@@ -1,0 +1,38 @@
+{
+  "subscription_file": "@ROOT@/secrets/network/combined-candidates.yaml",
+  "mihomo_binary": "/home/wenbo/.local/bin/mihomo",
+  "probe_port": 17994,
+  "probe_controller_port": 19194,
+  "pool_size": 3,
+  "max_candidates_per_role": 8,
+  "poll_seconds": 10,
+  "debounce_seconds": 5,
+  "state_file": "@ROOT@/data/proxy-qualifier-state.json",
+  "roles": [
+    {
+      "name": "gemini",
+      "mihomo_config": "@ROOT@/deployment/private/egress/mihomo-sub2api/config.yaml",
+      "provider_file": "@ROOT@/deployment/private/egress/mihomo-sub2api/qualified-nodes.yaml",
+      "group": "Sub2API egress",
+      "account_id": 54,
+      "proxy_id": 3
+    },
+    {
+      "name": "codex",
+      "mihomo_config": "@ROOT@/deployment/private/egress/mihomo-codex/config.yaml",
+      "provider_file": "@ROOT@/deployment/private/egress/mihomo-codex/qualified-nodes.yaml",
+      "group": "Codex egress",
+      "account_id": 91,
+      "proxy_id": 4
+    }
+  ],
+  "revalidate_seconds": 3600,
+  "live_probe_seconds": 15,
+  "live_probe_timeout_ms": 2500,
+  "live_failure_threshold": 2,
+  "model_probe_seconds": 300,
+  "suspect_model_probe_seconds": 30,
+  "model_failure_threshold": 2,
+  "recovery_retry_seconds": 60,
+  "qualification_budget_seconds": 180
+}

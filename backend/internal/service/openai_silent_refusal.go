@@ -177,6 +177,7 @@ func (d *openAIChatSilentRefusalDetector) observeChatChoicesPayload(payload []by
 		}
 		if delta.Get("reasoning").Exists() ||
 			delta.Get("reasoning_content").Exists() ||
+			delta.Get("thinking").Exists() ||
 			delta.Get("reasoning_summary").Exists() {
 			d.sawReasoning = true
 		}
