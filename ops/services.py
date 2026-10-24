@@ -2,6 +2,7 @@
 import argparse
 from contextlib import ExitStack
 import json
+import os
 import socket
 import sqlite3
 import subprocess
@@ -58,7 +59,22 @@ def active(exclude=()):
         generating = connection.execute("SELECT COUNT(*) FROM tasks WHERE "
             "json_extract(record,'$.status') IN ('processing','queued','pending')").fetchone()[0]
     return {'gateway': redis_active(exclude), 'nvidia': health(8096)['inflight'],
-            'qiniu': health(8095)['inflight'], 'generating': generating}
+            'qiniu': health(8095)['inflight'], 'generating': generating,
+            'chat_generations': durable_chat_active()}
+
+
+def durable_chat_active():
+    # A UI turn may be between paid model/tool legs with no active HTTP call.
+    # Its durable lifecycle, rather than a quiet socket, determines completion.
+    values = read_env(ROOT/'deployment/private/config/runtime.env')
+    result = subprocess.run([str(ROOT/'runtime/bin/psql'), '-X', '-qAt',
+        '-h', values['DATABASE_HOST'], '-p', values['DATABASE_PORT'],
+        '-U', values['DATABASE_USER'], '-d', values['DATABASE_DBNAME'],
+        '-c', "SELECT COUNT(*) FROM chat_generations WHERE status='running'"],
+        env=dict(os.environ, PGPASSWORD=values['DATABASE_PASSWORD'], PGCONNECT_TIMEOUT='3',
+                 PGOPTIONS='-c statement_timeout=2000'),
+        check=True, capture_output=True, text=True, timeout=5)
+    return int(result.stdout.strip())
 
 
 def status():
@@ -82,6 +98,8 @@ def restart(names, timeout=180):
     vector_accounts=[str(account['id']) for account in admin_api.list_items('/api/v1/admin/accounts',token)
         if set((account.get('credentials') or {}).get('openai_capabilities',[])) & {'embeddings','rerank'}
         and not set((account.get('credentials') or {}).get('openai_capabilities',[])) & {'chat_completions','responses'}]
+    monitor_enabled = subprocess.run(['systemctl', '--user', 'is-active', '--quiet',
+        'sub2api-vision-monitor.timer'], check=False, timeout=5).returncode == 0
     systemctl('stop', 'sub2api-vision-monitor.timer', 'sub2api-vision-monitor.service')
     try:
         print('Waiting for accepted paid work to drain', flush=True)
@@ -118,7 +136,8 @@ def restart(names, timeout=180):
                 return
         raise RuntimeError('Accepted work remains active; services were left running')
     finally:
-        systemctl('start', 'sub2api-vision-monitor.timer')
+        if monitor_enabled:
+            systemctl('start', 'sub2api-vision-monitor.timer')
 
 
 def main():

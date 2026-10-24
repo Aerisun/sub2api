@@ -3,6 +3,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import threading
 import time
 import unittest
+from unittest.mock import Mock, patch
 from image_hub.gateway_transport import GatewayTransport
 
 
@@ -81,3 +82,33 @@ class GatewayTransportTests(unittest.TestCase):
             self.assertEqual(response.code, 401)
             self.assertEqual(response.read(), b"OK")
         self.assertEqual(len(self.seen), 1)
+
+    def test_dead_listener_times_out_before_any_paid_request_is_written(self):
+        connection = Mock(sock=None)
+        connection.connect.side_effect = TimeoutError('fixture stalled connect')
+        with patch('image_hub.gateway_transport.HTTPConnection', return_value=connection) as factory:
+            with self.assertRaises(TimeoutError):
+                self.pool.open(self.base, b'paid-operation', timeout=1500)
+        self.assertEqual(factory.call_args.kwargs['timeout'], 3)
+        connection.request.assert_not_called()
+        connection.close.assert_called_once()
+        self.assertEqual(len(self.pool.idle), 0)
+
+    def test_cancel_during_connect_prevents_submission_after_socket_becomes_ready(self):
+        from image_hub.client_disconnect import ClientRequest
+        request = ClientRequest(Mock())
+        connection = Mock(sock=None)
+        def connect():
+            request.cancel()
+            connection.sock = Mock()
+        connection.connect.side_effect = connect
+        with patch('image_hub.gateway_transport.HTTPConnection', return_value=connection):
+            with self.assertRaises(ConnectionAbortedError):
+                self.pool.open(self.base, b'paid-operation', client_request=request)
+        connection.request.assert_not_called()
+        connection.close.assert_called_once()
+
+    def test_connect_budget_does_not_shorten_an_accepted_long_stream(self):
+        with self.pool.open(self.base+'/stream', b'prompt', timeout=60) as response:
+            self.assertEqual(response.connection.sock.gettimeout(), 60)
+            self.assertEqual(response.read(), b'abcdef')

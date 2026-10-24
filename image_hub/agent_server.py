@@ -54,6 +54,14 @@ class Handler(BaseHTTPRequestHandler):
             self.response_latency.status = code
         super().send_response(code, message)
 
+    def end_headers(self):
+        try:
+            super().end_headers()
+        except OSError:
+            if self.response_latency is not None:
+                self.response_latency.cancelled = True
+            raise
+
     def observe_response(self, raw):
         try:
             if self.response_latency is not None:
@@ -119,18 +127,33 @@ class Handler(BaseHTTPRequestHandler):
                         # connection without buffering a complete generation.
                         while chunk := response.read1(65536):
                             client_request.check()
-                            self.wfile.write((f"{len(chunk):x}\r\n".encode() + chunk + b"\r\n")
-                                             if chunked else chunk)
-                            self.wfile.flush()
+                            try:
+                                self.wfile.write((f"{len(chunk):x}\r\n".encode() + chunk + b"\r\n")
+                                                 if chunked else chunk)
+                                self.wfile.flush()
+                            except OSError:
+                                if self.response_latency is not None:
+                                    self.response_latency.cancelled = True
+                                raise
                             self.observe_response(chunk)
                         if response.length not in (0, None):
                             raise IncompleteRead(b"")
                         client_request.check()
                         if chunked:
-                            self.wfile.write(b"0\r\n\r\n")
-                            self.wfile.flush()
+                            try:
+                                self.wfile.write(b"0\r\n\r\n")
+                                self.wfile.flush()
+                            except OSError:
+                                if self.response_latency is not None:
+                                    self.response_latency.cancelled = True
+                                raise
         except (OSError, HTTPException):
             self.close_connection = True
+            if self.response_latency is not None:
+                if client_request.cancelled:
+                    self.response_latency.cancelled = True
+                elif not self.response_latency.cancelled:
+                    self.response_latency.transport_failed = True
             # Once headers are sent, terminate an incomplete response. A second
             # JSON/HTTP response here would corrupt this stream and its framing.
             if not started and not client_request.cancelled:
@@ -163,6 +186,8 @@ class Handler(BaseHTTPRequestHandler):
             self.passthrough(method="GET")
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             self.close_connection = True
+            if self.response_latency is not None and not self.response_latency.transport_failed:
+                self.response_latency.cancelled = True
         except HubError as error:
             self.reply(error.status,error.body())
 
@@ -257,6 +282,8 @@ class Handler(BaseHTTPRequestHandler):
             self.bridge(body, kind, streaming, executor)
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             self.close_connection = True
+            if self.response_latency is not None and not self.response_latency.transport_failed:
+                self.response_latency.cancelled = True
         except HubError as error:
             self.reply(error.status, error.body())
         except (ValueError, TypeError, KeyError, AttributeError, OSError, HTTPException):
@@ -279,6 +306,8 @@ class Handler(BaseHTTPRequestHandler):
             nonlocal disconnected
             with write_lock:
                 disconnected |= client_request.cancelled
+                if disconnected and self.response_latency is not None:
+                    self.response_latency.cancelled = True
                 if disconnected or stopped.is_set():
                     return
                 try:
@@ -288,6 +317,8 @@ class Handler(BaseHTTPRequestHandler):
                 except (BrokenPipeError, ConnectionResetError, OSError):
                     disconnected = True
                     self.close_connection = True
+                    if self.response_latency is not None:
+                        self.response_latency.cancelled = True
 
         def emit(event, value):
             encoded = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, separators=(",", ":"))
@@ -352,6 +383,8 @@ class Handler(BaseHTTPRequestHandler):
                         self.wfile.flush()
                     except OSError:
                         self.close_connection = True
+                        if self.response_latency is not None:
+                            self.response_latency.cancelled = True
             # Active generations retain their existing long read timeout;
             # bound idle keep-alive threads after a completed response.
             self.connection.settimeout(15)

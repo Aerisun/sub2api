@@ -20,7 +20,7 @@ class LatencyMonitorTests(unittest.TestCase):
         self.patcher = patch.object(latency_monitor, 'ROOT', self.root)
         self.patcher.start()
         self.addCleanup(self.patcher.stop)
-        observation = patch.object(latency_monitor, 'response_latency', return_value=[])
+        observation = patch.object(latency_monitor, 'response_metrics', return_value={'latency': [], 'reliability': []})
         observation.start()
         self.addCleanup(observation.stop)
 
@@ -75,7 +75,7 @@ class LatencyMonitorTests(unittest.TestCase):
                'first_text_p95_ms': 17000, 'semantic_gap_p95_ms': 16000}
         with patch.object(latency_monitor, 'measure', return_value=self.site()), \
                 patch.object(latency_monitor, 'model_latency', return_value=[]), \
-                patch.object(latency_monitor, 'response_latency', return_value=[row]), redirect_stdout(StringIO()):
+                patch.object(latency_monitor, 'response_metrics', return_value={'latency': [row], 'reliability': []}), redirect_stdout(StringIO()):
             latency_monitor.main()
         self.assertEqual(self.read()['slow_models'], ['fixture'])
 
@@ -86,9 +86,28 @@ class LatencyMonitorTests(unittest.TestCase):
                  'first_text_p95_ms': 40000, 'semantic_gap_p95_ms': 0}]
         with patch.object(latency_monitor, 'measure', return_value=self.site()), \
                 patch.object(latency_monitor, 'model_latency', return_value=[]), \
-                patch.object(latency_monitor, 'response_latency', return_value=rows), redirect_stdout(StringIO()):
+                patch.object(latency_monitor, 'response_metrics', return_value={'latency': rows, 'reliability': []}), redirect_stdout(StringIO()):
             latency_monitor.main()
         self.assertEqual(self.read()['state'], 'healthy')
+
+    def test_interrupted_replies_are_reported_even_when_health_and_first_tokens_are_fast(self):
+        metrics = {'latency': [], 'reliability': [{'model': 'fixture', 'attempts': 4, 'failures': 3, 'failure_rate': .75}]}
+        with patch.object(latency_monitor, 'measure', return_value=self.site()), \
+                patch.object(latency_monitor, 'model_latency', return_value=[]), \
+                patch.object(latency_monitor, 'response_metrics', return_value=metrics), redirect_stdout(StringIO()):
+            latency_monitor.main()
+        self.assertEqual(self.read()['state'], 'degraded')
+        self.assertEqual(self.read()['failing_models'], ['fixture'])
+        self.assertEqual(self.read()['consecutive_failures'], 0)
+
+    def test_single_transient_failure_does_not_trigger_recovery_or_an_outage_alarm(self):
+        metrics = {'latency': [], 'reliability': [{'model': 'fixture', 'attempts': 100, 'failures': 1, 'failure_rate': .01}]}
+        with patch.object(latency_monitor, 'measure', return_value=self.site()), \
+                patch.object(latency_monitor, 'model_latency', return_value=[]), \
+                patch.object(latency_monitor, 'response_metrics', return_value=metrics), redirect_stdout(StringIO()):
+            latency_monitor.main()
+        self.assertEqual(self.read()['state'], 'healthy')
+        self.assertEqual(self.read()['failing_models'], [])
 
 
 if __name__ == '__main__':

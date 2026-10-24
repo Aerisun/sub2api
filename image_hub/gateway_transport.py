@@ -13,8 +13,9 @@ from urllib.parse import urlsplit
 
 
 class GatewayTransport:
-    def __init__(self, capacity=128, idle_seconds=15):
+    def __init__(self, capacity=128, idle_seconds=15, connect_timeout=3):
         self.capacity, self.idle_seconds = capacity, idle_seconds
+        self.connect_timeout = connect_timeout
         self.idle = deque()
         self.lock = threading.Lock()
 
@@ -44,19 +45,23 @@ class GatewayTransport:
                 break
         if connection is None:
             factory = HTTPSConnection if target.scheme == "https" else HTTPConnection
-            connection = factory(target.hostname, target.port, timeout=timeout)
-        connection.timeout = timeout
+            connection = factory(target.hostname, target.port, timeout=min(timeout, self.connect_timeout))
         try:
             if client_request is not None:
                 client_request.attach(connection)
+            # Establish the socket before submitting any request bytes. A dead
+            # local listener must not consume the whole model generation budget.
+            if connection.sock is None:
+                connection.connect()
+            if client_request is not None:
+                client_request.connected(connection)
+            connection.timeout = timeout
             if connection.sock is not None:
                 connection.sock.settimeout(timeout)
             path = target.path or "/"
             if target.query:
                 path += "?" + target.query
             connection.request(method, path, body=body, headers=headers or {})
-            if client_request is not None:
-                client_request.connected(connection)
             response = connection.getresponse()
         except BaseException:
             if client_request is not None:

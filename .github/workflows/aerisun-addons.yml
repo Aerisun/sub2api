@@ -20,13 +20,14 @@ jobs:
           cache-dependency-path: requirements-aerisun.txt
       - run: pip install -r requirements-aerisun.txt
       - name: Recovery, publication paths, latency probes and cloud backup integrity
-        run: python -m unittest ops.test_recovery ops.test_web ops.test_site_latency ops.test_latency_monitor
+        run: python -m unittest ops.test_recovery ops.test_web ops.test_site_latency ops.test_latency_monitor ops.test_services
       - name: Network isolation, accepted stream completion and tool admission
         run: >-
           python -m unittest
           nvidia_pool.tests nvidia_pool.egress_tests nvidia_pool.egress_transport_tests
           nvidia_pool.vision_reliability_tests
           internal_tools.test_image_tools internal_tools.test_concurrency
+          internal_tools.test_vision_monitor internal_tools.test_vision_routing
           image_hub.proxy_qualifier_test image_hub.egress_subscriptions_test
           image_hub.egress_control_test image_hub.egress_watchdog_test
           image_hub.response_latency_test image_hub.transport_latency_test image_hub.gateway_transport_test

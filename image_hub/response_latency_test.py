@@ -4,7 +4,7 @@ import json
 import unittest
 from unittest.mock import Mock
 
-from image_hub.response_latency import MAX_FRAME, PREFIX, ResponseLatency, record, summarize
+from image_hub.response_latency import MAX_FRAME, PREFIX, ResponseLatency, record, summarize, summarize_reliability
 
 
 class ResponseLatencyTests(unittest.TestCase):
@@ -80,7 +80,9 @@ class ResponseLatencyTests(unittest.TestCase):
 
     def test_rejected_or_content_free_requests_do_not_enter_success_metrics(self):
         m = self.metric(); self.event(m, 1, {'usage': {'total_tokens': 2}})
-        self.assertIsNone(m.finish())
+        row = m.finish()
+        self.assertEqual(row['outcome'], 'incomplete_stream')
+        self.assertEqual(summarize([row]*3), [])
         m = self.metric(); m.status = 401
         self.event(m, 1, {'choices': [{'delta': {'content': 'not accepted'}}]})
         self.assertIsNone(m.finish())
@@ -104,6 +106,77 @@ class ResponseLatencyTests(unittest.TestCase):
         self.assertEqual(plain['first_text_p50_ms'], 2000)
         self.assertEqual(plain['first_text_p95_ms'], 18000)
         self.assertEqual(len(groups), 3)
+
+    def test_http_200_does_not_hide_an_interrupted_answer_or_stream_error(self):
+        for error in (False, True):
+            m = self.metric()
+            self.event(m, 1, {'choices': [{'delta': {'content': 'actual partial text'}}]})
+            if error:
+                self.event(m, 2, {'error': {'message': 'private provider error'}})
+                m.feed(b'data: [DONE]\n\n')
+            row = m.finish()
+            self.assertEqual(row['outcome'], 'upstream_error' if error else 'incomplete_stream')
+            self.assertEqual(summarize([row]*3), [])
+            summary = summarize_reliability([row]*3)[0]
+            self.assertEqual(summary['failures'], 3)
+            self.assertEqual(summary['failure_rate'], 1)
+
+    def test_failures_before_any_content_are_counted_without_logging_provider_text(self):
+        for status in (500, 502, 503, 504):
+            m = self.metric(); m.status = status
+            m.feed(b'data: {"error":{"message":"private details"}}\n\n')
+            with redirect_stdout(StringIO()) as output:
+                record(m)
+            row = json.loads(output.getvalue()[len(PREFIX):])
+            self.assertEqual(row['outcome'], 'upstream_error')
+            self.assertIsNone(row['first_text_ms'])
+            self.assertNotIn('private', output.getvalue())
+        m = self.metric(); m.status = None; m.transport_failed = True
+        self.assertEqual(m.finish()['outcome'], 'upstream_error')
+
+    def test_user_cancellation_and_limits_do_not_become_upstream_outages(self):
+        cancelled = self.metric(); cancelled.cancelled = True
+        limited = self.metric(); limited.status = 429
+        counts = summarize_reliability([cancelled.finish(), limited.finish()])[0]
+        self.assertEqual(counts['client_cancelled'], 1)
+        self.assertEqual(counts['rate_limited'], 1)
+        self.assertEqual(counts['failures'], 0)
+        self.assertEqual(counts['attempts'], 0)
+
+    def test_whitespace_deltas_do_not_hide_waiting_for_real_content(self):
+        m = self.metric()
+        self.event(m, .1, {'choices': [{'delta': {'content': ' \n\t'}}]})
+        self.assertIsNone(m.first_text)
+        self.event(m, 12, {'choices': [{'delta': {'content': 'answer'}}]})
+        self.assertEqual(m.first_text, 12000)
+
+    def test_nonstreaming_provider_replies_and_tool_only_outputs_are_valid(self):
+        replies = [
+            ('anthropic', {'content': [{'type': 'text', 'text': 'answer'}]}),
+            ('responses', {'output': [{'type': 'message', 'content': [{'type': 'output_text', 'text': 'answer'}]}]}),
+            ('gemini', {'candidates': [{'content': {'parts': [{'text': 'answer'}]}, 'finishReason': 'STOP'}]})]
+        for kind, body in replies:
+            with self.subTest(kind=kind):
+                m = self.metric(streaming=False, kind=kind); self.now = 3
+                m.feed(json.dumps(body).encode()); row = m.finish()
+                self.assertEqual(row['outcome'], 'completed')
+                self.assertEqual(row['first_text_ms'], 3000)
+        for kind, body in [('chat', {'choices': [{'message': {'tool_calls': [{'id': 'fixture'}]}}]}),
+                           ('anthropic', {'content': [{'type': 'tool_use', 'name': 'fixture'}]}),
+                           ('responses', {'output': [{'type': 'function_call', 'name': 'fixture'}]}),
+                           ('gemini', {'candidates': [{'content': {'parts': [{'functionCall': {'name': 'fixture'}}]}, 'finishReason': 'STOP'}]})]:
+            with self.subTest(tool_protocol=kind):
+                m = self.metric(streaming=False, kind=kind); m.feed(json.dumps(body).encode())
+                row = m.finish(); self.assertEqual(row['outcome'], 'completed')
+                self.assertIsNone(row['first_text_ms'])
+
+    def test_completed_empty_output_is_distinct_from_diagnostic_loss(self):
+        m = self.metric(); m.feed(b'data: [DONE]\n\n')
+        self.assertEqual(m.finish()['outcome'], 'empty_response')
+        m = self.metric(); m.feed(b'x'*(MAX_FRAME+1))
+        row = m.finish()
+        self.assertEqual(row['outcome'], 'observation_truncated')
+        self.assertEqual(summarize_reliability([row]*3)[0]['failures'], 0)
 
 
 if __name__ == '__main__':

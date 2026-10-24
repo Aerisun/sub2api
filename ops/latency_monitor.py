@@ -5,7 +5,7 @@ import subprocess
 
 from ops.admin_api import ROOT, read_env
 from ops.checks.site_latency import measure
-from image_hub.response_latency import PREFIX, summarize
+from image_hub.response_latency import PREFIX, summarize, summarize_reliability
 
 
 def model_latency():
@@ -27,21 +27,23 @@ def model_latency():
     return json.loads(result.stdout)
 
 
-def response_latency():
+def response_metrics():
     result = subprocess.run(['journalctl', '--user', '-u', 'sub2api-agent-images.service',
         '--since', '15 minutes ago', '-n', '10000', '-o', 'cat', '--no-pager', '--grep', '^'+PREFIX],
         check=False, capture_output=True, text=True, timeout=3)
     if result.returncode == 1 and not result.stdout:
-        return []  # A newly restored service has no response observations yet.
+        return {'latency': [], 'reliability': []}  # No observations after a fresh restore.
     result.check_returncode()
     records = []
     for line in result.stdout.splitlines():
         if line.startswith(PREFIX):
             try:
-                records.append(json.loads(line[len(PREFIX):]))
+                value = json.loads(line[len(PREFIX):])
+                if isinstance(value, dict):
+                    records.append(value)
             except ValueError:
                 pass
-    return summarize(records)
+    return {'latency': summarize(records), 'reliability': summarize_reliability(records)}
 
 
 def main():
@@ -59,20 +61,25 @@ def main():
         report['model_observation_error'] = type(error).__name__
     report['slow_models'] = [row['model'] for row in report['model_latency'] if row['first_event_p95_ms'] > 10000]
     try:
-        report['response_latency'] = response_latency()
+        metrics = response_metrics()
+        report['response_latency'] = metrics['latency']
+        report['model_reliability'] = metrics['reliability']
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         report['response_latency'] = []
+        report['model_reliability'] = []
         report['response_observation_error'] = type(error).__name__
     report['slow_models'] = sorted(set(report['slow_models']) | {
         row['model'] for row in report['response_latency'] if row['streaming'] and not row['with_tools']
         and (row['first_text_p95_ms'] > 10000 or row['semantic_gap_p95_ms'] > 10000)})
+    report['failing_models'] = [row['model'] for row in report['model_reliability']
+                               if row['failures'] >= 3 and row['failure_rate'] >= .05]
     slow = [row['origin']+row['endpoint'] for row in report['checks']
             if row['p95_ms'] > (2000 if row['origin'] == 'public' else 250)]
     report['slow_endpoints'] = slow
     bad = not report['all_calls_passed'] or bool(slow)
     report['consecutive_failures'] = previous.get('consecutive_failures', 0)+1 if bad else 0
     report['state'] = ('unhealthy' if report['consecutive_failures'] >= 3 else 'degraded') if bad else 'healthy'
-    if report['state'] == 'healthy' and (report['slow_models'] or report.get('model_observation_error') or report.get('response_observation_error')):
+    if report['state'] == 'healthy' and (report['slow_models'] or report['failing_models'] or report.get('model_observation_error') or report.get('response_observation_error')):
         report['state'] = 'degraded'
     destination.parent.mkdir(parents=True, exist_ok=True)
     pending = destination.with_suffix('.pending')
@@ -83,6 +90,7 @@ def main():
         print(json.dumps({'event': 'site_latency_state', 'state': report['state'],
                           'entry_resources_ok': all(r['ok'] for r in report['entries']),
                           'slow_endpoints': slow, 'slow_models': report['slow_models'],
+                          'failing_models': report['failing_models'],
                           'model_observation_error': report.get('model_observation_error'),
                           'response_observation_error': report.get('response_observation_error'),
                           'consecutive_failures': report['consecutive_failures']}), flush=True)

@@ -1,7 +1,8 @@
 """Real-socket checks for reuse, first-content delivery and request isolation."""
-from http.client import HTTPConnection
+from http.client import HTTPConnection, IncompleteRead
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import socket
 import threading
 import time
 import unittest
@@ -33,6 +34,12 @@ class TransportLatencyTests(unittest.TestCase):
                     self.close_connection = True
                     return
                 if self.path == "/v1/chat/completions":
+                    fault = json.loads(body).get('fixture_fault')
+                    if fault == 'provider_error':
+                        self.send_response(503)
+                        self.send_header('Content-Length', '0')
+                        self.end_headers()
+                        return
                     self.send_response(200)
                     self.send_header("Content-Type", "text/event-stream")
                     self.send_header("Transfer-Encoding", "chunked")
@@ -42,11 +49,20 @@ class TransportLatencyTests(unittest.TestCase):
                         self.wfile.write(f"{len(raw):x}\r\n".encode()+raw+b"\r\n")
                         self.wfile.flush()
                     emit({"id":"fixture", "choices":[{"index":0,"delta":{"role":"assistant","content":"a"}}]})
+                    if fault in ('semantic_truncation', 'wire_truncation'):
+                        if fault == 'semantic_truncation':
+                            self.wfile.write(b"0\r\n\r\n")
+                        else:
+                            self.close_connection = True
+                        return
                     time.sleep(.35)
-                    emit({"id":"fixture", "choices":[{"index":0,"delta":{"content":"b"},"finish_reason":"stop"}],
-                          "usage":{"prompt_tokens":2,"completion_tokens":2,"total_tokens":4}})
-                    emit(b"[DONE]")
-                    self.wfile.write(b"0\r\n\r\n")
+                    try:
+                        emit({"id":"fixture", "choices":[{"index":0,"delta":{"content":"b"},"finish_reason":"stop"}],
+                              "usage":{"prompt_tokens":2,"completion_tokens":2,"total_tokens":4}})
+                        emit(b"[DONE]")
+                        self.wfile.write(b"0\r\n\r\n")
+                    except OSError:
+                        self.close_connection = True
                     return
                 value = {"authorization":self.headers.get("Authorization"), "data":body.decode()}
                 if self.path == "/denied":
@@ -137,6 +153,56 @@ class TransportLatencyTests(unittest.TestCase):
                 self.assertEqual([json.loads(r[2])["reasoning_effort"] for r in self.requests], ["high", "high"])
         finally:
             connection.close()
+            for _, _, idle in transport.idle:
+                idle.close()
+            bridge.shutdown()
+            bridge.server_close()
+
+    def test_public_handler_distinguishes_partial_streams_provider_errors_and_client_cancellation(self):
+        bridge = agent_server.AgentHTTPServer(('127.0.0.1', 0), agent_server.Handler)
+        threading.Thread(target=lambda: bridge.serve_forever(poll_interval=.02), daemon=True).start()
+        observations, finished = [], threading.Event()
+        transport = GatewayTransport()
+        def record(metric):
+            observations.append(metric.finish())
+            finished.set()
+        try:
+            with patch.object(agent_server, 'GATEWAY', self.base), \
+                    patch.object(agent_server, 'GATEWAY_TRANSPORT', transport), \
+                    patch.object(agent_server, 'eligible', return_value=False), \
+                    patch.object(agent_server, 'search_eligible', return_value=False), \
+                    patch.object(agent_server, 'record_response_latency', side_effect=record):
+                for fault, outcome in [('semantic_truncation', 'incomplete_stream'),
+                                       ('wire_truncation', 'upstream_error'),
+                                       ('provider_error', 'upstream_error'),
+                                       ('client_cancel', 'client_cancelled'),
+                                       ('none', 'completed')]:
+                    with self.subTest(fault=fault):
+                        finished.clear()
+                        connection = HTTPConnection('127.0.0.1', bridge.server_port, timeout=3)
+                        try:
+                            body = {'model': 'fixture-model', 'stream': True, 'fixture_fault': fault,
+                                    'messages': [{'role': 'user', 'content': 'fixture'}]}
+                            connection.request('POST', '/v1/chat/completions', json.dumps(body),
+                                               {'Content-Type': 'application/json'})
+                            response = connection.getresponse()
+                            self.assertEqual(response.status, 503 if fault == 'provider_error' else 200)
+                            if fault == 'client_cancel':
+                                self.assertIn(b'fixture', response.readline())
+                                connection.sock.shutdown(socket.SHUT_RDWR)
+                                connection.close()
+                                response.close()
+                            elif fault == 'wire_truncation':
+                                with self.assertRaises(IncompleteRead):
+                                    response.read()
+                            else:
+                                response.read()
+                            self.assertTrue(finished.wait(3), 'request outcome was not recorded')
+                            self.assertEqual(observations[-1]['outcome'], outcome)
+                        finally:
+                            connection.close()
+            self.assertEqual(len(self.requests), 5)  # None of the paid POSTs was replayed.
+        finally:
             for _, _, idle in transport.idle:
                 idle.close()
             bridge.shutdown()
