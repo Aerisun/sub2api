@@ -1,6 +1,8 @@
 # Aerisun Sub2API 运维
 
-这是当前线上服务的完整项目，基于 `Wei-Shaw/sub2api`，在 `Aerisun/sub2api` 的 `aerisun` 分支维护。主机上只保留这一份源码与部署目录。模型 ID、推理参数、价格及文本供应商映射沿用线上配置；已按要求下架的 Step 和 GLM Flash 不再发布。
+这是当前线上服务的项目，基于 `Wei-Shaw/sub2api`，在 `Aerisun/sub2api` 的 `aerisun` 分支维护。Sub2API 及网络守护只保留这一份源码与部署目录；自动续期 `auto-get-api` 按要求保留在同级外部目录，`Gemini-API` 已删除。模型 ID、推理参数、价格及文本供应商映射沿用线上配置；已按要求下架的 Step 和 GLM Flash 不再发布。
+
+配置分层与新功能接入见 [CONFIGURATION.md](CONFIGURATION.md)，缤纷云备份范围与完整恢复步骤见 [BACKUP.md](BACKUP.md)。
 
 ## 目录
 
@@ -19,7 +21,7 @@
 | `bin/`、`runtime/`、`runtime-redis/` | 当前运行程序与依赖，不保留旧候选构建 |
 | `backups/` | 加密快照、校验和与恢复验证结果 |
 
-`~/.config/systemd/user/` 只注册指向项目内生成文件的链接，不保留第二份配置。系统提供的 SSH、systemd 和共享 Tailscale 守护进程属于主机基础设施。
+Sub2API 及 `service-tailnet` 在 `~/.config/systemd/user/` 只注册指向项目内生成文件的链接。网络恢复代码位于 `ops/tailnet.py`；活动 VPN 身份由主机管理并收入加密备份。外部 `auto-get-api` 的服务保持原样。
 
 ## 常用操作
 
@@ -64,23 +66,17 @@ python3 -m ops.checks.image_recognition_concurrency --concurrency 64 --waves 2 -
 ## 加密备份与恢复
 
 ```bash
-python3 -m ops.backup create
+python3 -m ops.backup create --publish
 python3 -m ops.backup verify backups/具体备份.tar.gz.age --restore-database
 ```
 
-备份包含当前代码与 Git 历史、实际私有配置、供应商与隧道凭据、运行程序和依赖、当前静态资源、PostgreSQL 逻辑快照、Redis RDB，以及通过 SQLite 在线备份接口取得的业务库。它不打包正在变化的 PostgreSQL 数据目录，也不复制旧构建、旧备份和临时上传缓存。
+备份清单由 `deployment/backup-layout.json` 管理，包含当前代码与 Git 历史、实际私有配置、凭据、运行程序和依赖、静态资源、PostgreSQL 逻辑快照、Redis RDB、SQLite 在线快照，以及外置自动续期组件和主机 VPN 身份。旧构建、旧备份和临时上传缓存不打包。
 
 验证会解密检查组件校验和，在只开放私有 Unix socket 的临时 PostgreSQL 实例中实际恢复，并检查 SQLite 完整性。验证完成后临时明文目录自动删除。
 
-解密文件是 `secrets/backup/identity.agekey`，权限为 0600。它必须另存一份；不会提交 Git，也不会随加密文件上传。GitHub Release 只上传 `.age` 文件、SHA-256 和不含凭据的验证结果。
+解密文件是 `secrets/backup/identity.agekey`，权限为 0600，必须另存。完整快照加密后上传系统已配置的缤纷云，并重新下载核对 SHA-256；解密文件不随包上传。GitHub 仅保存代码、模板和脱敏文档，不保存任何备份附件。
 
-灾难恢复步骤：
-
-1. 校验下载文件的 SHA-256，使用另存的解密文件解密：`age -d -i identity.agekey -o snapshot.tar.gz 备份.tar.gz.age`。只处理自己的、已验证的快照。
-2. 在空目录使用 `tar --no-same-owner` 解包，保留 `database.dump`、`redis.rdb` 和 `manifest.json`；将 `project/` 作为新的 `sub2api` 项目目录。
-3. 运行 `python3 -m ops.install`，重新生成当前路径对应的服务配置。系统 Python 版本不同时，先通过 `python3 -m pip install --upgrade --target runtime/python-site -r requirements-aerisun.txt` 重建 Python 依赖。由私有 `runtime.env` 中的用户和密码初始化空 PostgreSQL，使用 `pg_restore --no-owner --no-privileges --exit-on-error` 恢复业务库。
-4. Redis 停止时，将 `redis.rdb` 安装到其私有配置指定的数据目录；保留原有认证与配额状态。
-5. 先启动数据库、Redis、三个出口及推理连接，再启动池、图片工具、网关、Nginx、隧道和监控定时器。先检查 `ops.services status`，再执行小规模真实调用。
+灾难恢复遵循 [BACKUP.md 的恢复顺序](BACKUP.md#恢复顺序)，同时处理项目、外置自动续期、主机身份和数据库，避免遗漏独立运行的状态。
 
 CPU 推理目前运行在私有 SSH 配置指定的远端主机，8091/8101 经项目内的连接服务转发。其应用代码、私有配置、鉴权文件、配额数据库、实际引擎程序及构建补丁一并保存。模型权重由 `inference/` 中的下载脚本和 SHA-256 校验恢复，不重复上传数 GB 的公开权重；不会自动更换模型或量化规格。参见 [CPU 推理说明](../inference/README.md)。
 

@@ -19,6 +19,8 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-aerisun.txt
       - run: pip install -r requirements-aerisun.txt
+      - name: Network recovery ownership and cloud backup integrity
+        run: python -m unittest ops.test_recovery
       - name: Network isolation, accepted stream completion and tool admission
         run: >-
           python -m unittest

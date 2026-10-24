@@ -1,0 +1,6 @@
+{
+  "state_file": "~/.local/share/tailscale/tailscaled.state",
+  "socket_file": "~/.local/share/tailscale/tailscaled.sock",
+  "socks_port": 1055,
+  "http_port": 1056
+}

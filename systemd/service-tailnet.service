@@ -1,0 +1,18 @@
+[Unit]
+Description=Preserve and restore the existing user Tailscale network
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+NotifyAccess=main
+ExecStart=/usr/bin/python3 -m ops.tailnet
+WorkingDirectory=@ROOT@
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=90
+TimeoutStopSec=15
+UMask=0077
+
+[Install]
+WantedBy=default.target

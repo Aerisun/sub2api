@@ -3,3 +3,5 @@ httpcore==1.0.9
 h2==4.4.1
 PyYAML>=5.4.1,<7
 Pillow==12.3.0
+boto3==1.43.81
+cryptography==50.0.2

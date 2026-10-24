@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "destination": "system.backup_s3_config",
+  "publication": "encrypted archives to configured S3 only; no GitHub backup assets",
+  "project_trees": [
+    ".git",
+    "deployment/private",
+    "secrets",
+    "data",
+    "var/www",
+    "var/reports",
+    "runtime",
+    "runtime-redis",
+    "tunnel/keys",
+    "tunnel/known_hosts"
+  ],
+  "runtime_files": [
+    "sub2api",
+    "mihomo",
+    "redis-server",
+    "redis-cli",
+    "age",
+    "age-keygen",
+    "tailscale",
+    "tailscale-bin",
+    "tailscaled"
+  ],
+  "required_files": [
+    "ops/tailnet.py",
+    "systemd/service-tailnet.service",
+    "deployment/private/config/runtime.env",
+    "deployment/private/config/tailnet.json",
+    "deployment/private/config/backup-store.json",
+    "inference/embedding/scripts/embedding_pool.py",
+    "inference/reranker/scripts/pool.py",
+    "var/www/index.html"
+  ],
+  "host_files": [
+    {
+      "name": "tailscale-state",
+      "path": "~/.local/share/tailscale/tailscaled.state",
+      "archive": "host/tailscale/tailscaled.state",
+      "restore": "Only restore with every owner of this VPN state stopped; otherwise register the new host separately."
+    },
+    {
+      "name": "auto-get-api-service",
+      "path": "~/.config/systemd/user/auto-get-api.service",
+      "archive": "host/systemd/auto-get-api.service",
+      "restore": "Render the restored sibling path and start only one renewal process for this account."
+    }
+  ],
+  "external_components": [
+    {
+      "name": "auto-get-api",
+      "path": "../auto-get-api",
+      "include": [
+        "auto_get_api.py",
+        "renewal",
+        "README.md",
+        "config.example.json",
+        "account.example.json",
+        ".store",
+        "deploy"
+      ],
+      "restore": "Restore external/auto-get-api as the sibling auto-get-api folder. The live service remains outside sub2api."
+    }
+  ]
+}

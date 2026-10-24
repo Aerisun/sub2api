@@ -13,7 +13,7 @@ import yaml
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', type=Path,
-                        default=Path('/data/238_2/wenbo/Service/network/mihomo-sub2api/config.yaml'))
+                        default=Path(__file__).resolve().parents[1]/'deployment/private/egress/mihomo-sub2api/config.yaml')
     parser.add_argument('--group', default='Sub2API egress')
     args = parser.parse_args()
     config = yaml.safe_load(args.config.read_text())

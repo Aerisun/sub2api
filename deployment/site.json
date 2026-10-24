@@ -30,6 +30,12 @@
     "egress-watchdog": "deployment/private/config/egress-watchdog.json",
     "egress-subscriptions": "deployment/private/config/egress-subscriptions.json",
     "nvidia-pool": "deployment/private/config/nvidia-pool.json",
-    "qiniu-pool": "deployment/private/config/qiniu-pool.json"
-  }
+    "qiniu-pool": "deployment/private/config/qiniu-pool.json",
+    "tailnet": "deployment/private/config/tailnet.json",
+    "backup-store": "deployment/private/config/backup-store.json"
+  },
+  "backup_layout": "deployment/backup-layout.json",
+  "external_components": [
+    "../auto-get-api"
+  ]
 }
