@@ -10,18 +10,18 @@ from ops import services
 
 
 class ServiceDrainTests(unittest.TestCase):
-    def restart(self, states, timer_active=True, commands=None):
+    def restart(self, states, timer_active=True, commands=None, names=None, accounts=None, active=None):
         commands = commands or Mock()
         slots = SimpleNamespace(limit=2, acquire=lambda: nullcontext())
         with patch.object(services.admin_api, 'login', return_value='fixture'), \
-                patch.object(services.admin_api, 'list_items', return_value=[]), \
+                patch.object(services.admin_api, 'list_items', return_value=accounts or []), \
                 patch.object(services, 'systemctl', commands), \
                 patch.object(services.subprocess, 'run', return_value=SimpleNamespace(returncode=0 if timer_active else 3)), \
-                patch.object(services, 'active', side_effect=states), \
+                patch.object(services, 'active', active or Mock(side_effect=states)), \
                 patch.object(services, 'health', return_value={'status': 'ok'}), \
                 patch.object(services, 'RECOGNITION_SLOTS', slots), \
                 patch.object(services.time, 'sleep'), redirect_stdout(StringIO()):
-            services.restart(['sub2api-agent-images'])
+            services.restart(names or ['sub2api-agent-images'])
         return commands
 
     def test_chat_between_tool_legs_must_finish_before_addon_restart(self):
@@ -66,6 +66,18 @@ class ServiceDrainTests(unittest.TestCase):
         self.assertNotIn('fixture-secret', ' '.join(run.call_args.args[0]))
         self.assertEqual(run.call_args.kwargs['timeout'], 5)
         self.assertIn('statement_timeout=2000', run.call_args.kwargs['env']['PGOPTIONS'])
+
+    def test_restarting_vector_link_must_include_active_vector_accounts(self):
+        accounts = [{'id': 54, 'credentials': {'openai_capabilities': ['embeddings']}},
+                    {'id': 56, 'credentials': {'openai_capabilities': ['rerank']}}]
+        for names, excluded in [(['sub2api-agent-images'], ['54', '56']),
+                                (['sub2api-inference-link'], []),
+                                (['sub2api-agent-images', 'sub2api-inference-link'], [])]:
+            with self.subTest(names=names):
+                active = Mock(return_value={'gateway': 0, 'chat_generations': 0})
+                self.restart([], names=names, accounts=accounts, active=active)
+                self.assertEqual(active.call_count, 3)
+                self.assertTrue(all(call.args == (excluded,) for call in active.call_args_list))
 
 
 if __name__ == '__main__':

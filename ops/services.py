@@ -92,12 +92,14 @@ def status():
 def restart(names, timeout=180):
     if not names or set(names)-RESTARTABLE:
         raise ValueError('Choose only reviewed add-on services; database/gateway restarts are separate operations')
-    # The independent vector gateway is never restarted here. Its long CPU
-    # batches must not prevent maintenance of unrelated chat/image add-ons.
+    # Long CPU batches need not block unrelated chat/image maintenance. When
+    # replacing their inference link itself, those same calls must drain too.
     token=admin_api.login()
     vector_accounts=[str(account['id']) for account in admin_api.list_items('/api/v1/admin/accounts',token)
         if set((account.get('credentials') or {}).get('openai_capabilities',[])) & {'embeddings','rerank'}
         and not set((account.get('credentials') or {}).get('openai_capabilities',[])) & {'chat_completions','responses'}]
+    if 'sub2api-inference-link' in names:
+        vector_accounts=[]
     monitor_enabled = subprocess.run(['systemctl', '--user', 'is-active', '--quiet',
         'sub2api-vision-monitor.timer'], check=False, timeout=5).returncode == 0
     systemctl('stop', 'sub2api-vision-monitor.timer', 'sub2api-vision-monitor.service')
