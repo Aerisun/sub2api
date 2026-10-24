@@ -1,5 +1,6 @@
 import { ImageGenerationLoading } from "./image-generation-loading";
 import { GenerationWait } from "./generation-wait";
+import { preloadMarkdown } from "./components/markdown-body";
 import { ImageGenerationModels } from "./tool-calls";
 import { InlineToolTimeline, MessageThinking } from "./message-thinking";
 import { createRoot } from "react-dom/client";
@@ -110,6 +111,10 @@ async function api(path: string, init?: RequestInit) {
   return response;
 }
 function App() {
+  useEffect(() => {
+    const timer = setTimeout(() => { void preloadMarkdown().catch(() => {}); }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
   const [preparing, setPreparing] = useState<ReadonlySet<string>>(() => new Set());
   const [error, setError] = useState("");
   const {chats,setChats,current,setCurrent,ready:historyReady,deleteChat,refresh,detailLoading,acceptServer,beginSend,finishSend} = useChatHistory(storageKey,userID,preparing,setError);

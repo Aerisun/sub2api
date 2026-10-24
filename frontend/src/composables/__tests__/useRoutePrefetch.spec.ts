@@ -48,6 +48,8 @@ describe('useRoutePrefetch', () => {
   let mockRouter: Router
 
   beforeEach(() => {
+    vi.useFakeTimers()
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
     mockRouter = createMockRouter()
 
     // 保存原始函数
@@ -63,6 +65,7 @@ describe('useRoutePrefetch', () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.restoreAllMocks()
     // 恢复原始函数
     window.requestIdleCallback = originalRequestIdleCallback
@@ -119,7 +122,7 @@ describe('useRoutePrefetch', () => {
       triggerPrefetch(route)
 
       // 等待 requestIdleCallback 执行
-      await new Promise((resolve) => setTimeout(resolve, 100))
+      await vi.advanceTimersByTimeAsync(1600)
 
       expect(prefetchedRoutes.value.has('/admin/dashboard')).toBe(true)
     })
@@ -129,11 +132,11 @@ describe('useRoutePrefetch', () => {
       const route = createMockRoute('/admin/dashboard')
 
       triggerPrefetch(route)
-      await new Promise((resolve) => setTimeout(resolve, 100))
+      await vi.advanceTimersByTimeAsync(1600)
 
       // 第二次触发
       triggerPrefetch(route)
-      await new Promise((resolve) => setTimeout(resolve, 100))
+      await vi.advanceTimersByTimeAsync(1600)
 
       // 只应该预加载一次
       expect(prefetchedRoutes.value.size).toBe(1)
@@ -164,7 +167,7 @@ describe('useRoutePrefetch', () => {
       triggerPrefetch(createMockRoute('/admin/users'))
 
       // 等待执行
-      await new Promise((resolve) => setTimeout(resolve, 100))
+      await vi.advanceTimersByTimeAsync(1600)
 
       // 只有最后一个路由应该被预加载
       expect(prefetchedRoutes.value.has('/admin/users')).toBe(true)
@@ -177,7 +180,7 @@ describe('useRoutePrefetch', () => {
       const route = createMockRoute('/admin/dashboard')
 
       triggerPrefetch(route)
-      await new Promise((resolve) => setTimeout(resolve, 100))
+      await vi.advanceTimersByTimeAsync(1600)
 
       expect(prefetchedRoutes.value.size).toBeGreaterThan(0)
 
@@ -213,7 +216,7 @@ describe('useRoutePrefetch', () => {
       triggerPrefetch(route)
 
       // 等待超时执行
-      await new Promise((resolve) => setTimeout(resolve, 2100))
+      await vi.advanceTimersByTimeAsync(3600)
 
       expect(prefetchedRoutes.value.has('/dashboard')).toBe(true)
     })
@@ -235,10 +238,69 @@ describe('useRoutePrefetch', () => {
       const route = createMockRoute('/admin/dashboard')
 
       triggerPrefetch(route)
-      await new Promise((resolve) => setTimeout(resolve, 100))
+      await vi.advanceTimersByTimeAsync(1600)
 
       // 没有 router，无法获取组件，所以不会预加载
       expect(prefetchedRoutes.value.size).toBe(0)
     })
+  })
+})
+
+const route = (path: string) => ({ path } as RouteLocationNormalized)
+
+describe('route prefetch yields to the current page', () => {
+  const accounts = vi.fn(async () => ({}))
+  const users = vi.fn(async () => ({}))
+  const idle = vi.fn(() => 123)
+  const router = { getRoutes: () => [
+    { path: '/admin/accounts', components: { default: accounts } },
+    { path: '/admin/users', components: { default: users } }
+  ] } as unknown as Router
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    accounts.mockClear()
+    users.mockClear()
+    idle.mockClear()
+    vi.stubGlobal('requestIdleCallback', idle)
+    vi.stubGlobal('cancelIdleCallback', vi.fn())
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('does not compete with initial API requests and still prefetches when idle', async () => {
+    const prefetch = useRoutePrefetch(router)
+    prefetch.triggerPrefetch(route('/admin/dashboard'))
+    vi.advanceTimersByTime(1499)
+    expect(idle).not.toHaveBeenCalled()
+    expect(accounts).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(idle).toHaveBeenCalledOnce()
+    const callback = (idle.mock.calls as unknown as [[IdleRequestCallback]])[0][0]
+    callback({ didTimeout: false, timeRemaining: () => 50 })
+    await Promise.resolve()
+    expect(accounts).toHaveBeenCalledOnce()
+    expect(users).toHaveBeenCalledOnce()
+  })
+
+  it('cancels old speculative downloads when a user moves to chat', () => {
+    const prefetch = useRoutePrefetch(router)
+    prefetch.triggerPrefetch(route('/admin/dashboard'))
+    prefetch.triggerPrefetch(route('/chat'))
+    vi.runAllTimers()
+    expect(idle).not.toHaveBeenCalled()
+    expect(accounts).not.toHaveBeenCalled()
+  })
+
+  it('does not download hidden-page neighbours', () => {
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    useRoutePrefetch(router).triggerPrefetch(route('/admin/dashboard'))
+    vi.runAllTimers()
+    expect(idle).not.toHaveBeenCalled()
   })
 })

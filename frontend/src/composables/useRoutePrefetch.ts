@@ -70,6 +70,7 @@ const cancelScheduledCallback = (handle: IdleCallbackHandle): void => {
 export function useRoutePrefetch(router?: Router) {
   // 当前挂起的预加载任务句柄
   const pendingPrefetchHandle = ref<IdleCallbackHandle | null>(null)
+  let prefetchDelay: ReturnType<typeof setTimeout> | null = null
 
   // 已预加载的路由集合
   const prefetchedRoutes = ref<Set<string>>(new Set())
@@ -118,6 +119,10 @@ export function useRoutePrefetch(router?: Router) {
    * 取消挂起的预加载任务
    */
   const cancelPendingPrefetch = (): void => {
+    if (prefetchDelay !== null) {
+      clearTimeout(prefetchDelay)
+      prefetchDelay = null
+    }
     if (pendingPrefetchHandle.value !== null) {
       cancelScheduledCallback(pendingPrefetchHandle.value)
       pendingPrefetchHandle.value = null
@@ -130,33 +135,42 @@ export function useRoutePrefetch(router?: Router) {
   const triggerPrefetch = (route: RouteLocationNormalized): void => {
     cancelPendingPrefetch()
 
+    const connection = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection
+    if (connection?.saveData || /(^|-)2g$/.test(connection?.effectiveType || '')) return
+
     const prefetchPaths = getPrefetchPaths(route)
     if (prefetchPaths.length === 0) return
 
-    pendingPrefetchHandle.value = scheduleIdleCallback(
-      () => {
-        pendingPrefetchHandle.value = null
+    // Let initial data requests and the first render finish before downloading
+    // large neighbouring admin pages (including their spreadsheet dependencies).
+    prefetchDelay = setTimeout(() => {
+      prefetchDelay = null
+      if (document.visibilityState !== 'visible') return
+      pendingPrefetchHandle.value = scheduleIdleCallback(
+        () => {
+          pendingPrefetchHandle.value = null
 
-        const routePath = route.path
-        if (prefetchedRoutes.value.has(routePath)) return
+          const routePath = route.path
+          if (prefetchedRoutes.value.has(routePath)) return
 
-        // 获取需要预加载的组件 import 函数
-        const importFns: ComponentImportFn[] = []
-        for (const path of prefetchPaths) {
-          const importFn = getComponentImporter(path)
-          if (importFn) {
-            importFns.push(importFn)
+          // 获取需要预加载的组件 import 函数
+          const importFns: ComponentImportFn[] = []
+          for (const path of prefetchPaths) {
+            const importFn = getComponentImporter(path)
+            if (importFn) {
+              importFns.push(importFn)
+            }
           }
-        }
 
-        if (importFns.length > 0) {
-          Promise.all(importFns.map(prefetchComponent)).then(() => {
-            prefetchedRoutes.value.add(routePath)
-          })
-        }
-      },
-      { timeout: 2000 }
-    )
+          if (importFns.length > 0) {
+            Promise.all(importFns.map(prefetchComponent)).then(() => {
+              prefetchedRoutes.value.add(routePath)
+            })
+          }
+        },
+        { timeout: 2000 }
+      )
+    }, 1500)
   }
 
   /**

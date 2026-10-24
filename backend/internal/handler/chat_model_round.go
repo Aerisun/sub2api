@@ -48,7 +48,7 @@ func (h *ChatHistoryHandler) chatModelRound(ctx context.Context, item chatRecord
 	if item.ID != "" {
 		request.Header.Set("X-Session-Id", "chat_"+item.ID)
 	}
-	response, err := h.client.Do(request)
+	response, err := doChatRequest(h.client, request)
 	if err != nil {
 		return result, err
 	}

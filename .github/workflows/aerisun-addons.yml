@@ -19,8 +19,8 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-aerisun.txt
       - run: pip install -r requirements-aerisun.txt
-      - name: Network recovery ownership and cloud backup integrity
-        run: python -m unittest ops.test_recovery
+      - name: Recovery, publication paths, latency probes and cloud backup integrity
+        run: python -m unittest ops.test_recovery ops.test_web ops.test_site_latency ops.test_latency_monitor
       - name: Network isolation, accepted stream completion and tool admission
         run: >-
           python -m unittest
@@ -33,3 +33,29 @@ jobs:
         run: PYTHONPATH=inference/embedding/scripts python -m unittest discover -s inference/embedding/tests
       - name: CPU reranker scheduler
         run: PYTHONPATH=inference/reranker/scripts python -m unittest discover -s inference/reranker/tests
+
+  web-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: |
+            frontend/pnpm-lock.yaml
+            chat-ui/pnpm-lock.yaml
+      - run: pnpm --dir chat-ui install --frozen-lockfile
+      - run: pnpm --dir frontend install --frozen-lockfile
+      - name: Chat streaming, image and model-control regressions
+        run: node --test chat-ui/src/*.test.mjs
+      - name: Build both UIs under the public subpath
+        env:
+          VITE_APP_BASE_PATH: /sub2api/
+          VITE_API_BASE_URL: /sub2api/api/v1
+        run: make build-frontend
+      - name: Check both entry documents and every referenced bundle
+        run: python -c "from ops.web import validate_bundle; validate_bundle('backend/internal/web/dist', 'https://example.invalid/sub2api')"

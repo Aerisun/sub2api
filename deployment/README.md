@@ -2,7 +2,7 @@
 
 这是当前线上服务的项目，基于 `Wei-Shaw/sub2api`，在 `Aerisun/sub2api` 的 `aerisun` 分支维护。Sub2API 及网络守护只保留这一份源码与部署目录；自动续期 `auto-get-api` 按要求保留在同级外部目录，`Gemini-API` 已删除。模型 ID、推理参数、价格及文本供应商映射沿用线上配置；已按要求下架的 Step 和 GLM Flash 不再发布。
 
-配置分层与新功能接入见 [CONFIGURATION.md](CONFIGURATION.md)，缤纷云备份范围与完整恢复步骤见 [BACKUP.md](BACKUP.md)。
+配置分层与新功能接入见 [CONFIGURATION.md](CONFIGURATION.md)，网站发布、持续巡检与延迟验收见 [LATENCY.md](LATENCY.md)，缤纷云备份范围与完整恢复步骤见 [BACKUP.md](BACKUP.md)。
 
 ## 目录
 
@@ -61,7 +61,7 @@ python3 -m ops.checks.image_recognition_concurrency --concurrency 64 --waves 2 -
 
 这些是明确的真实付费调用，临时测试用户和密钥会在结束后删除。识图检查同时覆盖 REST、SSE、MCP 和通用工具调用，逐个验证图片内容、完成状态、用量和扣费。内部允许短暂排队，接收上限 64，供应商执行上限 16。
 
-离线回归测试在各组件中维护；不保留根目录的一次性测试脚本。后端使用 Go 1.27.3，前端使用 Node 24 和 pnpm 9。先安装 `chat-ui/` 与 `frontend/` 中锁定的依赖，再执行 `make build-frontend`。Docker 构建也会从源码编译独立对话界面；生成资源不提交 Git。
+离线回归测试在各组件中维护；不保留根目录的一次性测试脚本。后端使用 Go 1.27.3，前端使用 Node 24 和 pnpm 9。线上网页用 `python3 -m ops.web build`，自动按 `public_url` 构建路径、检查资源并发布。`make build-frontend` 是通用构建入口，部署到子路径时必须设置 `VITE_APP_BASE_PATH` 与 `VITE_API_BASE_URL`。Docker 构建也会从源码编译独立对话界面；生成资源不提交 Git。
 
 ## 加密备份与恢复
 
@@ -84,4 +84,4 @@ CPU 推理目前运行在私有 SSH 配置指定的远端主机，8091/8101 经�
 
 只在源码目录维护当前实现。验证结果写入 `var/reports/`，日志写入 `var/log/`，临时构建写入 `var/build/`。旧脚本、浏览器录制、源码副本和失效补丁在新快照恢复验证后删除。运行 `python3 -m ops.maintenance --apply` 执行既有的缓存与日志保留策略。
 
-当前源码的 Go/HTTP 依赖已使用修复版本构建和检查。线上 Go 网关二进制作为本次公网验收的运行版本原样归档，具体 SHA-256 保留在验收记录中；本次已经部署的变更包括网络恢复、识图调度隔离、目录与配置迁移、前端依赖修复。
+线上 Go 网关、页面资源与验收结果一同备份；具体二进制 SHA-256、构建来源及测试结果保留在私有验收记录中。后续发布先做完整回归、请求排空和公网复测，再形成新的缤纷云快照。

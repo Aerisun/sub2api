@@ -1,0 +1,12 @@
+[Unit]
+Description=Sub2API public assets and internal API latency checks
+After=network-online.target sub2api-web.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=@ROOT@
+Environment=PYTHONPATH=@ROOT@/runtime/python-site:@ROOT@
+ExecStart=/usr/bin/python3 -m ops.latency_monitor
+TimeoutStartSec=150
+UMask=0077
+NoNewPrivileges=true

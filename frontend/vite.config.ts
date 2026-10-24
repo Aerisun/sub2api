@@ -84,6 +84,7 @@ export default defineConfig(({ mode }) => {
   const devPort = Number(env.VITE_DEV_PORT || 3000)
 
   return {
+    base: env.VITE_APP_BASE_PATH || '/',
     plugins: [
       vue(),
       checker({

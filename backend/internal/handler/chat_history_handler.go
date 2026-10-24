@@ -14,7 +14,6 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"time"
 	"unicode/utf8"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
@@ -35,7 +34,7 @@ type ChatHistoryHandler struct {
 }
 
 func NewChatHistoryHandler(db *sql.DB, cfg *config.Config) *ChatHistoryHandler {
-	h := &ChatHistoryHandler{db: db, baseURL: fmt.Sprintf("http://127.0.0.1:%d", cfg.Server.Port), toolURL: "http://127.0.0.1:8094", client: &http.Client{Transport: &http.Transport{Proxy: nil}, Timeout: 20 * time.Minute}, tasks: make(map[string]context.CancelFunc)}
+	h := &ChatHistoryHandler{db: db, baseURL: fmt.Sprintf("http://127.0.0.1:%d", cfg.Server.Port), toolURL: "http://127.0.0.1:8094", client: newChatHTTPClient(), tasks: make(map[string]context.CancelFunc)}
 	h.startStorageMaintenance()
 	return h
 }

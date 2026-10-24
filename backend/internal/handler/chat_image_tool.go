@@ -148,7 +148,7 @@ func (h *ChatHistoryHandler) recognizeChatImages(ctx context.Context, images []c
 	request.Header.Set("Authorization", auth)
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "text/event-stream")
-	response, err := h.client.Do(request)
+	response, err := doChatRequest(h.client, request)
 	if err != nil {
 		return fail(errors.New("识图工具连接中断，请稍后重试"))
 	}

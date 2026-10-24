@@ -93,7 +93,7 @@ watch(
   () => authStore.isAuthenticated,
   (isAuthenticated, oldValue) => {
     if (isAuthenticated) {
-      if (authStore.isAdmin) {
+      if (authStore.isAdmin && !adminComplianceStore.initialized) {
         adminComplianceStore.fetchStatus().catch((error) => {
           console.error('Failed to fetch admin compliance status:', error)
         })
@@ -141,6 +141,8 @@ onBeforeUnmount(() => {
 
 onMounted(async () => {
   window.addEventListener('admin-compliance-required', onAdminComplianceRequired)
+  updateDocumentTitle()
+  const publicSettings = appStore.fetchPublicSettings()
 
   // Check if setup is needed
   try {
@@ -154,7 +156,7 @@ onMounted(async () => {
   }
 
   // Load public settings into appStore (will be cached for other components)
-  await appStore.fetchPublicSettings()
+  await publicSettings
 
   // Re-resolve document title now that site settings are available
   updateDocumentTitle()

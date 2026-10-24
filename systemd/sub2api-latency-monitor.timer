@@ -1,0 +1,11 @@
+[Unit]
+Description=Continuously check Sub2API website and API latency
+
+[Timer]
+OnBootSec=45s
+OnUnitInactiveSec=60s
+RandomizedDelaySec=5s
+Unit=sub2api-latency-monitor.service
+
+[Install]
+WantedBy=timers.target

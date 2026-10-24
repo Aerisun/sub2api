@@ -1,6 +1,8 @@
 .PHONY: build build-backend build-frontend build-chat-ui test test-backend test-frontend test-frontend-critical
 
 FRONTEND_CRITICAL_VITEST := \
+	src/composables/__tests__/useRoutePrefetch.spec.ts \
+	src/views/auth/__tests__/LoginView.spec.ts \
 	src/i18n/__tests__/localeKeyCompleteness.spec.ts \
 	src/api/__tests__/client.spec.ts \
 	src/api/__tests__/tokenRefresh.spec.ts \

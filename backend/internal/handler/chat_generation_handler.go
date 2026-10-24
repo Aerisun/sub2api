@@ -476,12 +476,11 @@ func (h *ChatHistoryHandler) runGeneration(ctx context.Context, cancel context.C
 	tools := make([]service.InternalToolEvent, 0)
 	dirty := false
 	lastCheckpoint := time.Now()
-	checkpoint := func() error {
-		saveCtx, stop := context.WithTimeout(context.Background(), 10*time.Second)
-		defer stop()
-		_, err := h.db.ExecContext(saveCtx, `UPDATE chat_generations SET content=$3,reasoning=$4,tools=$5,sequence=sequence+1,updated_at=NOW() WHERE user_id=$1 AND id=$2 AND status='running'`, uid, jobID, content, reasoning, string(mustChatJSON(tools)))
+	checkpoints := newChatCheckpointWriter(ctx, func(saveCtx context.Context, snapshot chatCheckpoint) error {
+		_, err := h.db.ExecContext(saveCtx, `UPDATE chat_generations SET content=$3,reasoning=$4,tools=$5,sequence=sequence+1,updated_at=NOW() WHERE user_id=$1 AND id=$2 AND status='running'`, uid, jobID, snapshot.content, snapshot.reasoning, string(snapshot.tools))
 		return err
-	}
+	})
+	defer checkpoints.stop()
 loop:
 	for {
 		select {
@@ -493,17 +492,20 @@ loop:
 				failure = "生成超时，可重新生成"
 			}
 			break loop
+		case checkpointErr := <-checkpoints.failed:
+			if checkpointErr == nil {
+				continue
+			}
+			status = "failed"
+			failure = "保存回复失败，请稍后重试"
+			break loop
 		case <-ticker.C:
 			if !dirty && time.Since(lastCheckpoint) < 10*time.Second {
 				continue
 			}
 			dirty = false
 			lastCheckpoint = time.Now()
-			if err := checkpoint(); err != nil {
-				status = "failed"
-				failure = "保存回复失败，请稍后重试"
-				break loop
-			}
+			checkpoints.submit(chatCheckpoint{content: content, reasoning: reasoning, tools: mustChatJSON(tools)})
 		case delta := <-updates:
 			if delta.ImageRequest != nil {
 				imageRequest = delta.ImageRequest
@@ -540,6 +542,7 @@ loop:
 			}
 		}
 	}
+	checkpoints.stop()
 	saveCtx, stop := context.WithTimeout(context.Background(), 15*time.Second)
 	defer stop()
 	if status != "completed" {

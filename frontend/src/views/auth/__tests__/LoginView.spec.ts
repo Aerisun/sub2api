@@ -55,6 +55,7 @@ vi.mock('@/stores', () => ({
     login2FA: vi.fn()
   }),
   useAppStore: () => ({
+    fetchPublicSettings: (...args: unknown[]) => getPublicSettingsMock(...args),
     showError: vi.fn(),
     showSuccess: vi.fn(),
     showWarning: vi.fn()
