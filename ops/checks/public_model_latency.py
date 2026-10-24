@@ -37,12 +37,19 @@ def chat(client, key, model, endpoint, round_number, target_ms):
            "first_text_ms": None, "first_reasoning_ms": None,
            "target_ms": target_ms, "text_deltas": 0, "reasoning_deltas": 0}
     start = time.monotonic()
+    request_id = "capacity-public-" + secrets.token_hex(8)
+    row['client_request_id'] = request_id
+    row['network_trace'] = []
+    def trace(name, _info):
+        if len(row['network_trace']) < 64:
+            row['network_trace'].append({'event': name, 'at_ms': round((time.monotonic()-start)*1000)})
     output, last_delta, gaps = [], None, []
     try:
         with client.stream("POST", PUBLIC + endpoint, json=body,
                            headers={"Authorization": "Bearer " + key,
-                                    "X-Client-Request-Id": "capacity-public-" + secrets.token_hex(8)}) as response:
+                                    "X-Client-Request-Id": request_id}, extensions={'trace': trace}) as response:
             row.update(status=response.status_code, headers_ms=round((time.monotonic()-start)*1000))
+            row['gateway_request_id'] = response.headers.get('X-Request-Id')
             if response.status_code != 200:
                 response.read()
                 try:
