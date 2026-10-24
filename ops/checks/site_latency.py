@@ -69,7 +69,7 @@ def check_entries(client, public_url, method='GET'):
     return rows
 
 
-def measure(public_url, samples=5, authenticated=False, head_assets=False):
+def measure(public_url, samples=5, authenticated=False, head_assets=False, request_timeout=12):
     token = login() if authenticated else None
     headers = {'Authorization': 'Bearer '+token} if token else {}
     origins = {'gateway': 'http://127.0.0.1:8080', 'web': 'http://127.0.0.1:8081', 'public': public_url.rstrip('/')}
@@ -78,7 +78,7 @@ def measure(public_url, samples=5, authenticated=False, head_assets=False):
     def one_origin(item):
         name, origin = item
         rows = []
-        with httpx.Client(trust_env=False, timeout=httpx.Timeout(12, connect=4)) as client:
+        with httpx.Client(trust_env=False, timeout=httpx.Timeout(request_timeout, connect=min(4, request_timeout))) as client:
             for path in paths:
                 runs = [probe(client, origin+path, headers=headers, expected_type=('application/json',))
                         for _ in range(samples)]
@@ -90,7 +90,7 @@ def measure(public_url, samples=5, authenticated=False, head_assets=False):
 
     with ThreadPoolExecutor(max_workers=3) as executor:
         checks = [row for group in executor.map(one_origin, origins.items()) for row in group]
-    with httpx.Client(trust_env=False, timeout=httpx.Timeout(12, connect=4)) as client:
+    with httpx.Client(trust_env=False, timeout=httpx.Timeout(request_timeout, connect=min(4, request_timeout))) as client:
         entries = check_entries(client, public_url, 'HEAD' if head_assets else 'GET')
     return {'at': datetime.now(timezone.utc).isoformat(), 'public_url': public_url,
             'samples_per_endpoint': samples, 'checks': checks, 'entries': entries,

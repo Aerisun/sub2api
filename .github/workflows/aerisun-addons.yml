@@ -29,6 +29,9 @@ jobs:
           internal_tools.test_image_tools internal_tools.test_concurrency
           image_hub.proxy_qualifier_test image_hub.egress_subscriptions_test
           image_hub.egress_control_test image_hub.egress_watchdog_test
+          image_hub.response_latency_test image_hub.transport_latency_test image_hub.gateway_transport_test
+          image_hub.image_intent_test
+          image_hub.agent_tests image_hub.agent_workers_test
       - name: CPU embedding scheduler
         run: PYTHONPATH=inference/embedding/scripts python -m unittest discover -s inference/embedding/tests
       - name: CPU reranker scheduler

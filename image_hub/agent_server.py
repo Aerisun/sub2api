@@ -10,6 +10,7 @@ import multiprocessing
 import os
 import signal
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from http.client import HTTPException, IncompleteRead
 from urllib.parse import urlsplit, parse_qs
@@ -20,6 +21,8 @@ from image_hub.server import HubError, NATIVE_MODEL, NATIVE_MODEL_CHOICES, ORIGI
 from image_hub.model_access import ImageAccessCache
 from image_hub.gateway_transport import GatewayTransport
 from image_hub.client_disconnect import ClientDisconnectMonitor
+from image_hub.response_latency import ResponseLatency, record as record_response_latency
+from image_hub.image_intent import self_contained_calculation, wants_image_generation
 from internal_tools import http_api
 from internal_tools.chat_bridge import ToolExecutor, inject_search, search_eligible
 from internal_tools.web_search import WebSearchExecutor, search_model
@@ -38,12 +41,25 @@ HOP_HEADERS = {"host", "content-length", "connection", "transfer-encoding", "upg
 
 
 class Handler(BaseHTTPRequestHandler):
+    response_latency = None
     protocol_version = "HTTP/1.1"
     # SSE headers and small deltas must be sent without a delayed-ACK wait.
     disable_nagle_algorithm = True
 
     def log_message(self, *_):
         pass  # No chat prompts, credentials or generated links in access logs.
+
+    def send_response(self, code, message=None):
+        if self.response_latency is not None:
+            self.response_latency.status = code
+        super().send_response(code, message)
+
+    def observe_response(self, raw):
+        try:
+            if self.response_latency is not None:
+                self.response_latency.feed(raw)
+        except Exception:
+            self.response_latency = None
 
     def handle(self):
         try:
@@ -60,6 +76,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
         self.wfile.write(raw)
+        self.observe_response(raw)
 
     def forwarded_headers(self):
         return {**{name: value for name, value in self.headers.items() if name.lower() not in HOP_HEADERS},
@@ -105,6 +122,7 @@ class Handler(BaseHTTPRequestHandler):
                             self.wfile.write((f"{len(chunk):x}\r\n".encode() + chunk + b"\r\n")
                                              if chunked else chunk)
                             self.wfile.flush()
+                            self.observe_response(chunk)
                         if response.length not in (0, None):
                             raise IncompleteRead(b"")
                         client_request.check()
@@ -149,6 +167,8 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(error.status,error.body())
 
     def do_POST(self):
+        self.response_latency = None
+        request_started = time.monotonic()
         self.connection.settimeout(1590)
         try:
             try:
@@ -186,9 +206,15 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(403, {"error": {"message": "Origin is not allowed"}})
                 return http_api.dispatch(self, GATEWAY, body)
             kind = protocol(self.path)
+            model = body.get('model') if isinstance(body, dict) else None
+            if kind == 'gemini' and not model:
+                model = urlsplit(self.path).path.split('/models/', 1)[-1].split(':', 1)[0]
+            if kind and isinstance(model, str) and 0 < len(model) <= 200:
+                streaming = bool(body.get('stream')) or kind == 'gemini' and ':streamGenerateContent' in self.path
+                self.response_latency = ResponseLatency(model, kind, streaming, len(raw), request_started)
             try:
-                allowed = eligible(body, kind, self.path)
-                search_allowed = search_eligible(body, kind, self.path)
+                allowed = eligible(body, kind, self.path) and wants_image_generation(body, kind)
+                search_allowed = search_eligible(body, kind, self.path) and not self_contained_calculation(body, kind)
             except (ValueError, TypeError, AttributeError, KeyError):
                 allowed = search_allowed = False
             if os.environ.get("AGENT_IMAGE_BRIDGE_ENABLED", "1") == "0":
@@ -235,6 +261,8 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(error.status, error.body())
         except (ValueError, TypeError, KeyError, AttributeError, OSError, HTTPException):
             self.reply(502, {"error": {"message": "The model response could not be processed"}})
+        finally:
+            record_response_latency(self.response_latency)
 
     def bridge(self, body, kind, streaming, executor):
         with CLIENT_DISCONNECT.watch(self.connection) as client_request:
@@ -256,6 +284,7 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     self.wfile.write(f"{len(raw):x}\r\n".encode() + raw + b"\r\n")
                     self.wfile.flush()
+                    self.observe_response(raw)
                 except (BrokenPipeError, ConnectionResetError, OSError):
                     disconnected = True
                     self.close_connection = True

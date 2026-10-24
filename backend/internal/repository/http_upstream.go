@@ -135,6 +135,7 @@ type upstreamClientEntry struct {
 	protocolMode string       // 协议模式（default/long_stream_h2/openai_h1/openai_h2/openai_h1_fallback）
 	lastUsed     int64        // 最后使用时间戳（纳秒），用于 LRU 淘汰
 	inFlight     int64        // 当前进行中的请求数，>0 时不可淘汰
+	retired      atomic.Bool  // Stop reuse after an explicit route rejection; active bodies finish.
 }
 
 type openAIHTTP2FallbackState struct {
@@ -234,6 +235,9 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 	resp.Body = wrapTrackedBody(resp.Body, func() {
 		atomic.AddInt64(&entry.inFlight, -1)
 		atomic.StoreInt64(&entry.lastUsed, time.Now().UnixNano())
+		if entry.retired.Load() {
+			entry.client.CloseIdleConnections()
+		}
 	})
 
 	return resp, nil
@@ -291,6 +295,9 @@ func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, acco
 	resp.Body = wrapTrackedBody(resp.Body, func() {
 		atomic.AddInt64(&entry.inFlight, -1)
 		atomic.StoreInt64(&entry.lastUsed, time.Now().UnixNano())
+		if entry.retired.Load() {
+			entry.client.CloseIdleConnections()
+		}
 	})
 
 	return resp, nil
@@ -823,9 +830,29 @@ func (s *httpUpstreamService) shouldReuseEntry(entry *upstreamClientEntry, isola
 func (s *httpUpstreamService) removeClientLocked(key string, entry *upstreamClientEntry) {
 	delete(s.clients, key)
 	if entry != nil && entry.client != nil {
+		entry.retired.Store(true)
 		// 关闭空闲连接，释放系统资源
 		// 注意：这不会中断活跃连接
 		entry.client.CloseIdleConnections()
+	}
+}
+
+// InvalidateConnectionPool replaces the transport for subsequent requests while
+// leaving existing response bodies alive. This also covers multiplexed HTTP/2:
+// merely closing idle connections would let new streams reuse the old route.
+func (s *httpUpstreamService) InvalidateConnectionPool(proxyURL string, accountID int64) {
+	proxyKey, _, err := normalizeProxyURL(proxyURL)
+	if err != nil {
+		return
+	}
+	base := buildCacheKey(s.getIsolationMode(), proxyKey, accountID, upstreamProtocolModeDefault)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for key, entry := range s.clients {
+		plain := strings.TrimPrefix(key, "tls:")
+		if entry.proxyKey == proxyKey && (plain == base || strings.HasPrefix(plain, base+"|proto:")) {
+			s.removeClientLocked(key, entry)
+		}
 	}
 }
 

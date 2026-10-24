@@ -100,6 +100,7 @@ def chat(client, key, model, endpoint, round_number, target_ms):
     row["total_ms"] = round((time.monotonic()-start)*1000)
     row["largest_delta_gap_ms"] = max(gaps, default=0)
     row["latency_passed"] = row["ok"] and row["first_semantic_ms"] <= target_ms
+    row["text_latency_passed"] = row["ok"] and row["first_text_ms"] is not None and row["first_text_ms"] <= target_ms
     return row
 
 
@@ -227,8 +228,11 @@ def main():
         report["usage"] = [{k:r.get(k) for k in ("model", "upstream_model", "account_id", "input_tokens",
             "output_tokens", "actual_cost", "first_token_ms", "duration_ms")} for r in records]
         report["cost_usd"] = str(sum((Decimal(str(r["actual_cost"])) for r in records), Decimal(0)))
-        report["all_calls_passed"] = all(r["ok"] for r in report["checks"])
+        report["image_generation_calls"] = sum(str(row.get('model', '')).startswith('gpt-image-') for row in records)
+        report["unexpected_image_generation"] = report["image_generation_calls"] > 0
+        report["all_calls_passed"] = all(r["ok"] for r in report["checks"]) and not report["unexpected_image_generation"]
         report["all_chat_latency_passed"] = all(r["latency_passed"] for r in report["checks"] if r["kind"] == "chat")
+        report["all_chat_text_latency_passed"] = all(r["text_latency_passed"] for r in report["checks"] if r["kind"] == "chat")
     except Exception as error:
         report["error_type"] = type(error).__name__
         raise
@@ -240,7 +244,7 @@ def main():
             api.request("/api/v1/admin/users/"+str(user["id"]), admin, method="DELETE")
         report["temporary_credentials_removed"] = True
         save()
-    if not report.get("all_calls_passed") or not report.get("all_chat_latency_passed"):
+    if not report.get("all_calls_passed") or not report.get("all_chat_latency_passed") or not report.get("all_chat_text_latency_passed"):
         raise SystemExit(1)
 
 

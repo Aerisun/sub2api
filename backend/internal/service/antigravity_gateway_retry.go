@@ -564,6 +564,7 @@ func (s *AntigravityGatewayService) antigravityRetryLoop(p antigravityRetryLoopP
 
 	var resp *http.Response
 	var usedBaseURL string
+	rejectedRouteRetried := false
 	logBody := p.settingService != nil && p.settingService.cfg != nil && p.settingService.cfg.Gateway.LogUpstreamErrorBody
 	maxBytes := 2048
 	if p.settingService != nil && p.settingService.cfg != nil && p.settingService.cfg.Gateway.LogUpstreamErrorBodyMaxBytes > 0 {
@@ -652,6 +653,15 @@ urlFallbackLoop:
 						Body:       io.NopCloser(bytes.NewReader(respBody)),
 					}
 					break urlFallbackLoop
+				}
+
+				// A region rejection precedes generation. Retire the old pooled
+				// tunnel after an egress switch, then permit one fresh connection.
+				// Ambiguous transport failures and other 4xx responses do not enter
+				// this path, and no accepted/streaming request is replayed.
+				if invalidateAntigravityRejectedRoute(p, resp.StatusCode, respBody) && !rejectedRouteRetried && attempt < antigravityMaxRetries {
+					rejectedRouteRetried = true
+					continue
 				}
 
 				// 429/503 限流处理：区分 URL 级别限流、智能重试和账户配额限流

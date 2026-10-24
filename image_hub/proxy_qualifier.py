@@ -228,6 +228,18 @@ def stable_pool(rows, selected):
     return rows
 
 
+def diverse_candidates(rank, limit):
+    """A region rejecting the API must not consume the entire bounded scan."""
+    buckets = [[name for name in rank if name.startswith(prefix)] for prefix in
+               ('NA-UnitedStates-', 'ASIA-Japan-', 'ASIA-Singapore-')]
+    candidates = []
+    while any(buckets) and len(candidates) < limit:
+        for bucket in buckets:
+            if bucket and len(candidates) < limit:
+                candidates.append(bucket.pop(0))
+    return candidates
+
+
 def probe_live_pools(config):
     """Check every installed spare without selecting it or submitting inference."""
     def check(role):
@@ -360,12 +372,7 @@ def evaluate(config, source):
         for role in config['roles']:
             rank = sorted([n for n in all_nodes if delays[n].get(role['name'])],
                           key=lambda n: delays[n][role['name']])
-            # Reserve a place for each available region before filling by latency.
-            candidates = []
-            for prefix in ('NA-UnitedStates-', 'ASIA-Japan-', 'ASIA-Singapore-'):
-                candidates.extend([n for n in rank if n.startswith(prefix)][:1])
-            candidates += [n for n in rank if n not in candidates]
-            candidates = candidates[:config.get('max_candidates_per_role', 12)]
+            candidates = diverse_candidates(rank, config.get('max_candidates_per_role', 12))
             rows = []
             opener = build_opener(ProxyHandler({'https': proxy}))
             for name in candidates:

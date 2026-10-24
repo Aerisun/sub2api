@@ -8,7 +8,8 @@ from unittest.mock import patch
 import yaml
 
 from image_hub.proxy_qualifier import (choose_pool, eligible_nodes, fingerprint,
-                                       install_pool, read_yaml, reconcile, qualification_due, probe_live_pools, stable_pool)
+                                       install_pool, read_yaml, reconcile, qualification_due, probe_live_pools, stable_pool,
+                                       diverse_candidates)
 
 
 def node(name):
@@ -41,6 +42,17 @@ class FileController:
 
 
 class QualificationTests(unittest.TestCase):
+    def test_region_rejection_does_not_hide_working_spares_in_other_regions(self):
+        rank = ['NA-UnitedStates-'+str(n) for n in range(20)]
+        rank += ['ASIA-Japan-'+str(n) for n in range(4)]
+        rank += ['ASIA-Singapore-'+str(n) for n in range(4)]
+        selected = diverse_candidates(rank, 8)
+        self.assertEqual(selected, ['NA-UnitedStates-0', 'ASIA-Japan-0', 'ASIA-Singapore-0',
+                                    'NA-UnitedStates-1', 'ASIA-Japan-1', 'ASIA-Singapore-1',
+                                    'NA-UnitedStates-2', 'ASIA-Japan-2'])
+        self.assertEqual(diverse_candidates(rank[:4], 8), rank[:4])
+        self.assertEqual(diverse_candidates([], 8), [])
+
     def test_small_latency_changes_do_not_flap_the_freshly_verified_primary(self):
         rows=[{'node':'candidate','score_ms':1500},{'node':'current','score_ms':1800}]
         self.assertEqual(stable_pool(rows,'current')[0]['node'],'current')

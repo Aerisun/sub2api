@@ -5,6 +5,7 @@ import subprocess
 
 from ops.admin_api import ROOT, read_env
 from ops.checks.site_latency import measure
+from image_hub.response_latency import PREFIX, summarize
 
 
 def model_latency():
@@ -26,6 +27,23 @@ def model_latency():
     return json.loads(result.stdout)
 
 
+def response_latency():
+    result = subprocess.run(['journalctl', '--user', '-u', 'sub2api-agent-images.service',
+        '--since', '15 minutes ago', '-n', '10000', '-o', 'cat', '--no-pager', '--grep', '^'+PREFIX],
+        check=False, capture_output=True, text=True, timeout=3)
+    if result.returncode == 1 and not result.stdout:
+        return []  # A newly restored service has no response observations yet.
+    result.check_returncode()
+    records = []
+    for line in result.stdout.splitlines():
+        if line.startswith(PREFIX):
+            try:
+                records.append(json.loads(line[len(PREFIX):]))
+            except ValueError:
+                pass
+    return summarize(records)
+
+
 def main():
     config = json.loads((ROOT/'deployment/site.json').read_text())
     destination = ROOT/'var/reports/latency-current.json'
@@ -33,20 +51,28 @@ def main():
         previous = json.loads(destination.read_text())
     except (OSError, ValueError):
         previous = {}
-    report = measure(config['public_url'], samples=1, head_assets=True)
+    report = measure(config['public_url'], samples=1, head_assets=True, request_timeout=4)
     try:
         report['model_latency'] = model_latency()
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         report['model_latency'] = []
         report['model_observation_error'] = type(error).__name__
     report['slow_models'] = [row['model'] for row in report['model_latency'] if row['first_event_p95_ms'] > 10000]
+    try:
+        report['response_latency'] = response_latency()
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
+        report['response_latency'] = []
+        report['response_observation_error'] = type(error).__name__
+    report['slow_models'] = sorted(set(report['slow_models']) | {
+        row['model'] for row in report['response_latency'] if row['streaming'] and not row['with_tools']
+        and (row['first_text_p95_ms'] > 10000 or row['semantic_gap_p95_ms'] > 10000)})
     slow = [row['origin']+row['endpoint'] for row in report['checks']
             if row['p95_ms'] > (2000 if row['origin'] == 'public' else 250)]
     report['slow_endpoints'] = slow
     bad = not report['all_calls_passed'] or bool(slow)
     report['consecutive_failures'] = previous.get('consecutive_failures', 0)+1 if bad else 0
     report['state'] = ('unhealthy' if report['consecutive_failures'] >= 3 else 'degraded') if bad else 'healthy'
-    if report['state'] == 'healthy' and (report['slow_models'] or report.get('model_observation_error')):
+    if report['state'] == 'healthy' and (report['slow_models'] or report.get('model_observation_error') or report.get('response_observation_error')):
         report['state'] = 'degraded'
     destination.parent.mkdir(parents=True, exist_ok=True)
     pending = destination.with_suffix('.pending')
@@ -58,6 +84,7 @@ def main():
                           'entry_resources_ok': all(r['ok'] for r in report['entries']),
                           'slow_endpoints': slow, 'slow_models': report['slow_models'],
                           'model_observation_error': report.get('model_observation_error'),
+                          'response_observation_error': report.get('response_observation_error'),
                           'consecutive_failures': report['consecutive_failures']}), flush=True)
     if report['state'] == 'unhealthy':
         raise SystemExit(1)

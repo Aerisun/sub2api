@@ -20,6 +20,9 @@ class LatencyMonitorTests(unittest.TestCase):
         self.patcher = patch.object(latency_monitor, 'ROOT', self.root)
         self.patcher.start()
         self.addCleanup(self.patcher.stop)
+        observation = patch.object(latency_monitor, 'response_latency', return_value=[])
+        observation.start()
+        self.addCleanup(observation.stop)
 
     def site(self, assets_ok=True):
         return {'all_calls_passed': assets_ok, 'model_calls': 0,
@@ -66,6 +69,26 @@ class LatencyMonitorTests(unittest.TestCase):
             latency_monitor.main()
         self.assertEqual(self.read()['model_observation_error'], 'TimeoutExpired')
         self.assertNotIn('private command', log.getvalue())
+
+    def test_early_gateway_events_cannot_hide_a_slow_first_text(self):
+        row = {'model': 'fixture', 'streaming': True, 'with_tools': False, 'samples': 3,
+               'first_text_p95_ms': 17000, 'semantic_gap_p95_ms': 16000}
+        with patch.object(latency_monitor, 'measure', return_value=self.site()), \
+                patch.object(latency_monitor, 'model_latency', return_value=[]), \
+                patch.object(latency_monitor, 'response_latency', return_value=[row]), redirect_stdout(StringIO()):
+            latency_monitor.main()
+        self.assertEqual(self.read()['slow_models'], ['fixture'])
+
+    def test_tool_and_nonstreaming_waits_are_reported_without_false_first_token_alarms(self):
+        rows = [{'model': 'with-tool', 'streaming': True, 'with_tools': True, 'samples': 3,
+                 'first_text_p95_ms': 40000, 'semantic_gap_p95_ms': 30000},
+                {'model': 'whole-output', 'streaming': False, 'with_tools': False, 'samples': 3,
+                 'first_text_p95_ms': 40000, 'semantic_gap_p95_ms': 0}]
+        with patch.object(latency_monitor, 'measure', return_value=self.site()), \
+                patch.object(latency_monitor, 'model_latency', return_value=[]), \
+                patch.object(latency_monitor, 'response_latency', return_value=rows), redirect_stdout(StringIO()):
+            latency_monitor.main()
+        self.assertEqual(self.read()['state'], 'healthy')
 
 
 if __name__ == '__main__':
