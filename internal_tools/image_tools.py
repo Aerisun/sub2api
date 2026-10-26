@@ -1,5 +1,6 @@
 """Public image tools delegate to the existing authenticated, billed gateway."""
 import base64
+from contextlib import contextmanager
 from copy import deepcopy
 import json
 import logging
@@ -113,6 +114,30 @@ def can_generate(models):return GENERATION in models or bool(set(NATIVE_MODEL_CH
 def can_recognize(models):return RECOGNITION in models or VISION_MODEL in models or LEGACY_VISION_MODEL in models
 
 
+@contextmanager
+def recognition_capacity(deadline,routed,excluded):
+    """Wait for a usable route without reserving the recovery probe's capacity."""
+    while time.monotonic()<deadline:
+        ready=not routed or ROUTER.has_ready(excluded)
+        if not ready and excluded:
+            excluded.clear();ready=ROUTER.has_ready()
+        if ready:
+            with RECOGNITION_UPSTREAM_SLOTS.acquire(timeout=max(0,deadline-time.monotonic())):
+                lease=ROUTER.acquire(excluded) if routed else None
+                if routed and lease is None and excluded:
+                    excluded.clear();lease=ROUTER.acquire()
+                if lease is not None or not routed:
+                    try:
+                        yield lease
+                    finally:
+                        if lease:ROUTER.release(lease)
+                    return
+            # Health may change after the readiness read. Release the execution
+            # slot before waiting again; all 64 callers must permit recovery.
+        time.sleep(min(.1,max(0,deadline-time.monotonic())))
+    raise SlotLimitReached()
+
+
 def public_image_result(value):
     if isinstance(value,list):return [public_image_result(item) for item in value]
     if isinstance(value,dict):return {key:public_image_result(item) for key,item in value.items() if key not in ("model","upstream_model","account_id","request_fingerprint")}
@@ -215,30 +240,17 @@ class ImageRecognitionExecutor:
                 # Health and leases are shared between workers. No image bytes,
                 # prompts, responses or customer identities enter the routing DB.
                 routed=selected==VISION_MODEL and RECOGNITION in models
-                excluded=set();last_error=None;attempts={}
+                excluded=set();last_error=None;attempts={};deadline=None
                 try:
-                    with RECOGNITION_UPSTREAM_SLOTS.acquire(timeout=max(0,queue_deadline-time.monotonic())):
-                        deadline=time.monotonic()+RECOGNITION_EXECUTION_SECONDS
-                        if self.progress:self.progress(event)
-                        for index in range(6 if routed else 1):
-                            if time.monotonic()>=deadline:
-                                if last_error:raise last_error
-                                raise ToolError(504,"识图超时，请稍后重试","upstream_timeout",retryable=True)
-                            lease=ROUTER.acquire(excluded) if routed else None
-                            if routed and lease is None and excluded:
-                                # Every current healthy route has been tried;
-                                # allow a bounded recovery attempt on them.
-                                excluded.clear();lease=ROUTER.acquire()
-                            route_deadline=deadline
-                            while routed and lease is None and time.monotonic()<route_deadline:
-                                # A health probe or another active image may
-                                # restore a temporarily closed route. Wait
-                                # within this call's execution deadline.
-                                time.sleep(min(.1,max(0,route_deadline-time.monotonic())))
-                                lease=ROUTER.acquire(excluded)
-                            if routed and lease is None:
-                                if last_error:raise last_error
-                                raise ToolError(503,"识图通道暂时繁忙，请稍后重试","service_unavailable",retryable=True)
+                    for index in range(6 if routed else 1):
+                        if deadline is not None and time.monotonic()>=deadline:
+                            if last_error:raise last_error
+                            raise ToolError(504,"识图超时，请稍后重试","upstream_timeout",retryable=True)
+                        with recognition_capacity(deadline if deadline is not None else queue_deadline,routed,excluded) as lease:
+                            # Queueing, including route recovery, cannot consume
+                            # the unchanged inference allowance of the first call.
+                            if deadline is None:deadline=time.monotonic()+RECOGNITION_EXECUTION_SECONDS
+                            if self.progress:self.progress(event)
                             model=lease[1] if lease else selected
                             excluded.add(model);attempt_started=time.monotonic();first_text.clear()
                             try:
@@ -277,15 +289,18 @@ class ImageRecognitionExecutor:
                                 delay=getattr(error,'retry_after',None)
                                 if delay is None:delay=min(2,.4*attempts[model])
                                 retry_until=min(deadline,time.monotonic()+max(.05,delay))
-                                while time.monotonic()<retry_until:
-                                    if self.progress:self.progress(event)
-                                    time.sleep(min(1,max(0,retry_until-time.monotonic())))
                                 last_error=error
                             else:
                                 if lease:ROUTER.finish(lease,True,first_text[0] if first_text else (time.monotonic()-attempt_started)*1000)
                                 break
-                        else:raise last_error
+                        # Backoff is not active inference. Recovery probes and
+                        # unrelated images can use the slot while this call waits.
+                        while time.monotonic()<retry_until:
+                            if self.progress:self.progress(event)
+                            time.sleep(min(1,max(0,retry_until-time.monotonic())))
+                    else:raise last_error
                 except SlotLimitReached:
+                    if last_error:raise last_error
                     raise ToolError(504,"识图排队超时，请稍后重试","queue_timeout",retryable=True) from None
 
         except SlotLimitReached:

@@ -101,6 +101,82 @@ class ConcurrencyTests(unittest.TestCase):
             self.assertEqual(sum(r['status']=='completed' for r in results),64)
             self.assertTrue(all(r['cached'] is False and r['usage']['total_tokens']==42 for r in results))
 
+    def test_64_waiting_requests_leave_capacity_for_route_recovery(self):
+        from internal_tools import image_tools
+        from internal_tools.vision_routing import PRIMARY
+        router=image_tools.ROUTER
+        for model in router.models:router.probe(model['id'],False)
+        entered=threading.Event();lock=threading.Lock();accepted=set()
+        def progress(event):
+            with lock:
+                accepted.add(event['id'])
+                if len(accepted)==64:entered.set()
+        def recognize(url,key,body,**kwargs):
+            self.assertEqual(body['model'],PRIMARY)
+            return 200,{'choices':[{'message':{'content':'fixture image result'}}],
+                        'usage':{'total_tokens':12}}
+        recovered=False
+        with patch.object(image_tools,'authorized_models',return_value={'image_recognition'}), \
+             patch.object(image_tools,'recognition_request',side_effect=recognize), \
+             patch.object(image_tools,'RECOGNITION_QUEUE_SECONDS',5), \
+             patch.object(image_tools,'RECOGNITION_EXECUTION_SECONDS',2), \
+             concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
+            pending=[executor.submit(ImageRecognitionExecutor('sk-fixture',progress=progress),
+                        {'image':IMAGE},str(index)) for index in range(64)]
+            self.assertTrue(entered.wait(5),'all accepted requests must reach the waiting phase')
+            time.sleep(.1)
+            try:
+                with image_tools.RECOGNITION_UPSTREAM_SLOTS.acquire(timeout=.2):
+                    recovered=True
+                    router.probe(PRIMARY,True,1000)
+            except SlotLimitReached:
+                pass
+            finally:
+                # Let the old implementation exit too, preserving the useful
+                # failed assertion rather than leaving test threads behind.
+                if not recovered:router.probe(PRIMARY,True,1000)
+            results=[item.result(8) for item in pending]
+        self.assertTrue(recovered,'waiting callers occupied every slot needed by the recovery probe')
+        self.assertEqual(sum(row['status']=='completed' for row in results),64)
+        self.assertEqual(router.active_count(),0)
+
+    def test_route_recovery_wait_does_not_consume_the_inference_budget(self):
+        from internal_tools import image_tools
+        from internal_tools.vision_routing import PRIMARY
+        router=image_tools.ROUTER
+        for model in router.models:router.probe(model['id'],False)
+        def recognize(*args,**kwargs):
+            self.assertGreater(kwargs['timeout'],.18)
+            time.sleep(.1)
+            return 200,{'choices':[{'message':{'content':'fixture recovered'}}],
+                        'usage':{'total_tokens':12}}
+        with patch.object(image_tools,'authorized_models',return_value={'image_recognition'}), \
+             patch.object(image_tools,'recognition_request',side_effect=recognize), \
+             patch.object(image_tools,'RECOGNITION_QUEUE_SECONDS',1), \
+             patch.object(image_tools,'RECOGNITION_EXECUTION_SECONDS',.2), \
+             concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            pending=executor.submit(ImageRecognitionExecutor('sk-fixture'),{'image':IMAGE},'recover')
+            time.sleep(.16);self.assertFalse(pending.done())
+            router.probe(PRIMARY,True,1000)
+            self.assertEqual(pending.result(2)['status'],'completed')
+
+    def test_disconnect_before_submission_releases_route_and_execution_slots(self):
+        from internal_tools import image_tools
+        router=image_tools.ROUTER;before=router.snapshot();events=[]
+        def disconnected(event):
+            events.append(event)
+            if len(events)==2:raise ConnectionResetError('fixture disconnected before provider submission')
+        with patch.object(image_tools,'authorized_models',return_value={'image_recognition'}), \
+             patch.object(image_tools,'recognition_request') as request:
+            with self.assertRaises(ConnectionResetError):
+                ImageRecognitionExecutor('sk-fixture',progress=disconnected)({'image':IMAGE},'disconnect')
+        request.assert_not_called()
+        self.assertEqual(router.active_count(),0)
+        self.assertEqual(router.snapshot(),before)
+        with ExitStack() as stack:
+            for _ in range(image_tools.RECOGNITION_UPSTREAM_SLOTS.limit):
+                stack.enter_context(image_tools.RECOGNITION_UPSTREAM_SLOTS.acquire())
+
     def test_64_slots_shared_by_four_processes_and_recovered_after_exit(self):
         context = multiprocessing.get_context("spawn")
         with tempfile.TemporaryDirectory() as folder:

@@ -99,3 +99,15 @@ class VisionRoutingTests(unittest.TestCase):
   self.assertIsNone(router.acquire())
   router.finish(primary,False)
   self.assertEqual(router.acquire()[1],PRIMARY)
+
+ def test_ready_check_respects_cooldowns_exclusions_and_retired_models(self):
+  self.assertTrue(self.router.has_ready())
+  self.router.probe(OMNI,False)
+  self.assertFalse(self.router.has_ready(exclude={PRIMARY}))
+  self.router.probe(PRIMARY,False)
+  with self.router.db() as c:
+   c.execute('INSERT INTO models(id,latency,ready) VALUES(?,?,?)',('retired-model',1,1))
+  self.assertFalse(self.router.has_ready())
+  self.router.probe(PRIMARY,True,1000)
+  self.assertTrue(self.router.has_ready())
+  self.assertFalse(self.router.has_ready(exclude={PRIMARY}))

@@ -45,6 +45,16 @@ class VisionRouter:
             yield conn
         finally:conn.close()
 
+    def has_ready(self,exclude=()):
+        names={m['id'] for m in self.models}-set(exclude)
+        with self.db() as c:
+            return any(row[0] in names for row in c.execute(
+                'SELECT id FROM models WHERE ready=1 AND cooldown<=?',(self.clock(),)))
+
+    def release(self,lease):
+        # Abandoning a reservation is not an upstream success or failure.
+        with self.db() as c:c.execute('DELETE FROM leases WHERE token=?',(lease[0],))
+
     def acquire(self,exclude=()):
         now=self.clock();names={m['id'] for m in self.models}
         with self.db() as c:
