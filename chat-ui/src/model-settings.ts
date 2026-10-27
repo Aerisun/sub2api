@@ -47,7 +47,7 @@ export function modelProfile(model: string = ""): ModelProfile {
       efforts: ["low", "medium", "high", "auto"],
       alwaysThinking: true,
     };
-  if (/^gpt-(6(?:\.1)?-(?:astra|sol|luna)|5\.6-(?:sol|terra|luna))(?:-|$)/.test(name)) {
+  if (/^gpt-(6(?:\.1)?-(?:astra|sol|luna)|6\.1-terra|5\.6-(?:sol|terra|luna))(?:-|$)/.test(name)) {
     const alwaysThinking = /^gpt-(6-astra|6\.1-sol)(?:-|$)/.test(name);
     return {
       brand: "OpenAI", mark: "O", color: "openai", family: "codex",
@@ -142,6 +142,7 @@ export function validEffort(model: string, value: string | undefined): Effort {
     qwen: "xhigh", glm52: "max", glm53: "low", kimi: "low",
     deepseek: "low", nemotron: "low", "gemini-web": "low",
   };
+  if (model.toLowerCase().split("/").at(-1) === "gpt-6.1-terra") return "low";
   return initial[profile.family] || "default";
 }
 export function reasoningParams(

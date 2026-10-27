@@ -826,6 +826,25 @@
         "billing_mode": "image",
         "per_request_price": 0.002
       }
+    },
+    "gpt-6.1-terra": {
+      "source": "https://developers.openai.com/api/docs/models/gpt-6.1-terra",
+      "status": "developer_standard",
+      "checked_at": "2026-10-27",
+      "note": "标准 Token 单价参考 OpenAI；本站 Fast ×3；Flex ×0.5。输入超过 272,000 Token 时，整次请求输入/缓存 ×2，输出 ×1.5。现有 Codex 通道最大上下文为 872,000 Token。",
+      "pricing": {
+        "platform": "openai",
+        "models": [
+          "gpt-6.1-terra"
+        ],
+        "billing_mode": "token",
+        "input_price": 1e-06,
+        "output_price": 5e-06,
+        "cache_write_price": 1.25e-06,
+        "cache_read_price": 5e-08,
+        "fast_multiplier": 3,
+        "flex_multiplier": 0.5
+      }
     }
   },
   "delegated_capabilities": {

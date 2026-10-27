@@ -13,8 +13,8 @@ test("Fast is a separate opt-in field and never changes effort or another provid
   assert.deepEqual(chatParams("kimi-k3", "max", true), {reasoning_effort:"max"});
 });
 test("Codex chat preserves every supported effort and refuses unsupported Off", () => {
-  for (const model of ["gpt-6.1-sol", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]) {
-    assert.equal(validEffort(model, undefined), "medium");
+  for (const model of ["gpt-6.1-terra", "gpt-6.1-sol", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]) {
+    assert.equal(validEffort(model, undefined), model === "gpt-6.1-terra" ? "low" : "medium");
     assert.equal(modelProfile(model).brand, "OpenAI");
     for (const effort of ["low", "medium", "high", "xhigh", "max"]) {
       assert.deepEqual(reasoningParams(model, effort), {reasoning_effort: effort});

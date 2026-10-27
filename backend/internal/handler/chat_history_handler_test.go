@@ -88,7 +88,7 @@ func TestChatHistoryModelStreamUsesOwnedAssetsAndRegularBillingRoute(t *testing.
 	defer upstream.Close()
 	h := &ChatHistoryHandler{db: db, baseURL: upstream.URL, client: upstream.Client()}
 	out := make(chan chatDelta, 4)
-	h.modelStream(context.Background(), 42, chatRecord{ID: chatID, Model: "gpt-6.1-sol", Messages: []chatMessage{{Role: "user", Images: []chatImage{{AssetID: asset}}}, {Role: "assistant"}}}, "Bearer user-jwt", map[string]json.RawMessage{"evil": json.RawMessage(`true`), "service_tier": json.RawMessage(`"fast"`), "reasoning_effort": json.RawMessage(`"max"`)}, out)
+	h.modelStream(context.Background(), 42, chatRecord{ID: chatID, Model: "gpt-6.1-terra", Messages: []chatMessage{{Role: "user", Images: []chatImage{{AssetID: asset}}}, {Role: "assistant"}}}, "Bearer user-jwt", map[string]json.RawMessage{"evil": json.RawMessage(`true`), "service_tier": json.RawMessage(`"fast"`), "reasoning_effort": json.RawMessage(`"max"`)}, out)
 	require.Equal(t, "红色圆形", (<-out).Content)
 	require.True(t, (<-out).Done)
 	require.NoError(t, mock.ExpectationsWereMet())

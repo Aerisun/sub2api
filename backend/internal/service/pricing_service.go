@@ -74,6 +74,24 @@ var (
 		Mode:                                "chat",
 		SupportsPromptCaching:               true,
 	}
+	// https://developers.openai.com/api/docs/models/gpt-6.1-terra (2026-10-27).
+	openAIGPT61TerraFallbackPricing = &LiteLLMModelPricing{
+		InputCostPerToken:                   1e-6,
+		InputCostPerTokenPriority:           2e-6,
+		OutputCostPerToken:                  5e-6,
+		OutputCostPerTokenPriority:          10e-6,
+		CacheCreationInputTokenCost:         1.25e-6,
+		CacheCreationInputTokenCostPriority: 2.5e-6,
+		CacheReadInputTokenCost:             0.05e-6,
+		CacheReadInputTokenCostPriority:     0.1e-6,
+		LongContextInputTokenThreshold:      272_000,
+		LongContextInputCostMultiplier:      2,
+		LongContextOutputCostMultiplier:     1.5,
+		SupportsServiceTier:                 true,
+		LiteLLMProvider:                     "openai",
+		Mode:                                "chat",
+		SupportsPromptCaching:               true,
+	}
 	openAIGPT6SolFallbackPricing = &LiteLLMModelPricing{
 		InputCostPerToken:                   2e-6,
 		InputCostPerTokenPriority:           4e-6,
@@ -1529,6 +1547,13 @@ func (s *PricingService) matchOpenAIModel(model string) *LiteLLMModelPricing {
 				Info(fmt.Sprintf("[Pricing] OpenAI fallback matched %s -> %s", model, "gpt-5.1-codex"))
 			return pricing
 		}
+	}
+
+	if isOpenAIGPT61TerraModel(model) {
+		if pricing, ok := s.pricingData[normalizeKnownOpenAICodexModel(model)]; ok {
+			return pricing
+		}
+		return openAIGPT61TerraFallbackPricing
 	}
 
 	if openai.IsGPT6SolOrLunaModelSpelling(model) {

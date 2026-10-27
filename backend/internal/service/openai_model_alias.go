@@ -43,6 +43,9 @@ func normalizeKnownOpenAICodexModel(model string) string {
 		}
 		return "gpt-6-luna"
 	}
+	if suffix, ok := strings.CutPrefix(normalized, "gpt-6.1-terra-"); ok && (suffix == "max" || isKnownCodexModelSuffix(suffix)) {
+		return "gpt-6.1-terra"
+	}
 
 	switch {
 	case normalized == "gpt-6" || normalized == "gpt-6-astra":
@@ -160,7 +163,12 @@ func firstUsageBillingModel(candidates []string) string {
 }
 
 func isOpenAIGPT6Model(model string) bool {
-	return isOpenAIGPT6AstraModel(model) || isOpenAIGPT61SolModel(model) || openai.IsGPT6SolOrLunaModelSpelling(model)
+	return isOpenAIGPT6AstraModel(model) || isOpenAIGPT61SolModel(model) || isOpenAIGPT61TerraModel(model) || openai.IsGPT6SolOrLunaModelSpelling(model)
+}
+
+func isOpenAIGPT61TerraModel(model string) bool {
+	normalized := canonicalizeOpenAIModelAliasSpelling(model)
+	return normalized == "gpt-6.1-terra" || strings.HasPrefix(normalized, "gpt-6.1-terra-")
 }
 
 func isOpenAIGPT61SolModel(model string) bool {

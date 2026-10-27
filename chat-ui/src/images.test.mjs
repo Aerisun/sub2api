@@ -14,7 +14,7 @@ test('vision availability follows the shared model catalog', () => {
 });
 test('text-only models use browser-only recognition uploads while native image models retain their route',()=>{
   for(const model of ['Nemotron-3.5','nvidia/Nemotron-3.5','glm-5.2','glm-5.3','unknown-model'])assert.equal(supportsNativeImages(model),false,model);
-  for(const model of ['qwen3.8-flash','gpt-6.1-sol'])assert.equal(supportsNativeImages(model),true,model);
+  for(const model of ['qwen3.8-flash','gpt-6.1-sol','gpt-6.1-terra'])assert.equal(supportsNativeImages(model),true,model);
   for(const retired of ['glm-5.3-flash','step-5-preview'])assert.equal(supportsNativeImages(retired),false,retired);
 });
 test('background sync preserves browser-only images without opening files or uploading them',async()=>{

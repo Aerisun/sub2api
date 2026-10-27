@@ -27,6 +27,7 @@ VERIFIED_IMAGE_MODELS = {'claude-sonnet-4-6', 'claude-opus-4-6-thinking', 'gemin
 # Endpoint constraints, checked against Qiniu's model_constraints and NVIDIA model cards.
 # These describe the active routing pool, rather than Claude's assumed alias window.
 MODEL_LIMITS = {
+    'gpt-6.1-terra': (872000,128000),
     # Account 54's current Antigravity catalog caps these Claude routes.
     'claude-sonnet-4-6': (250000,64000),
     'claude-opus-4-6-thinking': (250000,64000),
@@ -101,7 +102,7 @@ def opencode_config(models):
                 entry['variants']['off'] = {'reasoningEffort': 'none'}
         if model.startswith(('gpt-6', 'gpt-5.6')):
             entry['reasoning'] = True
-            entry['options'] = {'reasoningEffort': 'medium'}
+            entry['options'] = {'reasoningEffort': 'low' if model == 'gpt-6.1-terra' else 'medium'}
             entry['variants'] = {effort: {'reasoningEffort': effort}
                                  for effort in ('low', 'medium', 'high', 'xhigh', 'max')}
             if model not in ('gpt-6-astra', 'gpt-6.1-sol'):

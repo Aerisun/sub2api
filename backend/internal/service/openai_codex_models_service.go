@@ -527,6 +527,17 @@ func newConfiguredCodexModelDescriptor(modelID string) configuredCodexModelDescr
 				descriptor.MaxContextWindow = 1_050_000
 				descriptor.DefaultReasoningSummary = "auto"
 			}
+			if isOpenAIGPT61TerraModel(modelID) {
+				// The verified Codex channel advertises a smaller window than
+				// the public API card. Live account metadata remains authoritative.
+				defaultReasoningLevel := "low"
+				descriptor.DefaultReasoningLevel = &defaultReasoningLevel
+				descriptor.ContextWindow = 500_000
+				descriptor.MaxContextWindow = 872_000
+				multiAgentEffort := "xhigh"
+				descriptor.MultiAgentReasoningEffort = &multiAgentEffort
+				descriptor.MultiAgentVersion = "v2"
+			}
 			if isOpenAIGPT6AstraModel(modelID) {
 				// Codex resolves the Ultra workflow to this effort before inference.
 				// openai/codex a9896da3: codex-rs/models-manager/models.json.
@@ -636,6 +647,9 @@ func configuredCodexGPTReasoningLevels(modelID string) []configuredCodexReasonin
 		{Effort: "high", Description: "Greater reasoning depth for coding and agent tasks"},
 		{Effort: "xhigh", Description: "Extra-high reasoning depth for difficult tasks"},
 	}
+	if isOpenAIGPT61TerraModel(modelID) {
+		levels = append([]configuredCodexReasoningLevel{{Effort: "none", Description: "Respond without reasoning"}}, levels...)
+	}
 	normalized := getNormalizedCodexModel(modelID)
 	if isOpenAIGPT56Model(modelID) || isOpenAIGPT6Model(modelID) {
 		levels = append(levels, configuredCodexReasoningLevel{
@@ -643,7 +657,7 @@ func configuredCodexGPTReasoningLevels(modelID string) []configuredCodexReasonin
 			Description: "Maximum reasoning depth for complex tasks",
 		})
 	}
-	if isOpenAIGPT6AstraModel(modelID) || normalized == "gpt-5.6-sol" || normalized == "gpt-5.6-terra" {
+	if isOpenAIGPT6AstraModel(modelID) || isOpenAIGPT61TerraModel(modelID) || normalized == "gpt-5.6-sol" || normalized == "gpt-5.6-terra" {
 		levels = append(levels, configuredCodexReasoningLevel{
 			Effort:      "ultra",
 			Description: "Maximum reasoning with automatic task delegation",

@@ -6,6 +6,34 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestGPT61TerraPreservesModelAndReasoningControls(t *testing.T) {
+	for _, model := range []string{"gpt-6.1-terra", "openai/gpt-6.1-terra", "gpt-6.1-terra-2026-10-26", "gpt-6.1-terra-max"} {
+		require.Equal(t, "gpt-6.1-terra", normalizeKnownOpenAICodexModel(model))
+		require.Equal(t, "gpt-6.1-terra", normalizeCodexModel(model))
+		require.True(t, isOpenAICodexReasoningGPTModel(model))
+		require.True(t, isOpenAICodexImageInputModel(model))
+		require.True(t, shouldAutoInjectPromptCacheKeyForCompat(model))
+	}
+	for _, effort := range []string{"none", "low", "medium", "high", "xhigh", "max"} {
+		body := []byte(`{"model":"gpt-6.1-terra","reasoning":{"mode":"standard","effort":"` + effort + `"}}`)
+		normalized, changed, err := normalizeOpenAIResponsesReasoningMode(body, "gpt-6.1-terra")
+		require.NoError(t, err)
+		require.False(t, changed)
+		require.JSONEq(t, string(body), string(normalized))
+	}
+	for _, model := range []string{"gpt-6.1-terrain", "gpt-6.1-sol", "gpt-5.6-terra"} {
+		require.False(t, isOpenAIGPT61TerraModel(model))
+	}
+	descriptor := newConfiguredCodexModelDescriptor("gpt-6.1-terra")
+	require.Equal(t, "GPT-6.1 Terra", descriptor.DisplayName)
+	require.Equal(t, "low", *descriptor.DefaultReasoningLevel)
+	require.Equal(t, int64(500_000), descriptor.ContextWindow)
+	require.Equal(t, int64(872_000), descriptor.MaxContextWindow)
+	require.Equal(t, []string{"none", "low", "medium", "high", "xhigh", "max", "ultra"}, effortsFromConfiguredCodexLevels(descriptor.SupportedReasoningLevels))
+	require.Equal(t, "xhigh", *descriptor.MultiAgentReasoningEffort)
+	require.True(t, descriptor.SupportsParallelToolCalls)
+}
+
 func TestNormalizeKnownOpenAICodexModelGPT6Astra(t *testing.T) {
 	for _, model := range []string{"gpt-6-astra", "openai/gpt-6-astra", "OPENAI/GPT-6_ASTRA", "gpt-6", "openai/gpt-6"} {
 		require.Equal(t, "gpt-6-astra", normalizeKnownOpenAICodexModel(model))

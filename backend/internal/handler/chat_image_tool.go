@@ -61,7 +61,7 @@ func chatModelHasNativeVision(model string) bool {
 		name = name[slash+1:]
 	}
 	switch name {
-	case "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-astra", "gpt-6-luna", "gpt-6-sol", "gpt-6.1-sol",
+	case "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-astra", "gpt-6-luna", "gpt-6-sol", "gpt-6.1-sol", "gpt-6.1-terra",
 		"claude-opus-4-6-thinking", "claude-sonnet-4-6", "gemini-3.8-flash", "kimi-k3", "deepseek-v4.1-flash",
 		"qwen3.8-flash", "qwen3.8-max", "glm-5.3-flash", "step-5-preview":
 		return true

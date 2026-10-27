@@ -273,6 +273,46 @@
       ]
     }
   },
+  "gpt-6.1-terra": {
+    "name": "gpt-6.1-terra",
+    "limit": {
+      "context": 872000,
+      "output": 128000
+    },
+    "reasoning": true,
+    "options": {
+      "reasoningEffort": "low"
+    },
+    "variants": {
+      "low": {
+        "reasoningEffort": "low"
+      },
+      "medium": {
+        "reasoningEffort": "medium"
+      },
+      "high": {
+        "reasoningEffort": "high"
+      },
+      "xhigh": {
+        "reasoningEffort": "xhigh"
+      },
+      "max": {
+        "reasoningEffort": "max"
+      },
+      "off": {
+        "reasoningEffort": "none"
+      }
+    },
+    "modalities": {
+      "input": [
+        "text",
+        "image"
+      ],
+      "output": [
+        "text"
+      ]
+    }
+  },
   "claude-opus-4-6-thinking": {
     "name": "claude-opus-4-6-thinking",
     "limit": {

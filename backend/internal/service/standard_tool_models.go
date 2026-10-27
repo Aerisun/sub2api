@@ -13,7 +13,7 @@ const (
 // Legacy vision stays on the recognition endpoint for existing scoped keys.
 var ToolVisionModels = []string{ToolVisionModel, "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", "stepfun-ai/step-5-preview", "z-ai/glm-5.3-flash", "glm-5.3-flash"}
 
-var ToolSearchModels = []string{"gpt-6-luna", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-astra", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"}
+var ToolSearchModels = []string{"gpt-6-luna", "gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-sol", "gpt-6-astra", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"}
 var ToolImageModels = []string{ToolDefaultImageModel, "gpt-image-2.5-sunburst", "gpt-image-2"}
 
 // Public capability IDs are backed by real models; they are not text models.

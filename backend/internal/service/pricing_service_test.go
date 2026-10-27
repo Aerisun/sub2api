@@ -11,6 +11,40 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestGPT61TerraBillingUsesDedicatedRatesAndLongContext(t *testing.T) {
+	for _, pricingService := range []*PricingService{nil, {pricingData: map[string]*LiteLLMModelPricing{
+		"gpt-6":         {InputCostPerToken: 99, OutputCostPerToken: 99},
+		"gpt-5.6-terra": {InputCostPerToken: 88, OutputCostPerToken: 88},
+	}}} {
+		svc := NewBillingService(&config.Config{}, pricingService)
+		for _, model := range []string{"gpt-6.1-terra", "openai/gpt-6.1-terra", "gpt-6.1-terra-2026-10-26"} {
+			pricing, err := svc.GetModelPricing(model)
+			require.NoError(t, err)
+			require.InDelta(t, 1e-6, pricing.InputPricePerToken, 1e-12)
+			require.InDelta(t, 5e-6, pricing.OutputPricePerToken, 1e-12)
+			require.InDelta(t, 0.05e-6, pricing.CacheReadPricePerToken, 1e-12)
+			require.InDelta(t, 1.25e-6, pricing.CacheCreationPricePerToken, 1e-12)
+		}
+		for _, tier := range []struct {
+			name  string
+			scale float64
+		}{{"", 1}, {"priority", 2}, {"flex", 0.5}} {
+			for _, input := range []int{272_000, 272_001} {
+				cost, err := svc.CalculateCostWithServiceTier("gpt-6.1-terra", UsageTokens{InputTokens: input, OutputTokens: 10}, 1, tier.name)
+				require.NoError(t, err)
+				inputScale, outputScale := tier.scale, tier.scale
+				if input > 272_000 {
+					inputScale *= 2
+					outputScale *= 1.5
+				}
+				require.Equal(t, input > 272_000, cost.LongContextBillingApplied)
+				require.InDelta(t, float64(input)*1e-6*inputScale, cost.InputCost, 1e-12)
+				require.InDelta(t, 10*5e-6*outputScale, cost.OutputCost, 1e-12)
+			}
+		}
+	}
+}
+
 func TestPricingSchedulerBlankRemoteURLDoesNotStart(t *testing.T) {
 	svc := NewPricingService(&config.Config{Pricing: config.PricingConfig{RemoteURL: "  \t  "}}, nil)
 	defer svc.Stop()
