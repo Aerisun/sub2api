@@ -436,62 +436,6 @@
       ]
     }
   },
-  "glm-5.2": {
-    "name": "glm-5.2",
-    "limit": {
-      "context": 1000000,
-      "output": 128000
-    },
-    "modalities": {
-      "input": [
-        "text",
-        "image"
-      ],
-      "output": [
-        "text"
-      ]
-    }
-  },
-  "glm-5.3": {
-    "name": "glm-5.3",
-    "limit": {
-      "context": 1000000,
-      "output": 128000
-    },
-    "reasoning": true,
-    "options": {
-      "reasoningEffort": "low"
-    },
-    "variants": {
-      "auto": {
-        "reasoningEffort": "auto"
-      },
-      "low": {
-        "reasoningEffort": "low"
-      },
-      "medium": {
-        "reasoningEffort": "medium"
-      },
-      "high": {
-        "reasoningEffort": "high"
-      },
-      "xhigh": {
-        "reasoningEffort": "xhigh"
-      },
-      "max": {
-        "reasoningEffort": "max"
-      }
-    },
-    "modalities": {
-      "input": [
-        "text",
-        "image"
-      ],
-      "output": [
-        "text"
-      ]
-    }
-  },
   "deepseek-v4.1-flash": {
     "name": "deepseek-v4.1-flash",
     "limit": {

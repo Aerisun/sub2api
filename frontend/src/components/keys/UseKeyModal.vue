@@ -264,7 +264,7 @@ import { useClipboard } from '@/composables/useClipboard'
 import { fetchCodexModelsManifest } from '@/api/codex'
 import type { GroupPlatform } from '@/types'
 import aerisunModels from '@/config/aerisunModels.json'
-const compositeDefaultModel = 'glm-5.3' in aerisunModels ? 'glm-5.3' : Object.keys(aerisunModels)[0] || ''
+const compositeDefaultModel = Object.keys(aerisunModels)[0] || ''
 import { claudeStreamingSetupCommand } from '@/utils/claudeStreaming'
 import {
   findCodexCatalogModel,
@@ -879,14 +879,14 @@ $env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
         .map(model => [model, {
           ...('limit' in aerisunModels[model as keyof typeof aerisunModels]
             ? {autoCompactWindow: Math.min(1000000, (aerisunModels[model as keyof typeof aerisunModels] as {limit: {context: number}}).limit.context)} : {}),
-          ...((model.startsWith('gemini-') && !model.includes('image')) || ['kimi-k3', 'kimi-k3-free', 'glm-5.3', 'deepseek-v4.1-flash'].includes(model) || model.toLowerCase().startsWith('nemotron-') || model.startsWith('step-')
+          ...((model.startsWith('gemini-') && !model.includes('image')) || ['kimi-k3', 'kimi-k3-free', 'deepseek-v4.1-flash'].includes(model) || model.toLowerCase().startsWith('nemotron-') || model.startsWith('step-')
             ? {effortLevel: 'low', maxEffortLevel: 'max'} : {})
         }])),
       modelPicker: {
         replaceBuiltInOptions: true,
         options: Object.keys(aerisunModels).filter(model => !model.includes('image')).map(model => ({
           model, label: model,
-          ...(model.startsWith('claude-') ? {} : { behavesAs: (model.startsWith('gemini-') || ['kimi-k3', 'kimi-k3-free', 'glm-5.3', 'deepseek-v4.1-flash'].includes(model) || model.toLowerCase().startsWith('nemotron-') || model.startsWith('step-')) ? 'claude-sonnet-5' : 'claude-sonnet-4-6' })
+          ...(model.startsWith('claude-') ? {} : { behavesAs: (model.startsWith('gemini-') || ['kimi-k3', 'kimi-k3-free', 'deepseek-v4.1-flash'].includes(model) || model.toLowerCase().startsWith('nemotron-') || model.startsWith('step-')) ? 'claude-sonnet-5' : 'claude-sonnet-4-6' })
         }))
       }
     } : {})
@@ -1314,7 +1314,7 @@ function generateRoutedCodexFiles(
     zhipu: 'glm-4.7',
     deepseek: 'deepseek-v4-pro',
     minimax: 'MiniMax-M3',
-    opencode_go: 'glm-5.3',
+    opencode_go: 'kimi-k3',
     composite: 'claude-sonnet-4-6'
   }
   const preferredModel = preferredModels[platform] || ''

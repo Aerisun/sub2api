@@ -21,40 +21,40 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-func glmImageCacheContext(keyID int64) *gin.Context {
+func auxiliaryImageCacheContext(keyID int64) *gin.Context {
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	groupID := int64(9)
 	c.Set("api_key", &APIKey{ID: keyID, UserID: 20, GroupID: &groupID})
 	return c
 }
 
-func TestGLMImageDescriptionCacheScopesAndMutableURLs(t *testing.T) {
-	account, _, _, _ := glmVisionFixture()
-	c := glmImageCacheContext(10)
+func TestAuxiliaryImageDescriptionCacheScopesAndMutableURLs(t *testing.T) {
+	account, _, _, _ := auxiliaryVisionFixture()
+	c := auxiliaryImageCacheContext(10)
 	uri := "data:image/png;base64,AAAA"
-	key := glmVisionDescriptionCacheKey(c, account, uri)
+	key := auxiliaryVisionDescriptionCacheKey(c, account, uri)
 	require.NotEmpty(t, key)
 	require.NotContains(t, key, "AAAA")
-	require.NotEqual(t, key, glmVisionDescriptionCacheKey(glmImageCacheContext(11), account, uri))
+	require.NotEqual(t, key, auxiliaryVisionDescriptionCacheKey(auxiliaryImageCacheContext(11), account, uri))
 	apiKey, _ := c.Get("api_key")
 	apiKey.(*APIKey).UserID++
-	require.NotEqual(t, key, glmVisionDescriptionCacheKey(c, account, uri))
+	require.NotEqual(t, key, auxiliaryVisionDescriptionCacheKey(c, account, uri))
 	apiKey.(*APIKey).UserID--
 	*apiKey.(*APIKey).GroupID++
-	require.NotEqual(t, key, glmVisionDescriptionCacheKey(c, account, uri))
+	require.NotEqual(t, key, auxiliaryVisionDescriptionCacheKey(c, account, uri))
 	*apiKey.(*APIKey).GroupID--
-	account.Extra["glm_image_bridge_fallback_model"] = "claude-sonnet-4-6"
-	require.NotEqual(t, key, glmVisionDescriptionCacheKey(c, account, uri))
-	account.Extra["glm_image_bridge_fallback_model"] = ""
-	before := glmVisionDescriptionCacheKey(c, account, uri)
-	account.Extra["glm_image_bridge_reasoning_effort"] = "low"
-	require.NotEqual(t, before, glmVisionDescriptionCacheKey(c, account, uri), "a different helper effort must not reuse an older description")
-	require.Empty(t, glmVisionDescriptionCacheKey(c, account, "https://example.com/mutable.png"))
-	require.Empty(t, glmVisionDescriptionCacheKey(nil, account, uri))
+	account.Extra["image_bridge_fallback_model"] = "claude-sonnet-4-6"
+	require.NotEqual(t, key, auxiliaryVisionDescriptionCacheKey(c, account, uri))
+	account.Extra["image_bridge_fallback_model"] = ""
+	before := auxiliaryVisionDescriptionCacheKey(c, account, uri)
+	account.Extra["image_bridge_reasoning_effort"] = "low"
+	require.NotEqual(t, before, auxiliaryVisionDescriptionCacheKey(c, account, uri), "a different helper effort must not reuse an older description")
+	require.Empty(t, auxiliaryVisionDescriptionCacheKey(c, account, "https://example.com/mutable.png"))
+	require.Empty(t, auxiliaryVisionDescriptionCacheKey(nil, account, uri))
 }
 
-func TestGLMImageDescriptionCacheExpiryAndMemoryBounds(t *testing.T) {
-	cache := glmVisionDescriptionCache{maxEntries: 2, maxBytes: 12, ttl: time.Minute}
+func TestAuxiliaryImageDescriptionCacheExpiryAndMemoryBounds(t *testing.T) {
+	cache := auxiliaryVisionDescriptionCache{maxEntries: 2, maxBytes: 12, ttl: time.Minute}
 	now := time.Now()
 	cache.putLocked("a", "1111", now)
 	cache.putLocked("b", "2222", now)
@@ -75,15 +75,15 @@ func TestGLMImageDescriptionCacheExpiryAndMemoryBounds(t *testing.T) {
 	require.NotContains(t, cache.entries, "d", "insertion should purge expired descriptions")
 }
 
-func TestGLMImageDescriptionCacheConcurrentReuseAndBilling(t *testing.T) {
-	var cache glmVisionDescriptionCache
+func TestAuxiliaryImageDescriptionCacheConcurrentReuseAndBilling(t *testing.T) {
+	var cache auxiliaryVisionDescriptionCache
 	var calls, billed atomic.Int32
 	started, release := make(chan struct{}), make(chan struct{})
-	load := func(context.Context) (string, glmVisionUsage, error) {
+	load := func(context.Context) (string, auxiliaryVisionUsage, error) {
 		calls.Add(1)
 		close(started)
 		<-release
-		return "4729", glmVisionUsage{Account: &Account{ID: 1}}, nil
+		return "4729", auxiliaryVisionUsage{Account: &Account{ID: 1}}, nil
 	}
 	var wg sync.WaitGroup
 	errors := make(chan error, 10)
@@ -114,10 +114,10 @@ func TestGLMImageDescriptionCacheConcurrentReuseAndBilling(t *testing.T) {
 	require.Nil(t, usage, "later history reuse should not incur helper charges")
 }
 
-func TestGLMImageDescriptionCacheFailureAndCancellation(t *testing.T) {
-	var cache glmVisionDescriptionCache
-	load := func(context.Context) (string, glmVisionUsage, error) {
-		return "", glmVisionUsage{}, errors.New("unavailable")
+func TestAuxiliaryImageDescriptionCacheFailureAndCancellation(t *testing.T) {
+	var cache auxiliaryVisionDescriptionCache
+	load := func(context.Context) (string, auxiliaryVisionUsage, error) {
+		return "", auxiliaryVisionUsage{}, errors.New("unavailable")
 	}
 	_, _, err := cache.describe(context.Background(), "failed", load)
 	require.Error(t, err)
@@ -128,18 +128,18 @@ func TestGLMImageDescriptionCacheFailureAndCancellation(t *testing.T) {
 	started := make(chan struct{})
 	owner := make(chan error, 1)
 	go func() {
-		_, _, err := cache.describe(ctx, "canceled", func(ctx context.Context) (string, glmVisionUsage, error) {
+		_, _, err := cache.describe(ctx, "canceled", func(ctx context.Context) (string, auxiliaryVisionUsage, error) {
 			close(started)
 			<-ctx.Done()
-			return "", glmVisionUsage{}, ctx.Err()
+			return "", auxiliaryVisionUsage{}, ctx.Err()
 		})
 		owner <- err
 	}()
 	<-started
 	follower := make(chan error, 1)
 	go func() {
-		_, usage, err := cache.describe(context.Background(), "canceled", func(context.Context) (string, glmVisionUsage, error) {
-			return "retry succeeded", glmVisionUsage{Account: &Account{ID: 1}}, nil
+		_, usage, err := cache.describe(context.Background(), "canceled", func(context.Context) (string, auxiliaryVisionUsage, error) {
+			return "retry succeeded", auxiliaryVisionUsage{Account: &Account{ID: 1}}, nil
 		})
 		if err == nil && usage == nil {
 			err = errors.New("retry owner should receive usage")
@@ -151,13 +151,13 @@ func TestGLMImageDescriptionCacheFailureAndCancellation(t *testing.T) {
 	require.NoError(t, <-follower)
 }
 
-type glmImageParallelForwarder struct {
+type auxiliaryImageParallelForwarder struct {
 	started chan struct{}
 	release <-chan struct{}
 	calls   atomic.Int32
 }
 
-func (f *glmImageParallelForwarder) ForwardAsChatCompletions(ctx context.Context, c *gin.Context,
+func (f *auxiliaryImageParallelForwarder) ForwardAsChatCompletions(ctx context.Context, c *gin.Context,
 	account *Account, body []byte, _ *ParsedRequest,
 ) (*ForwardResult, error) {
 	// Native OAuth refresh can fill a project ID on the forwarded account.
@@ -170,36 +170,36 @@ func (f *glmImageParallelForwarder) ForwardAsChatCompletions(ctx context.Context
 	case <-f.release:
 	}
 	uri := gjson.GetBytes(body, "messages.0.content.1.image_url.url").String()
-	description := "image " + glmImageDigest(uri)
+	description := "image " + auxiliaryImageDigest(uri)
 	encoded, _ := json.Marshal(description)
 	c.Data(http.StatusOK, "application/json", []byte(`{"choices":[{"message":{"content":`+string(encoded)+`},"finish_reason":"stop"}]}`))
 	return &ForwardResult{Model: "gemini-3.8-flash", Usage: ClaudeUsage{InputTokens: 150, OutputTokens: 20}}, nil
 }
 
-func TestGLMImageBridgeParallelImagesAndHistoryReuse(t *testing.T) {
-	account, vision, svc, _ := glmVisionFixture()
+func TestAuxiliaryImageBridgeParallelImagesAndHistoryReuse(t *testing.T) {
+	account, vision, svc, _ := auxiliaryVisionFixture()
 	vision.ID, vision.Platform, vision.Type = 1, PlatformAntigravity, AccountTypeOAuth
 	vision.Credentials["model_mapping"] = map[string]any{"gemini-3.8-flash": "gemini-3.8-flash-low"}
-	account.Extra["glm_image_bridge_account_id"] = 1
-	account.Extra["glm_image_bridge_model"] = "gemini-3.8-flash"
+	account.Extra["image_bridge_account_id"] = 1
+	account.Extra["image_bridge_model"] = "gemini-3.8-flash"
 	release := make(chan struct{})
 	var releaseOnce sync.Once
 	defer releaseOnce.Do(func() { close(release) })
-	forwarder := &glmImageParallelForwarder{started: make(chan struct{}, 16), release: release}
-	svc.ConfigureGLMClaudeVision(forwarder, &GatewayService{})
+	forwarder := &auxiliaryImageParallelForwarder{started: make(chan struct{}, 16), release: release}
+	svc.ConfigureNativeVisionBridge(forwarder, &GatewayService{})
 	uri := func(suffix string) string {
 		return "data:image/png;base64," + base64.StdEncoding.EncodeToString([]byte("\x89PNG\r\n\x1a\n"+suffix))
 	}
 	first, second := uri("first"), uri("second")
-	body := []byte(`{"model":"glm-5.3","thinking":{"type":"enabled"},"reasoning_effort":"xhigh","messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"` + first + `"}},{"type":"image_url","image_url":{"url":"` + second + `"}},{"type":"image_url","image_url":{"url":"` + first + `"}}]}]}`)
-	c := glmImageCacheContext(10)
+	body := []byte(`{"model":"Nemotron-3.5","thinking":{"type":"enabled"},"reasoning_effort":"xhigh","messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"` + first + `"}},{"type":"image_url","image_url":{"url":"` + second + `"}},{"type":"image_url","image_url":{"url":"` + first + `"}}]}]}`)
+	c := auxiliaryImageCacheContext(10)
 	type result struct {
 		body []byte
 		err  error
 	}
 	finished := make(chan result, 1)
 	go func() {
-		body, err := svc.bridgeGLMImageInputs(context.Background(), c, account, body)
+		body, err := svc.bridgeAuxiliaryImageInputs(context.Background(), c, account, body)
 		finished <- result{body, err}
 	}()
 	for index := 0; index < 2; index++ {
@@ -214,19 +214,19 @@ func TestGLMImageBridgeParallelImagesAndHistoryReuse(t *testing.T) {
 	require.NoError(t, got.err)
 	require.Equal(t, int32(2), forwarder.calls.Load(), "duplicates must be deduplicated before parallel work")
 	require.Equal(t, "xhigh", gjson.GetBytes(got.body, "reasoning_effort").String())
-	require.Contains(t, gjson.GetBytes(got.body, "messages.0.content.0.text").String(), glmImageDigest(first))
-	require.Contains(t, gjson.GetBytes(got.body, "messages.0.content.1.text").String(), glmImageDigest(second))
-	require.Len(t, glmVisionRequestState(c).Usage, 2)
+	require.Contains(t, gjson.GetBytes(got.body, "messages.0.content.0.text").String(), auxiliaryImageDigest(first))
+	require.Contains(t, gjson.GetBytes(got.body, "messages.0.content.1.text").String(), auxiliaryImageDigest(second))
+	require.Len(t, auxiliaryVisionRequestState(c).Usage, 2)
 	require.NotContains(t, vision.Credentials, "project_id")
 
-	history := glmImageCacheContext(10)
-	reused, err := svc.bridgeGLMImageInputs(context.Background(), history, account, body)
+	history := auxiliaryImageCacheContext(10)
+	reused, err := svc.bridgeAuxiliaryImageInputs(context.Background(), history, account, body)
 	require.NoError(t, err)
 	require.JSONEq(t, string(got.body), string(reused))
 	require.Equal(t, int32(2), forwarder.calls.Load())
-	require.Empty(t, glmVisionRequestState(history).Usage)
+	require.Empty(t, auxiliaryVisionRequestState(history).Usage)
 
-	_, err = svc.bridgeGLMImageInputs(context.Background(), glmImageCacheContext(11), account, body)
+	_, err = svc.bridgeAuxiliaryImageInputs(context.Background(), auxiliaryImageCacheContext(11), account, body)
 	require.NoError(t, err)
 	require.Equal(t, int32(4), forwarder.calls.Load(), "another API key must analyze its own images")
 }

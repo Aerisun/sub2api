@@ -1,7 +1,6 @@
 {
   "port": 8096,
   "models": [
-    "z-ai/glm-5.3",
     "deepseek-ai/deepseek-v4.1-flash",
     "nvidia/nemotron-3.5-lightning-30b-a3b",
     "nvidia/nemotron-3.5-super-vl-120b-a12b",
@@ -21,7 +20,6 @@
   "first_event_seconds": 12,
   "require_semantic_first_event": true,
   "unavailable_models": {
-    "z-ai/glm-5.3": "NVIDIA NVCF 504 / errored verified by standard and direct function endpoints",
     "deepseek-ai/deepseek-v4.1-flash": "NVIDIA NVCF 504 / errored verified by standard and direct function endpoints"
   },
   "vision_capacity": 48,
@@ -37,6 +35,5 @@
   "gateway_proxy_id": 5,
   "vision_pre_output_timeout": 55,
   "vision_first_event_seconds": 30,
-  "vision_read_timeout": 30,
-  "image_asset_origin": "https://aerisun.top/sub2api/_vision-assets/"
+  "vision_read_timeout": 30
 }

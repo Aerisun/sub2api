@@ -164,21 +164,6 @@ func TestGetModelPricing_FallbackWarnPerModelNotGlobal(t *testing.T) {
 	require.Equal(t, 0, strings.Count(out, "model: GLM-5.2"), out) // 大写经 ToLower 归一,不应单独成行
 }
 
-// 回归:glm-5.2 必须命中自己的兜底价,不能被 strings.Contains("glm-5") 抢成 glm-5 价。
-// 历史 bug:兜底表缺 glm-5.2 条目,使用记录按 $1.00/$3.20 计费,比官方 $1.40/$4.40 少收约 27%。
-func TestGetModelPricing_GLM52UsesOwnPrice(t *testing.T) {
-	svc := newTestBillingService()
-
-	got, err := svc.GetModelPricing("glm-5.2")
-	require.NoError(t, err)
-	require.NotNil(t, got)
-
-	// 官方 z.ai 口径:与 glm-5.1 同价(见 TestGetFallbackPricing_FamilyMatching)。
-	require.InDelta(t, 1.4e-6, got.InputPricePerToken, 1e-12)
-	require.InDelta(t, 4.4e-6, got.OutputPricePerToken, 1e-12)
-	require.InDelta(t, 0.26e-6, got.CacheReadPricePerToken, 1e-12)
-}
-
 func TestGetModelPricing_UnknownClaudeModelFallsBackToSonnet(t *testing.T) {
 	svc := newTestBillingService()
 
@@ -558,27 +543,7 @@ func TestGetFallbackPricing_FamilyMatching(t *testing.T) {
 		},
 
 		// ---- 智谱 GLM（z.ai USD 口径）----
-		{
-			name:              "glm 5.3 flagship",
-			model:             "glm-5.3",
-			expectedInput:     1.4e-6,
-			expectedOutput:    floatPtr(4.4e-6),
-			expectedCacheRead: floatPtr(0.26e-6),
-		},
-		{
-			name:              "glm 5.3 flash",
-			model:             "glm-5.3-flash",
-			expectedInput:     0.15e-6,
-			expectedOutput:    floatPtr(0.5e-6),
-			expectedCacheRead: floatPtr(0.03e-6),
-		},
-		{
-			name:              "glm 5.2 flagship",
-			model:             "glm-5.2",
-			expectedInput:     1.4e-6,
-			expectedOutput:    floatPtr(4.4e-6),
-			expectedCacheRead: floatPtr(0.26e-6),
-		},
+
 		{
 			name:              "glm 5.1 flagship",
 			model:             "glm-5.1",
@@ -663,20 +628,7 @@ func TestGetFallbackPricing_FamilyMatching(t *testing.T) {
 			expectedOutput: floatPtr(0.1e-6),
 		},
 		// 关键：5.1 / 5.2 / 5.3 必须先于 5 匹配（避免被 glm-5 抢走）
-		{
-			name:              "glm 5.3-flash vs glm 5.3 ordering (verbatim 5.3-flash)",
-			model:             "glm-5.3-flash",
-			expectedInput:     0.15e-6, // = glm-5.3-flash 价格（不是 glm-5.3 的 1.4e-6，更不是 glm-5 的 1e-6）
-			expectedOutput:    floatPtr(0.5e-6),
-			expectedCacheRead: floatPtr(0.03e-6),
-		},
-		{
-			name:              "glm 5.3 vs glm 5 ordering (verbatim 5.3)",
-			model:             "glm-5.3",
-			expectedInput:     1.4e-6, // = glm-5.3 价格（不是 glm-5 的 1e-6）
-			expectedOutput:    floatPtr(4.4e-6),
-			expectedCacheRead: floatPtr(0.26e-6),
-		},
+
 		{
 			name:              "glm 5.1 vs glm 5 ordering (verbatim 5.1)",
 			model:             "glm-5.1",
@@ -684,13 +636,7 @@ func TestGetFallbackPricing_FamilyMatching(t *testing.T) {
 			expectedOutput:    floatPtr(4.4e-6),
 			expectedCacheRead: floatPtr(0.26e-6),
 		},
-		{
-			name:              "glm 5.2 vs glm 5 ordering (verbatim 5.2)",
-			model:             "glm-5.2",
-			expectedInput:     1.4e-6, // = glm-5.2 价格（不是 glm-5 的 1e-6）
-			expectedOutput:    floatPtr(4.4e-6),
-			expectedCacheRead: floatPtr(0.26e-6),
-		},
+
 		{
 			name:              "glm 4.5-air vs glm 4.5 ordering",
 			model:             "glm-4.5-air",

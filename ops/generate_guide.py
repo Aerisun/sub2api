@@ -22,8 +22,8 @@ FAMILIES = (
     ('gte-', 'GTE'),
     ('nemotron-', 'NVIDIA'), ('step-', '阶跃星辰'),
 )
-# Image understanding confirmed through routed endpoints; GLM 5.2/5.3 and Nemotron use internal vision tools.
-VERIFIED_IMAGE_MODELS = {'claude-sonnet-4-6', 'claude-opus-4-6-thinking', 'gemini-3.8-flash', 'kimi-k3', 'kimi-k3-free', 'deepseek-v4.1-flash', 'qwen3.8-flash', 'qwen3.8-max', 'glm-5.2', 'glm-5.3', 'Nemotron-3.5'}
+# Image understanding confirmed through routed endpoints; text-only Nemotron uses internal vision tools.
+VERIFIED_IMAGE_MODELS = {'claude-sonnet-4-6', 'claude-opus-4-6-thinking', 'gemini-3.8-flash', 'kimi-k3', 'kimi-k3-free', 'deepseek-v4.1-flash', 'qwen3.8-flash', 'qwen3.8-max', 'Nemotron-3.5'}
 # Endpoint constraints, checked against Qiniu's model_constraints and NVIDIA model cards.
 # These describe the active routing pool, rather than Claude's assumed alias window.
 MODEL_LIMITS = {
@@ -32,7 +32,6 @@ MODEL_LIMITS = {
     'claude-sonnet-4-6': (250000,64000),
     'claude-opus-4-6-thinking': (250000,64000),
     'gemini-3.8-flash': (1048576,65536),
-    'glm-5.2': (1000000,128000), 'glm-5.3': (1000000,128000),
     'kimi-k3': (1048576,1048576), 'kimi-k3-free': (1048576,1048576),
     'deepseek-v4.1-flash': (1000000,384000),
     'qwen3.8-flash': (1000000,128000), 'qwen3.8-max': (1000000,128000),
@@ -82,7 +81,7 @@ def opencode_config(models):
         if model in MODEL_LIMITS:
             context, output = MODEL_LIMITS[model]
             entry['limit'] = {'context': context, 'output': min(output, context)}
-        if model in {'kimi-k3', 'kimi-k3-free', 'glm-5.3', 'deepseek-v4.1-flash'} or model.lower().startswith(('nemotron-', 'step-')):
+        if model in {'kimi-k3', 'kimi-k3-free', 'deepseek-v4.1-flash'} or model.lower().startswith(('nemotron-', 'step-')):
             entry['reasoning'] = True
             entry['options'] = {'reasoningEffort': 'low'}
             entry['variants'] = {effort: {'reasoningEffort': effort}

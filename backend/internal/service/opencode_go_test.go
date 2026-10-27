@@ -18,7 +18,7 @@ func TestOpenCodeGoModelProtocol(t *testing.T) {
 		{"minimax-m3", APIProtocolAnthropic},
 		{"qwen3.8-max", APIProtocolAnthropic},
 		{"qwen3.7-plus", APIProtocolAnthropic},
-		{"glm-5.3", APIProtocolChatCompletions},
+		{"glm-5.1", APIProtocolChatCompletions},
 		{"kimi-k3", APIProtocolChatCompletions},
 		{"deepseek-v4-pro", APIProtocolChatCompletions},
 		{"mimo-v2.5-pro", APIProtocolChatCompletions},
@@ -37,7 +37,7 @@ func TestResolveOpenCodeGoUpstreamProtocol(t *testing.T) {
 	adaptive := &Account{Platform: PlatformOpenCodeGo, Credentials: map[string]any{"api_protocol": APIProtocolAdaptive}}
 	require.Equal(t, APIProtocolAnthropic, adaptive.ResolveOpenCodeGoUpstreamProtocol("minimax-m3"))
 	require.Equal(t, APIProtocolResponses, adaptive.ResolveOpenCodeGoUpstreamProtocol("grok-4.6"))
-	require.Equal(t, APIProtocolChatCompletions, adaptive.ResolveOpenCodeGoUpstreamProtocol("glm-5.3"))
+	require.Equal(t, APIProtocolChatCompletions, adaptive.ResolveOpenCodeGoUpstreamProtocol("glm-5.1"))
 
 	pinned := &Account{Platform: PlatformOpenCodeGo, Credentials: map[string]any{"api_protocol": APIProtocolChatCompletions}}
 	require.Equal(t, APIProtocolChatCompletions, pinned.ResolveOpenCodeGoUpstreamProtocol("minimax-m3"))
@@ -52,7 +52,7 @@ func TestResolveOpenCodeGoUpstreamProtocol(t *testing.T) {
 	require.Equal(t, APIProtocolAnthropic, zen.ResolveOpenCodeGoUpstreamProtocol("claude-opus-4-6"))
 	require.Equal(t, DefaultOpenCodeZenBaseURL, zen.GetOpenAIBaseURL())
 
-	require.Equal(t, "", (&Account{Platform: PlatformKimi}).ResolveOpenCodeGoUpstreamProtocol("glm-5.3"))
+	require.Equal(t, "", (&Account{Platform: PlatformKimi}).ResolveOpenCodeGoUpstreamProtocol("glm-5.1"))
 }
 
 func TestResolveOpenCodeGoUpstreamProtocolUsesAccountRules(t *testing.T) {
@@ -71,7 +71,7 @@ func TestResolveOpenCodeGoUpstreamProtocolUsesAccountRules(t *testing.T) {
 	require.Equal(t, APIProtocolChatCompletions, account.ResolveOpenCodeGoUpstreamProtocol("grok-4.6"))
 	require.Equal(t, APIProtocolResponses, account.ResolveOpenCodeGoUpstreamProtocol("deepseek-v4-flash"))
 	require.Equal(t, APIProtocolAnthropic, account.ResolveOpenCodeGoUpstreamProtocol("qwen3.8-max"))
-	require.Equal(t, APIProtocolChatCompletions, account.ResolveOpenCodeGoUpstreamProtocol("glm-5.3"))
+	require.Equal(t, APIProtocolChatCompletions, account.ResolveOpenCodeGoUpstreamProtocol("glm-5.1"))
 	require.Equal(t, APIProtocolChatCompletions, account.ResolveOpenCodeGoUpstreamProtocol("minimax-m3"))
 }
 
@@ -116,7 +116,7 @@ func TestOpenCodeGoNativeProtocolUnmatchedFallsBackToChatCompletions(t *testing.
 		},
 	}
 	require.Equal(t, APIProtocolChatCompletions, openCodeGoNativeProtocol(withRules, "deepseek-v4-flash"))
-	require.Equal(t, APIProtocolChatCompletions, openCodeGoNativeProtocol(withRules, "glm-5.3"))
+	require.Equal(t, APIProtocolChatCompletions, openCodeGoNativeProtocol(withRules, "glm-5.1"))
 	require.Equal(t, APIProtocolChatCompletions, openCodeGoNativeProtocol(withRules, "omen-alpha"))
 	require.Equal(t, APIProtocolChatCompletions, openCodeGoNativeProtocol(withRules, "kimi-k3"))
 	require.Equal(t, APIProtocolChatCompletions, openCodeGoNativeProtocol(withRules, "unknown-model"))
@@ -232,6 +232,9 @@ func TestDefaultOpenCodeGoModelIDsCoverDocumentedCatalog(t *testing.T) {
 	ids := DefaultOpenCodeGoModelIDs()
 	require.Contains(t, ids, "grok-4.6")
 	require.Contains(t, ids, "minimax-m3")
-	require.Contains(t, ids, "glm-5.3")
+	require.Contains(t, ids, "glm-5.1")
+	require.NotContains(t, ids, "glm-5.2")
+	require.NotContains(t, ids, "glm-5.3")
+	require.NotContains(t, ids, "glm-5.3-flash")
 	require.NotEmpty(t, ids)
 }

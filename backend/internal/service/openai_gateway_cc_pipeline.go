@@ -182,11 +182,11 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 	userAgent string,
 	grokCacheIdentity string,
 ) (*http.Response, error) {
-	hasGLMImages := glmRequestHasImageInput(account, body)
-	stopVisionKeepalive := startGLMVisionKeepalive(c, account, body, stream)
+	hasAuxiliaryImages := auxiliaryRequestHasImageInput(account, body)
+	stopVisionKeepalive := startAuxiliaryVisionKeepalive(c, account, body, stream)
 	defer stopVisionKeepalive()
 	var bridgeErr error
-	body, bridgeErr = s.bridgeGLMImageInputs(ctx, c, account, body)
+	body, bridgeErr = s.bridgeAuxiliaryImageInputs(ctx, c, account, body)
 	if bridgeErr != nil {
 		if c != nil && !c.Writer.Written() {
 			if strings.Contains(c.Request.URL.Path, "/messages") {
@@ -205,8 +205,8 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 	body = ensureDeepSeekChatReasoningPlaceholders(account, body)
 	upstreamCtx, releaseUpstreamCtx := detachUpstreamContext(ctx)
 	var headerGuard *openAIFirstOutputHeaderGuard
-	if hasGLMImages {
-		// Auxiliary vision is bounded above; also bound the subsequent GLM
+	if hasAuxiliaryImages {
+		// Auxiliary vision is bounded above; also bound the subsequent text-model
 		// header wait, which otherwise inherits the long generic HTTP timeout.
 		upstreamCtx, headerGuard = newOpenAIFirstOutputHeaderGuard(ctx, releaseUpstreamCtx, time.Now().Add(45*time.Second))
 	}
@@ -265,10 +265,7 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 	if account.ProxyID != nil && account.Proxy != nil {
 		proxyURL = account.Proxy.URL()
 	}
-	tracedCtx, finishGLMHeaders := traceGLMUpstreamHeaders(upstreamReq.Context(), account, body)
-	upstreamReq = upstreamReq.WithContext(tracedCtx)
 	resp, err := s.doOpenAIUpstream(upstreamReq, proxyURL, account)
-	finishGLMHeaders(resp, err)
 	if headerGuard != nil && headerGuard.stopHeaderWait() {
 		headerGuard.close()
 		if resp != nil && resp.Body != nil {
@@ -276,7 +273,7 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 		}
 		return nil, &UpstreamFailoverError{StatusCode: http.StatusGatewayTimeout,
 			SafeToFailoverAfterWrite: true,
-			ResponseBody:             []byte(`{"error":{"type":"upstream_timeout","message":"GLM did not respond after image analysis within 45 seconds"}}`)}
+			ResponseBody:             []byte(`{"error":{"type":"upstream_timeout","message":"Text model did not respond after image analysis within 45 seconds"}}`)}
 	}
 	if err != nil {
 		if headerGuard != nil {
@@ -285,7 +282,7 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 		return nil, s.handleOpenAIUpstreamTransportError(ctx, c, account, err, false)
 	}
 	if headerGuard != nil {
-		resp.Body = &openAIRequestContextReadCloser{ReadCloser: &glmVisionIdleReadCloser{
+		resp.Body = &openAIRequestContextReadCloser{ReadCloser: &auxiliaryVisionIdleReadCloser{
 			ReadCloser: resp.Body, cancel: headerGuard.cancel, idle: 45 * time.Second}, cleanup: headerGuard.close}
 	}
 	return resp, nil

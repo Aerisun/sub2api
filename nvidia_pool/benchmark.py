@@ -11,7 +11,7 @@ from uuid import uuid4
 import httpx
 
 ROOT = Path(__file__).resolve().parents[1]
-MODELS = ['nvidia/nemotron-3.5-lightning-30b-a3b','z-ai/glm-5.3-flash']
+MODELS = ['nvidia/nemotron-3.5-lightning-30b-a3b']
 
 
 def main():

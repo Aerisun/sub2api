@@ -1355,7 +1355,7 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 
 // writeAnthropicError writes an error response in Anthropic Messages API format.
 func writeAnthropicError(c *gin.Context, statusCode int, errType, message string) {
-	if writeGLMVisionStreamError(c, statusCode, errType, message) {
+	if writeAuxiliaryVisionStreamError(c, statusCode, errType, message) {
 		return
 	}
 	c.JSON(statusCode, gin.H{

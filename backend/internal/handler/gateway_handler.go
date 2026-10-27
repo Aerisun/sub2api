@@ -78,7 +78,7 @@ func NewGatewayHandler(
 	settingService *service.SettingService,
 ) *GatewayHandler {
 	if openAIGatewayService != nil && antigravityGatewayService != nil && gatewayService != nil {
-		openAIGatewayService.ConfigureGLMClaudeVision(antigravityGatewayService, gatewayService)
+		openAIGatewayService.ConfigureNativeVisionBridge(antigravityGatewayService, gatewayService)
 	}
 	pingInterval := time.Duration(0)
 	maxAccountSwitches := 10

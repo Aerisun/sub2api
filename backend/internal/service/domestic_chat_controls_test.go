@@ -15,7 +15,7 @@ import (
 )
 
 func TestDomesticReasoningScaleAndSwitch(t *testing.T) {
-	for _, model := range []string{"deepseek/deepseek-v4.1-flash", "deepseek/deepseek-v4.1-flash-1017", "moonshotai/kimi-k3", "moonshotai/kimi-k3-free", "glm-5.3"} {
+	for _, model := range []string{"deepseek/deepseek-v4.1-flash", "deepseek/deepseek-v4.1-flash-1017", "moonshotai/kimi-k3", "moonshotai/kimi-k3-free"} {
 		for _, tc := range []struct{ effort, want string }{{"auto", "low"}, {"low", "low"}, {"medium", "high"}, {"high", "high"}, {"xhigh", "max"}, {"max", "max"}} {
 			t.Run(model+"/"+tc.effort, func(t *testing.T) {
 				original := []byte(fmt.Sprintf(`{"model":%q,"reasoning_effort":%q}`, model, tc.effort))
@@ -38,15 +38,15 @@ func TestDomesticReasoningScaleAndSwitch(t *testing.T) {
 			require.Equal(t, "low", gjson.GetBytes(out, "reasoning_effort").String())
 		}
 	}
-	other := []byte(`{ "model":"glm-5.2", "reasoning_effort":"xhigh" }`)
-	out, err := prepareDomesticChatControls(other, other, "glm-5.2", "chat")
+	other := []byte(`{ "model":"unhandled-text-model", "reasoning_effort":"xhigh" }`)
+	out, err := prepareDomesticChatControls(other, other, "unhandled-text-model", "chat")
 	require.NoError(t, err)
 	require.Equal(t, string(other), string(out))
 }
 
 func TestDomesticProtocolsPreserveThinkingCacheAndAffinity(t *testing.T) {
 	for _, protocol := range []string{"chat", "messages", "responses"} {
-		for _, model := range []string{"deepseek-v4.1-flash", "kimi-k3", "kimi-k3-free", "glm-5.3", "glm-5.3-flash", "nemotron-3.5-lightning-30b-a3b", "step-5-preview"} {
+		for _, model := range []string{"deepseek-v4.1-flash", "kimi-k3", "kimi-k3-free", "nemotron-3.5-lightning-30b-a3b", "step-5-preview"} {
 			t.Run(model+"/"+protocol, func(t *testing.T) {
 				input := `"messages":[{"role":"user","content":"hello"}]`
 				effort := `"reasoning_effort":"max"`

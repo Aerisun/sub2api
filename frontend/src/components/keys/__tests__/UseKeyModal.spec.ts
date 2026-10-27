@@ -24,6 +24,7 @@ vi.mock('file-saver', () => ({
 }))
 
 import UseKeyModal from '../UseKeyModal.vue'
+import aerisunModels from '@/config/aerisunModels.json'
 
 function readBlobAsText(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -60,9 +61,9 @@ describe('UseKeyModal', () => {
       } else {
         const config = JSON.parse(content)
         expect(config.provider.composite.npm).toBe('@ai-sdk/openai-compatible')
-        expect(Object.keys(config.provider.composite.models)).toHaveLength(9)
+        expect(config.provider.composite.models).toEqual(aerisunModels)
         expect(config.provider.composite.models['kimi-k3-free']).toBeUndefined()
-        for (const model of ['kimi-k3', 'glm-5.3', 'deepseek-v4.1-flash', 'glm-5.3-flash', 'Nemotron-3.5', 'step-5-preview']) {
+        for (const model of ['kimi-k3', 'deepseek-v4.1-flash', 'Nemotron-3.5']) {
           const entry = config.provider.composite.models[model]
           expect(entry.reasoning).toBe(true)
           expect(entry.options.reasoningEffort).toBe('low')
@@ -73,9 +74,11 @@ describe('UseKeyModal', () => {
         expect(config.provider.composite.models['deepseek-v4.1-flash']).toBeDefined()
         expect(config.provider.composite.models['qwen3.8-flash']).toBeDefined()
         expect(config.provider.composite.models['qwen3.8-max']).toBeDefined()
-        expect(config.provider.composite.models['glm-5.3-flash']).toBeDefined()
-        expect(config.provider.composite.models['glm-5.3']).toBeDefined()
-        expect(config.provider.composite.models['gemini-3.8-flash']).toBeUndefined()
+        expect(config.provider.composite.models['glm-5.2']).toBeUndefined()
+        expect(config.provider.composite.models['glm-5.3-flash']).toBeUndefined()
+        expect(config.provider.composite.models['step-5-preview']).toBeUndefined()
+        expect(config.provider.composite.models['glm-5.3']).toBeUndefined()
+        expect(config.provider.composite.models['gemini-3.8-flash']).toBeDefined()
         expect(config.provider.composite.models['gemini-3.7-flash']).toBeUndefined()
         expect(config.provider.composite.models['gemini-3.6-flash']).toBeUndefined()
         expect(config.provider.composite.models['gemini-3.1-pro']).toBeUndefined()
@@ -87,8 +90,7 @@ describe('UseKeyModal', () => {
         for (const model of ['kimi-k3', 'deepseek-v4.1-flash', 'qwen3.8-flash', 'qwen3.8-max']) {
           expect(config.provider.composite.models[model].modalities).toEqual({input: ['text', 'image'], output: ['text']})
         }
-        expect(config.provider.composite.models['glm-5.3'].modalities).toEqual({input: ['text', 'image'], output: ['text']})
-        expect(config.provider.composite.models['claude-sonnet-4-6']).toBeUndefined()
+                expect(config.provider.composite.models['claude-sonnet-4-6']).toBeDefined()
         expect(config.provider.composite.models['gpt-5.5']).toBeUndefined()
       }
     }
@@ -109,7 +111,7 @@ describe('UseKeyModal', () => {
       expect(blocks[0]).toContain('IS_SANDBOX')
       const settings = JSON.parse(blocks.find(content => content.includes('"$schema"'))!)
       for (const name of ['ANTHROPIC_MODEL', 'ANTHROPIC_DEFAULT_OPUS_MODEL', 'ANTHROPIC_DEFAULT_HAIKU_MODEL', 'ANTHROPIC_DEFAULT_SONNET_MODEL', 'CLAUDE_CODE_SUBAGENT_MODEL']) {
-        expect(settings.env[name]).toBe('glm-5.3')
+        expect(settings.env[name]).toBe(Object.keys(aerisunModels)[0])
       }
       expect(settings.env.ANTHROPIC_API_KEY).toBe('')
       expect(settings.env.CLAUDE_CODE_OAUTH_TOKEN).toBe('')
@@ -117,15 +119,18 @@ describe('UseKeyModal', () => {
       expect(settings.autoCompactEnabled).toBe(true)
       expect(settings.autoCompactWindow).toBeUndefined()
       expect(settings.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('')
-      for (const model of ['kimi-k3', 'glm-5.3', 'deepseek-v4.1-flash', 'glm-5.3-flash', 'Nemotron-3.5', 'step-5-preview']) {
+      for (const model of ['kimi-k3', 'deepseek-v4.1-flash', 'Nemotron-3.5']) {
         expect(settings.modelSettings[model]).toEqual({effortLevel: 'low', maxEffortLevel: 'max', autoCompactWindow: 1000000})
         expect(settings.modelPicker.options.find((option: {model: string}) => option.model === model).behavesAs).toBe('claude-sonnet-5')
         expect(settings.modelPicker.options.map((option: {model: string}) => option.model)).not.toContain(`${model}-max`)
       }
       expect(settings.env.NO_PROXY.split(',')).toContain('aerisun.top')
-      expect(settings.modelPicker.options.map((option: {model: string}) => option.model)).toContain('glm-5.3-flash')
+      expect(settings.modelPicker.options.map((option: {model: string}) => option.model)).toEqual(Object.keys(aerisunModels))
+      for (const retired of ['glm-5.2', 'glm-5.3', 'glm-5.3-flash', 'step-5-preview']) {
+        expect(settings.modelSettings[retired]).toBeUndefined()
+      }
       expect(settings.modelPicker.options.map((option: {model: string}) => option.model)).not.toContain('gemini-3.8-flash-high')
-      expect(settings.modelPicker.options.find((option: {model: string}) => option.model === 'glm-5.3-flash').behavesAs).toBe('claude-sonnet-5')
+      expect(settings.modelPicker.options.find((option: {model: string}) => option.model === 'Nemotron-3.5').behavesAs).toBe('claude-sonnet-5')
       const extension = JSON.parse(blocks.find(content => content.includes('"claudeCode.environmentVariables"'))!)
       expect(extension['claudeCode.selectedModel']).toBeUndefined()
       const environment = Object.fromEntries(extension['claudeCode.environmentVariables'].map((variable: {name: string, value: string}) => [variable.name, variable.value]))
@@ -1045,7 +1050,7 @@ describe('UseKeyModal', () => {
       json: async () => ({
         models: [
           {
-            slug: 'glm-5.3',
+            slug: 'kimi-k3',
             default_reasoning_level: 'none',
             supported_reasoning_levels: [{ effort: 'none' }]
           }
@@ -1078,7 +1083,7 @@ describe('UseKeyModal', () => {
     const configToml = wrapper.findAll('pre code')
       .map((code) => code.text())
       .find((content) => content.includes('model_provider = "OpenAI"'))
-    expect(configToml).toContain('model = "glm-5.3"')
+    expect(configToml).toContain('model = "kimi-k3"')
     expect(configToml).not.toContain('model_reasoning_effort')
   })
 })

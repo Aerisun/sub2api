@@ -61,7 +61,7 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 	body []byte,
 	defaultMappedModel string,
 ) (result *OpenAIForwardResult, err error) {
-	defer func() { attachGLMVisionUsage(c, result) }()
+	defer func() { attachAuxiliaryVisionUsage(c, result) }()
 	startTime := time.Now()
 
 	// 1. Parse minimal fields needed for routing/billing

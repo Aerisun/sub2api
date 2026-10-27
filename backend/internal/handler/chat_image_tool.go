@@ -63,7 +63,7 @@ func chatModelHasNativeVision(model string) bool {
 	switch name {
 	case "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-astra", "gpt-6-luna", "gpt-6-sol", "gpt-6.1-sol", "gpt-6.1-terra",
 		"claude-opus-4-6-thinking", "claude-sonnet-4-6", "gemini-3.8-flash", "kimi-k3", "deepseek-v4.1-flash",
-		"qwen3.8-flash", "qwen3.8-max", "glm-5.3-flash", "step-5-preview":
+		"qwen3.8-flash", "qwen3.8-max", "step-5-preview":
 		return true
 	}
 	return false
@@ -100,8 +100,8 @@ func chatRecognizedImages(messages []chatMessage) map[string]bool {
 }
 
 // Use the exact authenticated REST tool used by external callers. Concurrency,
-// GLM/NVIDIA routing, pricing and usage remain owned by that implementation.
-// Do not retry a paid tool POST automatically, or reenter the legacy GLM bridge.
+// NVIDIA routing, pricing and usage remain owned by that implementation.
+// Do not retry a paid tool POST automatically, or reenter the retired provider bridge.
 func (h *ChatHistoryHandler) recognizeChatImages(ctx context.Context, images []chatImage, urls []string, prompt, auth string, emit func(chatDelta) bool) (string, error) {
 	if len(images) != 1 || len(urls) != 1 {
 		return "", errors.New("每次识图调用只能识别一张图片")

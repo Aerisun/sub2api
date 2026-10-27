@@ -114,8 +114,8 @@ class NativeImageTests(unittest.TestCase):
             self.assertFalse(eligible({'model': model}, 'responses', '/v1/responses'))
             self.assertTrue(eligible({'model': model}, 'anthropic', '/v1/messages'))
             self.assertEqual(image_model_for_chat(model), NATIVE_MODEL)
-        self.assertEqual(image_model_for_chat('glm-5.3'), NATIVE_MODEL)
-        self.assertTrue(eligible({'model': 'glm-5.3'}, 'responses', '/v1/responses'))
+        self.assertEqual(image_model_for_chat('kimi-k3'), NATIVE_MODEL)
+        self.assertTrue(eligible({'model': 'kimi-k3'}, 'responses', '/v1/responses'))
 
     def test_image25_variants_and_legacy_preserve_native_parameters(self):
         for model in NATIVE_MODELS:

@@ -22,7 +22,7 @@
     const jsonString = value => JSON.stringify(value);
     const hasEffort = model => model.startsWith('claude-') || (model.startsWith('gemini-') && !model.includes('image'))
       || model.startsWith('gpt-6') || model.startsWith('gpt-5.6')
-      || ['kimi-k3', 'kimi-k3-free', 'glm-5.3', 'deepseek-v4.1-flash'].includes(model)
+      || ['kimi-k3', 'kimi-k3-free', 'deepseek-v4.1-flash'].includes(model)
       || model.toLowerCase().startsWith('nemotron-') || model.startsWith('step-');
     function authToken() {
       try { return localStorage.getItem('auth_token'); } catch { return null; }
@@ -341,7 +341,7 @@
     if (!sidebar) return;
     const catalog = [...document.querySelectorAll('[data-model-id]')].map(button => button.dataset.modelId);
     for (const section of document.querySelectorAll('[data-guide-builder]')) {
-      builders.push({ section, defaultModel: 'glm-5.3',
+      builders.push({ section, defaultModel: 'kimi-k3',
         templates: [...section.querySelectorAll('pre code[id]')].map(code => [code, code.textContent]),
       });
     }
@@ -378,7 +378,7 @@
     fields.model.append(new Option('自定义模型 ID…', 'custom'));
     const codexGuideDefault = location.hash === '#codex' && catalog.includes('gpt-6.1-sol');
     fields.model.value = codexGuideDefault ? 'gpt-6.1-sol'
-      : catalog.includes('glm-5.3') ? 'glm-5.3' : fields.model.options[0].value;
+      : fields.model.options[0].value;
     const customModel = document.createElement('input');
     customModel.className = 'input docs-builder-custom-model';
     customModel.id = 'guide-custom-model';

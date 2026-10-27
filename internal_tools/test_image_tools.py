@@ -78,12 +78,12 @@ class ImageToolTests(unittest.TestCase):
   self.assertEqual(result['output']['text'],'红色');self.assertNotIn(IMAGE,json.dumps(result))
   self.assertNotIn('model',RECOGNITION_DEFINITION['inputSchema']['properties'])
 
- def test_legacy_vision_only_key_keeps_its_existing_model_scope(self):
-  raw={'choices':[{'message':{'content':'红色'}}],'usage':{'prompt_tokens':20,'completion_tokens':2,'total_tokens':22}}
-  with patch('internal_tools.image_tools.authorized_models',return_value={'glm-5.3-flash'}),patch('internal_tools.image_tools.recognition_request',return_value=(200,raw)) as request:
-   ImageRecognitionExecutor('sk-legacy')({'image':IMAGE},'one')
-  self.assertEqual(request.call_args.args[2]['model'],'glm-5.3-flash')
-  self.assertEqual(request.call_args.args[1],'sk-legacy')
+ def test_retired_vision_only_keys_do_not_gain_recognition_permission(self):
+  for model in ('glm-5.2','glm-5.3','glm-5.3-flash'):
+   with self.subTest(model=model),patch('internal_tools.image_tools.authorized_models',return_value={model}),patch('internal_tools.image_tools.recognition_request') as request,self.assertRaises(HubError) as error:
+    ImageRecognitionExecutor('sk-retired-only')({'image':IMAGE},'one')
+   self.assertEqual(error.exception.status,403);request.assert_not_called()
+
 
  def test_recognition_validation_blocks_private_urls_and_malformed_images(self):
   for image in ('http://127.0.0.1/x','file:///etc/passwd','data:image/png;base64,ZmFrZQ==','https://u:p@example.com/x'):

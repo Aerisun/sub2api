@@ -1,6 +1,5 @@
 """Local administration helpers. Credentials never belong in source or reports."""
 import json
-import os
 from pathlib import Path
 import shlex
 from urllib.error import HTTPError
@@ -28,7 +27,7 @@ def read_env(path):
 def credentials():
     directory = ROOT/'deployment/private/config'
     settings = read_env(directory/'operator.env')
-    return settings, os.environ.get('GOAICHAT_API_KEY') or settings.get('GOAICHAT_API_KEY', '')
+    return settings
 
 
 def request(path, token=None, payload=None, method=None):
@@ -48,7 +47,7 @@ def request(path, token=None, payload=None, method=None):
 
 
 def login():
-    env, _ = credentials()
+    env = credentials()
     return request('/api/v1/auth/login', payload={
         'email': env['ADMIN_EMAIL'], 'password': env['ADMIN_PASSWORD']})['access_token']
 

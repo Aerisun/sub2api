@@ -269,6 +269,31 @@ class SchedulingTests(unittest.TestCase):
             self.assertEqual(lease.index,2)
             after.release(lease,'model',True)
 
+    def test_retired_model_state_cannot_restart_probes_or_clear_key_holds(self):
+        with TemporaryDirectory() as directory:
+            config = self.config(state_path=str(Path(directory)/'state.json'),models=['active','glm-5.3'])
+            before = NvidiaPool(['one','two'],config)
+            lease = before.acquire('active')
+            before.error(lease,'active',401)
+            before.release(lease,'active',False)
+            before.mark_availability('glm-5.3',False,'retired provider')
+            before.mark_availability('active',True,'verified')
+            before.transient_circuits['glm-5.3'] = {'until':before.clock()+30,'backoff':3,'probe':False,'avoid':[]}
+            before.members[1].cooldowns.update({'glm-5.3':before.clock()+30,'active':before.clock()+30})
+            before.cooldowns.update({'glm-5.3':before.clock()+30,'*':before.clock()+30,
+                                      'member:N02':before.clock()+30})
+            before._persist()
+            after = NvidiaPool(['one','two'],dict(config,models=['active']))
+            self.assertNotIn('glm-5.3',after.model_availability)
+            self.assertNotIn('glm-5.3',after.transient_circuits)
+            self.assertNotIn('glm-5.3',after.cooldowns)
+            self.assertNotIn('glm-5.3',after.members[1].cooldowns)
+            self.assertTrue(after.model_availability['active']['available'])
+            self.assertTrue(after.members[lease.index].disabled)
+            self.assertGreater(after.cooldowns['*'],after.clock())
+            self.assertGreater(after.cooldowns['member:N02'],after.clock())
+            self.assertGreater(after.members[1].cooldowns['active'],after.clock())
+
     def test_fifty_keys_balance_new_sessions_and_enforce_global_capacity(self):
         p = NvidiaPool([str(i) for i in range(50)],self.config(capacity=64,per_key=3,model_capacity=64))
         for i in range(500):
@@ -459,9 +484,6 @@ class ControlTests(unittest.TestCase):
             'reasoning_effort':'max','chat_template_kwargs':{'enable_thinking':True}})
         self.assertFalse(off['chat_template_kwargs']['enable_thinking'])
         self.assertNotIn('reasoning_budget',off)
-        glm = prepare_request({'model':'z-ai/glm-5.3-flash','reasoning_effort':'xhigh'})
-        self.assertEqual(glm['reasoning_effort'],'max')
-        self.assertFalse(glm['chat_template_kwargs']['clear_thinking'])
 
     def test_provider_key_is_redacted(self):
         self.assertNotIn('super-secret',sanitized('nvapi-super-secret-0123456789'))

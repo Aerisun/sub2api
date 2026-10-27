@@ -130,36 +130,6 @@
         "flex_multiplier": 0.5
       }
     },
-    "glm-5.2": {
-      "source": "https://docs.z.ai/guides/overview/pricing",
-      "status": "developer_standard",
-      "note": "智谱 Z.ai 官方美元 API 价；缓存存储当前限免，未额外配置写入 Token 费。",
-      "pricing": {
-        "platform": "openai",
-        "models": [
-          "glm-5.2"
-        ],
-        "billing_mode": "token",
-        "input_price": 1.4e-06,
-        "output_price": 4.4e-06,
-        "cache_read_price": 2.6e-07
-      }
-    },
-    "glm-5.3": {
-      "source": "https://docs.z.ai/guides/overview/pricing",
-      "status": "developer_standard",
-      "note": "智谱 Z.ai 官方美元 API 价；缓存存储当前限免，未额外配置写入 Token 费。",
-      "pricing": {
-        "platform": "openai",
-        "models": [
-          "glm-5.3"
-        ],
-        "billing_mode": "token",
-        "input_price": 1.4e-06,
-        "output_price": 4.4e-06,
-        "cache_read_price": 2.6e-07
-      }
-    },
     "kimi-k3": {
       "source": "https://platform.kimi.ai/docs/pricing/chat",
       "status": "developer_standard",

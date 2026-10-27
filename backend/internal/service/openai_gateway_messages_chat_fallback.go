@@ -34,7 +34,7 @@ func (s *OpenAIGatewayService) forwardAnthropicViaRawChatCompletions(
 	body []byte,
 	defaultMappedModel string,
 ) (result *OpenAIForwardResult, err error) {
-	defer func() { attachGLMVisionUsage(c, result) }()
+	defer func() { attachAuxiliaryVisionUsage(c, result) }()
 	startTime := time.Now()
 
 	// 1. Parse Anthropic request
@@ -72,9 +72,6 @@ func (s *OpenAIGatewayService) forwardAnthropicViaRawChatCompletions(
 	chatBody, err := json.Marshal(chatReq)
 	if err != nil {
 		return nil, fmt.Errorf("marshal chat completions request: %w", err)
-	}
-	if thinkingBody, changed := ApplyGLMMessagesThinking(chatBody, body, upstreamModel); changed {
-		chatBody = thinkingBody
 	}
 	if normalizedBody, normalized := NormalizeGLMOpenAIReasoningEffort(chatBody, upstreamModel); normalized {
 		chatBody = normalizedBody

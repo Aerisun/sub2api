@@ -15,8 +15,8 @@ import (
 const (
 	openCodeGoUsagePath = "/usage"
 	// DefaultOpenCodeGoTestModel is the admin connection-test fallback when
-	// the UI does not pick a model. glm-5.3 is a Chat Completions catalog ID.
-	DefaultOpenCodeGoTestModel = "glm-5.3"
+	// the UI does not pick a model. Kimi K3 uses the Chat Completions catalog.
+	DefaultOpenCodeGoTestModel = "kimi-k3"
 
 	openCodeGoProtocolRulesKey         = "protocol_rules"
 	maxOpenCodeGoProtocolRules         = 64
@@ -30,9 +30,6 @@ func DefaultOpenCodeGoModelIDs() []string {
 		"grok-4.7",
 		"grok-4.6",
 		"gpt-5.6-luna",
-		"glm-5.3-flash",
-		"glm-5.3",
-		"glm-5.2",
 		"glm-5.1",
 		"kimi-k3",
 		"kimi-k2.7-code",

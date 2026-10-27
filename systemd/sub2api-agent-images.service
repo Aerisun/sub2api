@@ -1,5 +1,5 @@
 [Unit]
-Description=Aerisun server-managed image tools for Claude Gemini and GLM
+Description=Aerisun server-managed image tools for the configured model catalogue
 After=network-online.target sub2api.service sub2api-image-hub.service
 Wants=network-online.target sub2api-image-hub.service
 

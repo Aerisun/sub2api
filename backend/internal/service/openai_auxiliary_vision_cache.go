@@ -12,19 +12,19 @@ import (
 )
 
 const (
-	glmVisionDescriptionTTL        = 10 * time.Minute
-	glmVisionDescriptionMaxEntries = 1024
-	glmVisionDescriptionMaxBytes   = 16 * 1024 * 1024
-	glmVisionImageParallelism      = 2
+	auxiliaryVisionDescriptionTTL        = 10 * time.Minute
+	auxiliaryVisionDescriptionMaxEntries = 1024
+	auxiliaryVisionDescriptionMaxBytes   = 16 * 1024 * 1024
+	auxiliaryVisionImageParallelism      = 2
 )
 
-type glmVisionDescriptionEntry struct {
+type auxiliaryVisionDescriptionEntry struct {
 	key, description string
 	expires          time.Time
 	bytes            int
 }
 
-type glmVisionDescriptionFlight struct {
+type auxiliaryVisionDescriptionFlight struct {
 	done        chan struct{}
 	description string
 	err         error
@@ -34,11 +34,11 @@ type glmVisionDescriptionFlight struct {
 // This bounded, process-local cache stores descriptions only. Customer identity
 // and helper configuration scope every key; mutable remote URLs are never cached.
 // A flight's owner records usage, while followers reuse its description for free.
-type glmVisionDescriptionCache struct {
+type auxiliaryVisionDescriptionCache struct {
 	mu      sync.Mutex
 	entries map[string]*list.Element
 	lru     list.List
-	flights map[string]*glmVisionDescriptionFlight
+	flights map[string]*auxiliaryVisionDescriptionFlight
 	bytes   int
 
 	// Zero values use the production limits; tests can use smaller bounds.
@@ -47,7 +47,7 @@ type glmVisionDescriptionCache struct {
 	maxBytes   int
 }
 
-func glmVisionDescriptionCacheKey(c *gin.Context, account *Account, imageURL string) string {
+func auxiliaryVisionDescriptionCacheKey(c *gin.Context, account *Account, imageURL string) string {
 	if c == nil || account == nil || !strings.HasPrefix(strings.ToLower(imageURL), "data:image/") {
 		return ""
 	}
@@ -61,24 +61,24 @@ func glmVisionDescriptionCacheKey(c *gin.Context, account *Account, imageURL str
 		groupID = *key.GroupID
 	}
 	return fmt.Sprintf("v2:%d:%d:%d:%d:%q:%d:%q:%q:%s", key.UserID, key.ID, groupID,
-		account.getExtraInt("glm_image_bridge_account_id"), account.getExtraString("glm_image_bridge_model"),
-		account.getExtraInt("glm_image_bridge_fallback_account_id"), account.getExtraString("glm_image_bridge_fallback_model"),
-		glmVisionReasoningEffort(account), glmImageDigest(imageURL))
+		account.getExtraInt("image_bridge_account_id"), account.getExtraString("image_bridge_model"),
+		account.getExtraInt("image_bridge_fallback_account_id"), account.getExtraString("image_bridge_fallback_model"),
+		auxiliaryVisionReasoningEffort(account), auxiliaryImageDigest(imageURL))
 }
 
-func (cache *glmVisionDescriptionCache) removeLocked(element *list.Element) {
-	entry, _ := element.Value.(*glmVisionDescriptionEntry)
+func (cache *auxiliaryVisionDescriptionCache) removeLocked(element *list.Element) {
+	entry, _ := element.Value.(*auxiliaryVisionDescriptionEntry)
 	delete(cache.entries, entry.key)
 	cache.bytes -= entry.bytes
 	cache.lru.Remove(element)
 }
 
-func (cache *glmVisionDescriptionCache) getLocked(key string, now time.Time) (string, bool) {
+func (cache *auxiliaryVisionDescriptionCache) getLocked(key string, now time.Time) (string, bool) {
 	element := cache.entries[key]
 	if element == nil {
 		return "", false
 	}
-	entry, _ := element.Value.(*glmVisionDescriptionEntry)
+	entry, _ := element.Value.(*auxiliaryVisionDescriptionEntry)
 	if !now.Before(entry.expires) {
 		cache.removeLocked(element)
 		return "", false
@@ -87,16 +87,16 @@ func (cache *glmVisionDescriptionCache) getLocked(key string, now time.Time) (st
 	return entry.description, true
 }
 
-func (cache *glmVisionDescriptionCache) putLocked(key, description string, now time.Time) {
+func (cache *auxiliaryVisionDescriptionCache) putLocked(key, description string, now time.Time) {
 	ttl, maxEntries, maxBytes := cache.ttl, cache.maxEntries, cache.maxBytes
 	if ttl <= 0 {
-		ttl = glmVisionDescriptionTTL
+		ttl = auxiliaryVisionDescriptionTTL
 	}
 	if maxEntries <= 0 {
-		maxEntries = glmVisionDescriptionMaxEntries
+		maxEntries = auxiliaryVisionDescriptionMaxEntries
 	}
 	if maxBytes <= 0 {
-		maxBytes = glmVisionDescriptionMaxBytes
+		maxBytes = auxiliaryVisionDescriptionMaxBytes
 	}
 	size := len(key) + len(description)
 	if strings.TrimSpace(description) == "" || size > maxBytes {
@@ -112,7 +112,7 @@ func (cache *glmVisionDescriptionCache) putLocked(key, description string, now t
 	// as lookup, so old conversations cannot occupy the bounded cache forever.
 	for element := cache.lru.Back(); element != nil; {
 		previous := element.Prev()
-		entry, _ := element.Value.(*glmVisionDescriptionEntry)
+		entry, _ := element.Value.(*auxiliaryVisionDescriptionEntry)
 		if !now.Before(entry.expires) {
 			cache.removeLocked(element)
 		}
@@ -121,14 +121,14 @@ func (cache *glmVisionDescriptionCache) putLocked(key, description string, now t
 	for len(cache.entries) >= maxEntries || cache.bytes+size > maxBytes {
 		cache.removeLocked(cache.lru.Back())
 	}
-	entry := &glmVisionDescriptionEntry{key: key, description: description, expires: now.Add(ttl), bytes: size}
+	entry := &auxiliaryVisionDescriptionEntry{key: key, description: description, expires: now.Add(ttl), bytes: size}
 	cache.entries[key] = cache.lru.PushFront(entry)
 	cache.bytes += size
 }
 
-func (cache *glmVisionDescriptionCache) describe(ctx context.Context, key string,
-	load func(context.Context) (string, glmVisionUsage, error),
-) (string, *glmVisionUsage, error) {
+func (cache *auxiliaryVisionDescriptionCache) describe(ctx context.Context, key string,
+	load func(context.Context) (string, auxiliaryVisionUsage, error),
+) (string, *auxiliaryVisionUsage, error) {
 	for {
 		if err := ctx.Err(); err != nil {
 			return "", nil, err
@@ -152,9 +152,9 @@ func (cache *glmVisionDescriptionCache) describe(ctx context.Context, key string
 			}
 		}
 		if cache.flights == nil {
-			cache.flights = make(map[string]*glmVisionDescriptionFlight)
+			cache.flights = make(map[string]*auxiliaryVisionDescriptionFlight)
 		}
-		flight := &glmVisionDescriptionFlight{done: make(chan struct{})}
+		flight := &auxiliaryVisionDescriptionFlight{done: make(chan struct{})}
 		cache.flights[key] = flight
 		cache.mu.Unlock()
 
@@ -175,14 +175,14 @@ func (cache *glmVisionDescriptionCache) describe(ctx context.Context, key string
 	}
 }
 
-func (s *OpenAIGatewayService) describeGLMImageForRequest(ctx context.Context, c *gin.Context,
+func (s *OpenAIGatewayService) describeAuxiliaryImageForRequest(ctx context.Context, c *gin.Context,
 	account *Account, imageURL string,
-) (string, *glmVisionUsage, error) {
-	load := func(ctx context.Context) (string, glmVisionUsage, error) {
-		return s.describeGLMImage(ctx, account, imageURL)
+) (string, *auxiliaryVisionUsage, error) {
+	load := func(ctx context.Context) (string, auxiliaryVisionUsage, error) {
+		return s.describeAuxiliaryImage(ctx, account, imageURL)
 	}
-	if key := glmVisionDescriptionCacheKey(c, account, imageURL); key != "" {
-		return s.glmVisionDescriptions.describe(ctx, key, load)
+	if key := auxiliaryVisionDescriptionCacheKey(c, account, imageURL); key != "" {
+		return s.auxiliaryVisionDescriptions.describe(ctx, key, load)
 	}
 	description, usage, err := load(ctx)
 	if err != nil {

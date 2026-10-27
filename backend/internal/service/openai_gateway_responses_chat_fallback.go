@@ -29,7 +29,7 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 	account *Account,
 	body []byte,
 ) (result *OpenAIForwardResult, err error) {
-	defer func() { attachGLMVisionUsage(c, result) }()
+	defer func() { attachAuxiliaryVisionUsage(c, result) }()
 	startTime := time.Now()
 
 	var responsesReq apicompat.ResponsesRequest
@@ -81,21 +81,7 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 	if err != nil {
 		return nil, fmt.Errorf("marshal chat completions fallback request: %w", err)
 	}
-	if isGLMClientThinkingModel(upstreamModel) {
-		if thinking := gjson.GetBytes(body, "thinking"); thinking.IsObject() {
-			chatBody, err = sjson.SetRawBytes(chatBody, "thinking", []byte(thinking.Raw))
-			if err != nil {
-				return nil, fmt.Errorf("preserve GLM thinking controls: %w", err)
-			}
-		}
-		if effort := gjson.GetBytes(body, "reasoning_effort"); effort.Type == gjson.String && !gjson.GetBytes(body, "reasoning.effort").Exists() {
-			chatBody, err = sjson.SetRawBytes(chatBody, "reasoning_effort", []byte(effort.Raw))
-			if err != nil {
-				return nil, fmt.Errorf("preserve GLM reasoning effort: %w", err)
-			}
-		}
-		chatBody, _ = NormalizeGLMOpenAIReasoningEffort(chatBody, upstreamModel)
-	}
+
 	chatBody, err = prepareDomesticChatControls(chatBody, body, upstreamModel, "responses", account)
 	if err != nil {
 		writeOpenAIResponsesFallbackError(c, http.StatusBadRequest, "invalid_request_error", err.Error())

@@ -6,16 +6,16 @@ test('vision availability follows the shared model catalog', () => {
   assert.equal(supportsImages('qwen3.8-flash'), true);
   assert.equal(supportsImages('moonshot/kimi-k3'), true);
   assert.equal(supportsImages('nemotron-3.5-lightning-30b-a3b'), false);
-  for (const model of ['Nemotron-3.5', 'nemotron-3.5', 'nvidia/Nemotron-3.5', 'glm-5.2', 'glm-5.3']) {
+  for (const model of ['Nemotron-3.5', 'nemotron-3.5', 'nvidia/Nemotron-3.5']) {
     assert.equal(supportsImages(model), true, model);
   }
   assert.equal(supportsImages('unknown-model'), false);
-  for (const retired of ['glm-5.3-flash', 'step-5-preview']) assert.equal(supportsImages(retired), false);
+  for (const retired of ['glm-5.2', 'glm-5.3', 'glm-5.3-flash', 'step-5-preview']) assert.equal(supportsImages(retired), false);
 });
 test('text-only models use browser-only recognition uploads while native image models retain their route',()=>{
-  for(const model of ['Nemotron-3.5','nvidia/Nemotron-3.5','glm-5.2','glm-5.3','unknown-model'])assert.equal(supportsNativeImages(model),false,model);
+  for(const model of ['Nemotron-3.5','nvidia/Nemotron-3.5','unknown-model'])assert.equal(supportsNativeImages(model),false,model);
   for(const model of ['qwen3.8-flash','gpt-6.1-sol','gpt-6.1-terra'])assert.equal(supportsNativeImages(model),true,model);
-  for(const retired of ['glm-5.3-flash','step-5-preview'])assert.equal(supportsNativeImages(retired),false,retired);
+  for(const retired of ['glm-5.2','glm-5.3','glm-5.3-flash','step-5-preview'])assert.equal(supportsNativeImages(retired),false,retired);
 });
 test('background sync preserves browser-only images without opening files or uploading them',async()=>{
   const local={clientID:'85e9d563-7808-4ee7-8ef1-6372b130b0d4',name:'local.png',mediaType:'image/png'};

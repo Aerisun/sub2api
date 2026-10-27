@@ -24,7 +24,6 @@ GENERATION = "image_generation"
 RECOGNITION = "image_recognition"
 VISION_MODEL = "nvidia/nemotron-3.5-super-vl-120b-a12b"
 VISION_BACKUP = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
-LEGACY_VISION_MODEL = "glm-5.3-flash"
 VISION_SYSTEM_PROMPT = (
     "你是图像观察员，输出将作为对话模型理解图片的视觉依据。按用户任务直接输出准确、充分的可见信息，不展示推理。"
     "不要为了简短而省略相关细节。描述任务先说明图片类型与整体内容，再按区域说明对象、数量、颜色、位置、状态及相互关系。"
@@ -111,7 +110,7 @@ def image_value(value, name, remote=True):
 
 
 def can_generate(models):return GENERATION in models or bool(set(NATIVE_MODEL_CHOICES)&models)
-def can_recognize(models):return RECOGNITION in models or VISION_MODEL in models or LEGACY_VISION_MODEL in models
+def can_recognize(models):return RECOGNITION in models or VISION_MODEL in models
 
 
 @contextmanager
@@ -219,8 +218,8 @@ class ImageRecognitionExecutor:
         if type(limit) is not int or not 1<=limit<=4096:raise invalid("max_output_tokens 必须为 1–4096",RECOGNITION,"max_output_tokens")
         models=authorized_models(self.credential,self.gateway,self.headers)
         if not can_recognize(models):raise ToolError(403,"当前密钥未开通识图工具","permission_denied")
-        selected=VISION_MODEL if RECOGNITION in models or VISION_MODEL in models else LEGACY_VISION_MODEL
-        payload={"model":selected,"stream":False,"max_tokens":limit,"reasoning_effort":"off" if selected!=LEGACY_VISION_MODEL else "low","messages":[
+        selected=VISION_MODEL
+        payload={"model":selected,"stream":False,"max_tokens":limit,"reasoning_effort":"off","messages":[
             {"role":"system","content":VISION_SYSTEM_PROMPT},
             {"role":"user","content":[{"type":"text","text":prompt},
                                       {"type":"image_url","image_url":{"url":images[0]}}]}]}

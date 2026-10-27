@@ -1219,7 +1219,7 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 
 // writeChatCompletionsError writes an error response in OpenAI Chat Completions format.
 func writeChatCompletionsError(c *gin.Context, statusCode int, errType, message string) {
-	if writeGLMVisionStreamError(c, statusCode, errType, message) {
+	if writeAuxiliaryVisionStreamError(c, statusCode, errType, message) {
 		return
 	}
 	MarkResponseCommitted(c)

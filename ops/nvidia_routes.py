@@ -4,11 +4,29 @@ import re
 import httpx
 from ops import admin_api as api
 from ops.admin_api import ROOT
+from ops.credentials import accounts as account_credentials
 STATE = ROOT/'deployment/private/config/nvidia-account.json'
-MAPPING = {'glm-5.3':'z-ai/glm-5.3',
-           'deepseek-v4.1-flash':'deepseek-ai/deepseek-v4.1-flash',
+MAPPING = {'deepseek-v4.1-flash':'deepseek-ai/deepseek-v4.1-flash',
            'Nemotron-3.5':'nvidia/nemotron-3.5-lightning-30b-a3b'}
 NEW_PRICES = {'Nemotron-3.5':'qwen3.8-flash'}
+
+
+def sync_credentials(admin, account_id, ready):
+    # Administration responses hide credentials and some connection settings.
+    # A PUT replaces that map, so merge against the stored record instead.
+    current = account_credentials([account_id])[account_id]
+    desired = {**current, 'model_mapping':ready,
+        'base_url':'http://127.0.0.1:8096',
+        'api_key':(ROOT/'secrets/nvidia/internal_key.txt').read_text().strip(),
+        'openai_capabilities':['chat_completions'],'pool_mode':True,
+        'pool_mode_retry_count':0,'pool_mode_retry_status_codes':[],
+        'pool_manages_transient_errors':True}
+    if current != desired:
+        api.request(f'/api/v1/admin/accounts/{account_id}',admin,
+                    {'credentials':desired},'PUT')
+        if account_credentials([account_id])[account_id] != desired:
+            raise RuntimeError('NVIDIA connection settings were not saved completely')
+
 
 def ensure_routes(admin):
     routes = api.request('/api/v1/admin/groups/9/composite-routes',admin)
@@ -57,27 +75,17 @@ def sync(admin):
     if metadata:
         api.request(f"/api/v1/admin/accounts/{state['account_id']}",admin,metadata,'PUT')
     if state.get('vision_enabled'):
-        # Retired GLM Flash must not be resurrected by this periodic sync.
+        # Vision settings are shared by the active text-only NVIDIA model.
         from internal_tools.vision_routing import PRIMARY, OMNI
         desired_extra = {k:v for k,v in account['extra'].items()
-                         if not k.startswith('glm_image_bridge_') and k!='glm_flash_native_vision'}
+                         if not k.startswith('image_bridge_')}
         desired_extra.update(nvidia_image_tool='configured',
-            glm_image_bridge_account_id=state['account_id'],glm_image_bridge_model=PRIMARY,
-            glm_image_bridge_reasoning_effort='low',
-            glm_image_bridge_fallback_account_id=state['account_id'],glm_image_bridge_fallback_model=OMNI)
+            image_bridge_account_id=state['account_id'],image_bridge_model=PRIMARY,
+            image_bridge_reasoning_effort='low',
+            image_bridge_fallback_account_id=state['account_id'],image_bridge_fallback_model=OMNI)
         if desired_extra != account['extra']:
             api.request(f"/api/v1/admin/accounts/{state['account_id']}",admin,{'extra':desired_extra},'PUT')
-    if (account['credentials']['model_mapping'] != ready or
-            account['credentials'].get('base_url') != 'http://127.0.0.1:8096' or
-            account['credentials'].get('pool_manages_transient_errors') is not True):
-        credentials = {**account['credentials'], 'model_mapping':ready,
-            'base_url':'http://127.0.0.1:8096',
-            'api_key':(ROOT/'secrets/nvidia/internal_key.txt').read_text().strip(),
-            'openai_capabilities':['chat_completions'],'pool_mode':True,
-            'pool_mode_retry_count':0,'pool_mode_retry_status_codes':[],
-            'pool_manages_transient_errors':True}
-        api.request(f"/api/v1/admin/accounts/{state['account_id']}",admin,
-                    {'credentials':credentials},'PUT')
+    sync_credentials(admin, state['account_id'], ready)
     print(json.dumps({'ready_models':list(ready),'unavailable_models':sorted(set(MAPPING)-set(ready))}))
 
 

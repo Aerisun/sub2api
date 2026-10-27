@@ -46,16 +46,6 @@ test("current models expose their native tiers rather than gateway aliases", () 
     "medium",
     "xhigh",
   ]);
-  assert.deepEqual(modelProfile("glm-5.2").efforts, [
-    "none",
-    "high",
-    "max",
-  ]);
-  assert.deepEqual(modelProfile("glm-5.3").efforts, [
-    "low",
-    "high",
-    "max",
-  ]);
   assert.deepEqual(modelProfile("kimi-k3").efforts, [
     "low",
     "high",
@@ -70,10 +60,6 @@ test("current models expose their native tiers rather than gateway aliases", () 
 });
 test("always-thinking models never receive a disable switch", () => {
   assert.equal(validEffort("kimi-k3", "none"), "low");
-  assert.deepEqual(reasoningParams("glm-5.3", "none"), {reasoning_effort:"low",thinking:{type:"enabled"}});
-  assert.deepEqual(reasoningParams("kimi-k3", "max"), {
-    reasoning_effort: "max",
-  });
 });
 test("off and on reach the correct provider controls", () => {
   assert.deepEqual(reasoningParams("qwen3.8-max", "none"), {
@@ -84,17 +70,12 @@ test("off and on reach the correct provider controls", () => {
     reasoning_effort: "medium",
     enable_thinking: true,
   });
-  assert.deepEqual(reasoningParams("glm-5.2", "none"), {
-    reasoning_effort: "none",
-    thinking: { type: "disabled" },
-  });
   assert.deepEqual(reasoningParams("deepseek-v4.1-flash", "high"), {
     reasoning_effort: "high",
     thinking: { type: "enabled" },
   });
 });
 test("switching models cannot carry an unsupported effort into requests", () => {
-  assert.deepEqual(reasoningParams("glm-5.2", "medium"), {reasoning_effort:"max",thinking:{type:"enabled"}});
   assert.deepEqual(reasoningParams("qwen3.8-max", "max"), {reasoning_effort:"xhigh",enable_thinking:true});
   assert.deepEqual(reasoningParams("unknown-model", "high"), {});
   assert.deepEqual(reasoningParams("qwen3.8-max", "default"), {reasoning_effort:"xhigh",enable_thinking:true});
@@ -108,10 +89,17 @@ test('new NVIDIA routes expose only verified controls', () => {
 });
 
 test('legacy defaults resolve to the exact tier displayed and sent', () => {
- for (const [model, tier] of [['qwen3.8-flash','xhigh'], ['glm-5.2','max'], ['glm-5.3','low'], ['kimi-k3','low'], ['deepseek-v4.1-flash','low']]) {
+ for (const [model, tier] of [['qwen3.8-flash','xhigh'], ['kimi-k3','low'], ['deepseek-v4.1-flash','low']]) {
   assert.equal(validEffort(model, 'default'), tier);
   assert.equal(reasoningParams(model, 'default').reasoning_effort, tier);
   assert.ok(!modelProfile(model).efforts.includes('default'));
  }
  assert.equal(validEffort('qwen3.8-flash', 'medium'), 'medium');
+});
+
+test("retired GLM models expose no controls", () => {
+ for (const model of ["glm-5.2", "glm-5.3", "glm-5.3-flash"]) {
+  assert.deepEqual(modelProfile(model).efforts, []);
+  assert.deepEqual(reasoningParams(model, "high"), {});
+ }
 });

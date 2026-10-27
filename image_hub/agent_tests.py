@@ -42,7 +42,7 @@ def anthropic(call=False, mixed=False):
 
 
 def chat(call=False, mixed=False):
-    base = {"id": "chat_test", "object": "chat.completion.chunk", "created": 1, "model": "glm-5.3"}
+    base = {"id": "chat_test", "object": "chat.completion.chunk", "created": 1, "model": "kimi-k3"}
     chunks = [{"role": "assistant", "reasoning_content": "signed reasoning"}]
     if call:
         chunks += [{"tool_calls": [{"index": 0, "id": "internal-1", "type": "function", "function": {"name": "aerisun_", "arguments": ""}}]},
@@ -84,7 +84,7 @@ def gemini(call=False, mixed=False):
 
 
 BODIES = {"anthropic": {"model": "claude-sonnet-4-6", "messages": [{"role": "user", "content": "draw"}]},
-          "chat": {"model": "glm-5.3", "messages": [{"role": "user", "content": "draw"}]},
+          "chat": {"model": "kimi-k3", "messages": [{"role": "user", "content": "draw"}]},
           "responses": {"model": "gemini-3.8-flash", "input": "draw"},
           "gemini": {"contents": [{"role": "user", "parts": [{"text": "draw"}]}]}}
 GENERATORS = {"anthropic": anthropic, "chat": chat, "responses": responses, "gemini": gemini}
@@ -201,7 +201,7 @@ class AgentTests(unittest.TestCase):
             self.assertEqual(request.call_args_list[1].args[0], request.call_args_list[2].args[0])
 
     def test_all_live_chat_models_have_the_same_internal_image_tool(self):
-        for model in ["Nemotron-3.5", "kimi-k3", "deepseek-v4.1-flash", "qwen3.8-flash", "qwen3.8-max", "glm-5.2", "glm-5.3", "glm-5.3-flash", "step-5-preview"]:
+        for model in ["Nemotron-3.5", "kimi-k3", "deepseek-v4.1-flash", "qwen3.8-flash", "qwen3.8-max", "step-5-preview"]:
             for kind in ("chat", "anthropic", "responses"):
                 with self.subTest(model=model, kind=kind):
                     body = {**BODIES[kind], "model": model}

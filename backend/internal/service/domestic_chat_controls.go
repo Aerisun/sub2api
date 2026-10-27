@@ -24,7 +24,7 @@ func prepareDomesticChatControls(chatBody, original []byte, model, protocol stri
 		}
 		chatBody = cleaned
 	}
-	visionConfigured := len(accounts) > 0 && glmImageBridgeEnabled(accounts[0], model)
+	visionConfigured := len(accounts) > 0 && auxiliaryImageBridgeEnabled(accounts[0], model)
 	if (name == "nemotron-3.5-lightning-30b-a3b" || name == "nemotron-3.5") && !visionConfigured {
 		for _, message := range gjson.GetBytes(chatBody, "messages").Array() {
 			for _, block := range message.Get("content").Array() {
@@ -36,9 +36,8 @@ func prepareDomesticChatControls(chatBody, original []byte, model, protocol stri
 	}
 	deepseek := strings.HasPrefix(name, "deepseek-v4.1-flash")
 	kimi := name == "kimi-k3" || name == "kimi-k3-free"
-	glm := name == "glm-5.3" || name == "glm-5.3-flash"
 	portable := isNvidiaPortableThinkingModel(name)
-	if !deepseek && !kimi && !glm && !portable {
+	if !deepseek && !kimi && !portable {
 		return chatBody, nil
 	}
 	var out map[string]json.RawMessage
@@ -112,7 +111,7 @@ func prepareDomesticChatControls(chatBody, original []byte, model, protocol stri
 		out["reasoning_effort"], _ = json.Marshal(effort)
 		return json.Marshal(out)
 	}
-	// K3 and GLM-5.3 always reason; off selects their documented lightweight
+	// K3 always reasons; off selects its documented lightweight
 	// mode without substituting another model. Auto also favors low latency.
 	if disabled {
 		effort = "low"

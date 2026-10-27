@@ -1283,7 +1283,7 @@ func accountCodexModelSupportsImageInput(account *Account, upstreamModel string)
 	if account == nil {
 		return false
 	}
-	if glmImageBridgeEnabled(account, upstreamModel) {
+	if auxiliaryImageBridgeEnabled(account, upstreamModel) {
 		return true
 	}
 	switch account.Platform {

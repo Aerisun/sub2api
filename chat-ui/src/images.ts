@@ -103,7 +103,7 @@ export function supportsImages(model: string): boolean {
 }
 export function supportsNativeImages(model: string): boolean {
   const name = model.toLowerCase().split("/").at(-1) || "";
-  return supportsImages(model) && !["glm-5.2", "glm-5.3", "nemotron-3.5"].includes(name);
+  return supportsImages(model) && !["nemotron-3.5"].includes(name);
 }
 export function toChatMessages(items: { role: "user" | "assistant"; content: string; images?: ChatImage[]; reasoning?: string; error?: string }[]) {
   let latestUser = -1;

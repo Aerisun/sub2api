@@ -19,7 +19,7 @@ func TestVisionToolStreamsRealDeltasBeforeCompletion(t *testing.T) {
 	parts := make(chan string, 2)
 	finished := make(chan error, 1)
 	go func() {
-		raw, err := readGLMVisionStream(reader, func(part string) { parts <- part })
+		raw, err := readAuxiliaryVisionStream(reader, func(part string) { parts <- part })
 		if err == nil && gjson.GetBytes(raw, "choices.0.message.content").String() != "红色三角形" {
 			t.Error("description was corrupted")
 		}
@@ -43,20 +43,20 @@ func TestVisionToolStreamsRealDeltasBeforeCompletion(t *testing.T) {
 	writer.Close()
 	require.NoError(t, <-finished)
 	require.Equal(t, "三角形", <-parts)
-	_, err := readGLMVisionStream(strings.NewReader("data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n\n"), nil)
+	_, err := readAuxiliaryVisionStream(strings.NewReader("data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n\n"), nil)
 	require.Error(t, err)
 }
 func TestVisionToolLifecycleAndCacheReuse(t *testing.T) {
-	account, _, svc, upstream := glmVisionFixture()
+	account, _, svc, upstream := auxiliaryVisionFixture()
 	upstream.resp.Header.Set("Content-Type", "text/event-stream")
 	upstream.resp.Body = io.NopCloser(strings.NewReader("data: {\"choices\":[{\"delta\":{\"content\":\"red \"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"triangle\"},\"finish_reason\":\"stop\"}]}\n\ndata: {\"choices\":[],\"usage\":{\"prompt_tokens\":20,\"completion_tokens\":3}}\n\ndata: [DONE]\n\n"))
-	body := []byte(`{"model":"glm-5.3","stream":true,"messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"data:image/png;base64,AAAA"}}]}]}`)
+	body := []byte(`{"model":"Nemotron-3.5","stream":true,"messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"data:image/png;base64,AAAA"}}]}]}`)
 	for attempt := 0; attempt < 2; attempt++ {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Set("api_key", &APIKey{ID: 88, UserID: 4})
-		stop := startGLMVisionKeepalive(c, account, body, true)
-		_, err := svc.bridgeGLMImageInputs(context.Background(), c, account, body)
+		stop := startAuxiliaryVisionKeepalive(c, account, body, true)
+		_, err := svc.bridgeAuxiliaryImageInputs(context.Background(), c, account, body)
 		stop()
 		require.NoError(t, err)
 		output := w.Body.String()

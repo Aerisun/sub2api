@@ -66,19 +66,28 @@ class NvidiaPool(Pool):
         self.egress_marker = None
         self.model_availability = {model:{'available':False,'reason':reason,'checked_at':time.time()}
             for model,reason in config.get('unavailable_models',{}).items()}
+        configured_models = set(config['models']) if 'models' in config else None
         if self.state_path and self.state_path.exists():
             state = json.loads(self.state_path.read_text())
             self.egress_generation = state.get('egress_generation')
-            self.model_availability.update(state.get('model_availability',{}))
+            self.model_availability.update({model:value for model,value in state.get('model_availability',{}).items()
+                if configured_models is None or model in configured_models})
             offset = time.time()-self.clock()
             for model, saved in state.get('transient_circuits',{}).items():
+                if configured_models is not None and model not in configured_models:
+                    continue
                 self.transient_circuits[model] = {'until':saved['resume_at']-offset,
                     'backoff':saved['backoff'],'probe':False,'avoid':saved.get('avoid',[])}
             for member, digest in zip(self.members, self._member_hashes()):
                 saved = state.get('key_health',{}).get(digest,{})
                 member.disabled = saved.get('disabled',False)
                 member.cooldowns = {model:expiry-offset for model,expiry in saved.get('cooldowns',{}).items()
-                                    if expiry > time.time()}
+                                    if expiry > time.time() and (configured_models is None or model in configured_models)}
+        if configured_models is not None:
+            # A retired model must not return through persisted health probes.
+            # Keep key authentication holds and shared rolling quotas intact.
+            self.cooldowns = {bucket:expiry for bucket,expiry in self.cooldowns.items()
+                if bucket == '*' or bucket.startswith('member:') or bucket in configured_models}
 
     def persistent_extra(self):
         offset = time.time()-self.clock()
@@ -389,13 +398,6 @@ def prepare_request(body):
         budget = thinking.get('budget_tokens') or {'auto':1024,'minimal':512,'low':1024,'medium':4096,'high':8192,'xhigh':16384,'max':32768,'off':0,'none':0}[effort]
         if not disabled:
             out.setdefault('reasoning_budget',min(int(budget),int(out.get('max_tokens',32768))))
-    elif name in ('glm-5.3','glm-5.3-flash'):
-        out['reasoning_effort'] = 'low' if disabled or effort in ('auto','minimal','low') else 'high' if effort in ('medium','high') else 'max'
-        # TensorRT-LLM reads GLM-5.3 controls from the chat template. A root-only
-        # hint can silently use its default max effort, delaying vision output.
-        kwargs['reasoning_effort'] = out['reasoning_effort']
-        # Preserve full thinking history for agent/tool turns.
-        kwargs.setdefault('clear_thinking',False)
     elif name.startswith('deepseek-v4.1-flash'):
         if disabled:
             out.pop('reasoning_effort',None)
@@ -473,22 +475,8 @@ class NvidiaServer(Server):
             out={**out,'stream':True,'stream_options':{**(out.get('stream_options') or {}),'include_usage':True}}
         return out
 
-    def upload_context(self, body):
-        assets=getattr(self,'image_assets',None)
-        # GLM's large inline upload stalls were reproduced with exact pixels.
-        # Step's remote-image fetch instead emits provider SSE 504s; its native
-        # inline path succeeds. Only the verified GLM route uses capabilities.
-        glm=body.get('model','').rsplit('/',1)[-1]=='glm-5.3-flash'
-        return assets.request(body) if assets and glm else super().upload_context(body)
-
-    def public_asset(self, handler, head=False):
-        assets=getattr(self,'image_assets',None)
-        return assets.serve(handler,head) if assets else False
-
     def local_request_error(self, error):
-        from nvidia_pool.assets import AssetCapacityError
         from nvidia_pool.image_fetch import ImageFetchError
-        if isinstance(error,AssetCapacityError):return 429,str(error)
         if isinstance(error,ImageFetchError):return error.status,str(error)
         return None
 
@@ -580,7 +568,6 @@ class NvidiaServer(Server):
             'tool_first_attempt_seconds':min(self.vision_pre_output_timeout,self.vision_first_event_seconds)}
         transport=getattr(getattr(self,'client',None),'_transport',None)
         if callable(getattr(transport,'snapshot',None)):value['upstream_transport']=transport.snapshot()
-        if getattr(self,'image_assets',None):value['image_transfer']=self.image_assets.snapshot()
         path=getattr(self,'egress_route_file',None)
         if path:
             try:
@@ -627,13 +614,9 @@ class NvidiaServer(Server):
         self.completed_drains=threading.BoundedSemaphore(4)
         super().__init__(*args, **kwargs)
         config = args[1] if len(args) > 1 else kwargs['config']
-        self.image_assets=None
-        if config.get('image_asset_origin'):
-            from nvidia_pool.assets import ImageAssets
-            self.image_assets=ImageAssets(config['image_asset_origin'])
-            # Large requests can fetch several image URLs concurrently while
-            # provider POSTs are waiting. GETs must not exhaust relay workers.
-            self.workers=threading.BoundedSemaphore(max(16,self.pool.capacity*8))
+
+        # Keep accepted client requests responsive while provider work queues.
+        self.workers=threading.BoundedSemaphore(max(16,self.pool.capacity*8))
         self.egress_route_file=config.get('proxy_route_state_file')
         if config.get('proxy_route_state_file'):
             from nvidia_pool.egress_transport import EgressTransport

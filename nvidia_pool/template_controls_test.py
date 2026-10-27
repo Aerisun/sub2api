@@ -2,21 +2,11 @@ import unittest
 from nvidia_pool.server import prepare_request
 
 
-class GLMTemplateTests(unittest.TestCase):
-    def test_unified_effort_reaches_native_glm_template_and_root(self):
-        for model in ['z-ai/glm-5.3','z-ai/glm-5.3-flash']:
-            for effort,expected in [('auto','low'),('low','low'),('medium','high'),('high','high'),('xhigh','max'),('max','max')]:
-                with self.subTest(model=model,effort=effort):
-                    value=prepare_request({'model':model,'reasoning_effort':effort})
-                    self.assertEqual(value['reasoning_effort'],expected)
-                    self.assertEqual(value['chat_template_kwargs']['reasoning_effort'],expected)
-                    self.assertIs(value['chat_template_kwargs']['clear_thinking'],False)
-
-    def test_template_only_effort_survives_and_explicit_unified_field_has_precedence(self):
-        value=prepare_request({'model':'z-ai/glm-5.3-flash','chat_template_kwargs':{'reasoning_effort':'high'}})
-        self.assertEqual(value['reasoning_effort'],'high')
-        value=prepare_request({'model':'z-ai/glm-5.3-flash','reasoning_effort':'low','chat_template_kwargs':{'reasoning_effort':'max'}})
-        self.assertEqual(value['chat_template_kwargs']['reasoning_effort'],'low')
+class RetiredModelTests(unittest.TestCase):
+    def test_retired_glm_models_cannot_reenter_the_pool(self):
+        for model in ('z-ai/glm-5.2', 'z-ai/glm-5.3', 'z-ai/glm-5.3-flash'):
+            with self.subTest(model=model), self.assertRaises(ValueError):
+                prepare_request({'model':model,'reasoning_effort':'low'})
 
 
 class StepTemplateTests(unittest.TestCase):

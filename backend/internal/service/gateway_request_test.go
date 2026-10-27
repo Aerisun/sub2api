@@ -1621,13 +1621,7 @@ func TestNormalizeGLMOpenAIReasoningEffort(t *testing.T) {
 			wantPath:    "reasoning.effort",
 			wantValue:   "high",
 		},
-		{
-			name:          "glm 5.3 native low unchanged",
-			model:         "glm-5.3",
-			input:         `{"model":"glm-5.3","reasoning_effort":"low","messages":[]}`,
-			wantApplied:   false,
-			wantUnchanged: true,
-		},
+
 		{
 			name:          "native max unchanged",
 			model:         "glm-5.1",

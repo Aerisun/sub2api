@@ -47,10 +47,10 @@ type InternalToolEvent struct {
 	Sources         []InternalToolSource `json:"sources,omitempty"`
 	Metadata        json.RawMessage      `json:"metadata,omitempty"`
 }
-type glmVisionProgressKey struct{}
+type auxiliaryVisionProgressKey struct{}
 
-func glmVisionProgress(ctx context.Context) func(string) {
-	fn, _ := ctx.Value(glmVisionProgressKey{}).(func(string))
+func auxiliaryVisionProgress(ctx context.Context) func(string) {
+	fn, _ := ctx.Value(auxiliaryVisionProgressKey{}).(func(string))
 	return fn
 }
 
@@ -93,7 +93,7 @@ func writeInternalVisionToolEvent(c *gin.Context, event InternalToolEvent) {
 
 // Consume real upstream deltas. Never simulate streaming by splitting a final
 // description; an incomplete result or missing usage must not enter the cache.
-func readGLMVisionStream(source io.Reader, emit func(string)) ([]byte, error) {
+func readAuxiliaryVisionStream(source io.Reader, emit func(string)) ([]byte, error) {
 	scanner := bufio.NewScanner(source)
 	scanner.Buffer(make([]byte, 4096), 2*1024*1024)
 	var text strings.Builder

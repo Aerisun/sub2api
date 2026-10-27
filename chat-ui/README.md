@@ -73,37 +73,32 @@ Requests carry the explicitly displayed supported tier; the selector has no Defa
 Always-thinking models have no Off option. Sent messages retain the selected tier.
 
 The currently deployed families use these native tiers (without a Default option): Qwen 3.8
-Flash/Max: Off, low, medium, xhigh; GLM 5.2: Off, high, max; GLM 5.3 and Kimi K3:
+Flash/Max: Off, low, medium, xhigh; Kimi K3:
 low, high, max; DeepSeek V4.1 Flash: Off, low, high, max. The payload helper uses
-Qwen's enable_thinking, GLM/DeepSeek's thinking.type and the provider's
+Qwen's enable_thinking, DeepSeek's thinking.type and the provider's
 reasoning_effort field; it never sends incompatible combinations or stale tiers
 from another model. These controls follow the current gateway mappings and:
 
 - Qwen: https://docs.qwencloud.com/api-reference/chat/openai-chat
-- GLM 5.2: https://huggingface.co/zai-org/GLM-5.2/blob/main/README.md
-- GLM 5.3: https://huggingface.co/zai-org/GLM-5.3/blob/main/README.md
 - Kimi: https://github.com/MoonshotAI/Kimi-K3/blob/main/README.md
 - DeepSeek: https://api-docs.deepseek.com/guides/thinking_mode/
 
 Run `node --experimental-strip-types --test src/*.test.mjs` for native-tier,
 request-parameter, stale-selection and SSE regressions. Browser tests additionally
-capture the actual submitted request for all six currently available models.
+capture the actual submitted request for the configured models.
 
-The current catalog can also include GLM 5.3 Flash, NVIDIA Nemotron and Step 5.
-GLM 5.3 Flash shares GLM 5.3's native tiers. Nemotron uses the deployed gateway's
-verified budget mapping for low/medium/high/xhigh/max and supports Off. Step 5's
-NVIDIA endpoint documents always-on reasoning without an adjustable effort field;
-the UI therefore omits the effort selector instead of claiming unsupported depth controls. References:
-https://build.nvidia.com/nvidia/nemotron-3.5-lightning-30b-a3b/build and
-https://docs.api.nvidia.com/nim/reference/stepfun-ai-step-5-preview-infer.
+NVIDIA Nemotron uses the deployed gateway's verified budget mapping for
+low/medium/high/xhigh/max and supports Off. Reference:
+https://build.nvidia.com/nvidia/nemotron-3.5-lightning-30b-a3b/build.
+Retired models are absent from the shared catalog and have no dedicated GLM controls.
 
 PromptInput also has an optional `resetOnSubmit` setting (default true). This
 controlled composer disables native form resets and clears text in its submit
 handler, so Radix model and reasoning controls retain their current selections.
 
 The selector now contains only concrete tiers. Previously saved `default` values
-are resolved to explicit request settings: Qwen xhigh, GLM 5.2 max, and the current
-gateway's low tier for GLM 5.3, Kimi, DeepSeek and Nemotron. The resolved value is
+are resolved to explicit request settings: Qwen xhigh and the current
+gateway's low tier for Kimi, DeepSeek and Nemotron. The resolved value is
 both displayed and submitted; existing concrete user choices remain unchanged.
 
 Image messages support PNG/JPEG/WebP (up to 4 images, 5 MiB each), file selection,

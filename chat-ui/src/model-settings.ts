@@ -14,7 +14,7 @@ export type ModelProfile = {
   efforts: Effort[];
   alwaysThinking: boolean;
   note?: string;
-  family: "codex" | "claude" | "gemini" | "qwen" | "glm52" | "glm53" | "kimi" | "deepseek" | "nemotron" | "gemini-web" | "unknown";
+  family: "codex" | "claude" | "gemini" | "qwen" | "kimi" | "deepseek" | "nemotron" | "gemini-web" | "unknown";
 };
 export const effortDetails: Record<
   Effort,
@@ -75,24 +75,6 @@ export function modelProfile(model: string = ""): ModelProfile {
       alwaysThinking: false,
       family: "qwen",
     };
-  if (/^glm-5\.2(?:-|$)/.test(name))
-    return {
-      brand: "GLM",
-      mark: "G",
-      color: "glm",
-      efforts: ["none", "high", "max"],
-      alwaysThinking: false,
-      family: "glm52",
-    };
-  if (/^glm-5\.3(?:-|$)/.test(name))
-    return {
-      brand: "GLM",
-      mark: "G",
-      color: "glm",
-      efforts: ["low", "high", "max"],
-      alwaysThinking: true,
-      family: "glm53",
-    };
   if (/^kimi-k3(?:-|$)/.test(name))
     return {
       brand: "Kimi",
@@ -139,7 +121,7 @@ export function validEffort(model: string, value: string | undefined): Effort {
   // displays this same value and the request always sends it.
   const initial: Partial<Record<ModelProfile["family"], Effort>> = {
     codex: "medium", claude: "low", gemini: "low",
-    qwen: "xhigh", glm52: "max", glm53: "low", kimi: "low",
+    qwen: "xhigh", kimi: "low",
     deepseek: "low", nemotron: "low", "gemini-web": "low",
   };
   if (model.toLowerCase().split("/").at(-1) === "gpt-6.1-terra") return "low";

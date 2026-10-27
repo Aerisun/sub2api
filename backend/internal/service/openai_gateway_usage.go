@@ -159,12 +159,12 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	if result == nil {
 		return errors.New("openai usage result is nil")
 	}
-	for _, vision := range result.GLMVisionUsage {
+	for _, vision := range result.AuxiliaryVisionUsage {
 		if vision.ClaudeResult != nil {
-			if s.glmVisionClaudeBilling == nil {
-				return errors.New("GLM Claude vision billing is unavailable")
+			if s.auxiliaryVisionClaudeBilling == nil {
+				return errors.New("Native vision billing is unavailable")
 			}
-			if err := s.glmVisionClaudeBilling.RecordUsage(ctx, &RecordUsageInput{
+			if err := s.auxiliaryVisionClaudeBilling.RecordUsage(ctx, &RecordUsageInput{
 				Result: vision.ClaudeResult, APIKey: input.APIKey, User: input.User,
 				Account: vision.Account, Subscription: input.Subscription, PricingAt: input.PricingAt,
 				InboundEndpoint: input.InboundEndpoint, UpstreamEndpoint: "/v1internal:streamGenerateContent",
@@ -172,7 +172,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 				RequestPayloadHash: input.RequestPayloadHash, APIKeyService: input.APIKeyService,
 				QuotaPlatform: PlatformAntigravity, ChannelUsageFields: ChannelUsageFields{OriginalModel: vision.ClaudeResult.Model},
 			}); err != nil {
-				return fmt.Errorf("record GLM Claude image analysis usage: %w", err)
+				return fmt.Errorf("record Native image analysis usage: %w", err)
 			}
 			continue
 		}
@@ -182,7 +182,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		auxiliary.UpstreamEndpoint = "/v1/chat/completions"
 		auxiliary.ChannelUsageFields = ChannelUsageFields{OriginalModel: vision.Result.Model}
 		if err := s.RecordUsage(ctx, &auxiliary); err != nil {
-			return fmt.Errorf("record GLM image analysis usage: %w", err)
+			return fmt.Errorf("record Auxiliary image analysis usage: %w", err)
 		}
 	}
 	if s.rateLimitService != nil && input.Account != nil && input.Account.Platform == PlatformOpenAI {

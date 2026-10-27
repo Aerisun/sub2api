@@ -12,13 +12,13 @@ import (
 func TestHistoricalImagesNeverTriggerVisionWhileNewImagesRemain(t *testing.T) {
 	for _, model := range []string{"Nemotron-3.5", "glm-5.2", "glm-5.3", "glm-5.3-flash", "step-5-preview", "qwen3.8-flash", "qwen3.8-max", "kimi-k3", "deepseek-v4.1-flash"} {
 		for _, protocol := range []string{"chat", "messages", "responses"} {
-			account, _, _, _ := glmVisionFixture()
+			account, _, _, _ := auxiliaryVisionFixture()
 			account.Extra["nvidia_image_tool"] = "deepseek"
 			body := []byte(`{"model":"` + model + `","messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"https://old.example/image.png"},"cache_control":{"type":"ephemeral"}}]},{"role":"assistant","content":"图片是红色三角形"},{"role":"user","content":"给我一段代码"}]}`)
 			got, err := prepareDomesticChatControls(body, body, model, protocol, account)
 			require.NoError(t, err)
 			require.NotContains(t, string(got), "old.example")
-			require.False(t, glmRequestHasImageInput(account, got))
+			require.False(t, auxiliaryRequestHasImageInput(account, got))
 			require.Contains(t, string(got), "图片是红色三角形")
 			require.NotContains(t, string(got), "do not re-analyze")
 			require.NotContains(t, string(got), "Historical image omitted")

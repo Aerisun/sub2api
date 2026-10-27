@@ -26,30 +26,32 @@ func TestVisionDescriptionIsContentWithoutRoutingInstructions(t *testing.T) {
 		map[string]any{"type": "text", "text": "分析这张框架图"},
 		map[string]any{"type": "image_url", "image_url": map[string]any{"url": url}},
 	}}}}
-	rewriteGLMImagesAsText(payload, map[string]string{glmImageDigest(url): "Ego-Pi 框架包含视觉编码器和动作解码器。"})
+	rewriteAuxiliaryImagesAsText(payload, map[string]string{auxiliaryImageDigest(url): "Ego-Pi 框架包含视觉编码器和动作解码器。"})
 	parts := payload["messages"].([]any)[0].(map[string]any)["content"].([]any)
 	require.Equal(t, "分析这张框架图", parts[0].(map[string]any)["text"])
 	require.Equal(t, "图片内容：\nEgo-Pi 框架包含视觉编码器和动作解码器。", parts[1].(map[string]any)["text"])
 }
 
-type glmVisionAccountRepo struct {
+type auxiliaryVisionAccountRepo struct {
 	AccountRepository
 	account  *Account
 	accounts map[int64]*Account
 }
 
-func (r glmVisionAccountRepo) GetByID(_ context.Context, id int64) (*Account, error) {
+func (r auxiliaryVisionAccountRepo) GetByID(_ context.Context, id int64) (*Account, error) {
 	if r.accounts != nil {
 		return r.accounts[id], nil
 	}
 	return r.account, nil
 }
 
-func glmVisionFixture() (*Account, *Account, *OpenAIGatewayService, *httpUpstreamRecorder) {
+func auxiliaryVisionFixture() (*Account, *Account, *OpenAIGatewayService, *httpUpstreamRecorder) {
 	account := forceChatMessagesFallbackAccount()
 	account.ID = 9
-	account.Extra["glm_image_bridge_account_id"] = 5
-	account.Extra["glm_image_bridge_model"] = "kimi-k3"
+	account.Extra["nvidia_image_tool"] = "configured"
+	account.Credentials["model_mapping"] = map[string]any{"Nemotron-3.5": "nvidia/nemotron-3.5-lightning-30b-a3b"}
+	account.Extra["image_bridge_account_id"] = 5
+	account.Extra["image_bridge_model"] = "kimi-k3"
 	vision := &Account{ID: 5, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
 		Status: StatusActive, Schedulable: true, Credentials: map[string]any{
 			"base_url": "https://vision.example", "api_key": "vision-test-key",
@@ -57,7 +59,7 @@ func glmVisionFixture() (*Account, *Account, *OpenAIGatewayService, *httpUpstrea
 	upstream := &httpUpstreamRecorder{resp: &http.Response{StatusCode: http.StatusOK,
 		Header: http.Header{"Content-Type": []string{"application/json"}},
 		Body:   io.NopCloser(strings.NewReader(`{"id":"vision-probe","object":"chat.completion","model":"kimi-k3","choices":[{"message":{"role":"assistant","content":"Red triangle, blue circle, number 4729."},"finish_reason":"stop"}],"usage":{"prompt_tokens":195,"completion_tokens":20,"total_tokens":215}}`))}}
-	svc := &OpenAIGatewayService{accountRepo: glmVisionAccountRepo{account: vision},
+	svc := &OpenAIGatewayService{accountRepo: auxiliaryVisionAccountRepo{account: vision},
 		cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
 	return account, vision, svc, upstream
 }
@@ -73,18 +75,18 @@ func (c *visionSlotCounter) AcquireAccountSlot(context.Context, int64, int, stri
 }
 func (c *visionSlotCounter) ReleaseAccountSlot(context.Context, int64, string) error { return nil }
 
-func TestVisionFlashLowSharesMainAccountSlotAndPreservesEffort(t *testing.T) {
+func TestAuxiliaryVisionSharesMainAccountSlotAndPreservesEffort(t *testing.T) {
 	for _, shared := range []bool{true, false} {
-		account, vision, svc, upstream := glmVisionFixture()
-		account.Extra["glm_image_bridge_reasoning_effort"] = "low"
-		vision.Credentials["model_mapping"] = map[string]any{"glm-5.3-flash": "z-ai/glm-5.3-flash"}
+		account, vision, svc, upstream := auxiliaryVisionFixture()
+		account.Extra["image_bridge_reasoning_effort"] = "low"
+		vision.Credentials["model_mapping"] = map[string]any{"kimi-k3": "moonshotai/kimi-k3"}
 		vision.Concurrency = 64
 		if shared {
 			account.ID = vision.ID
 		}
 		counter := &visionSlotCounter{}
 		svc.concurrencyService = NewConcurrencyService(counter)
-		_, usage, err := svc.describeGLMImageAttempt(context.Background(), account, vision.ID, "glm-5.3-flash", "data:image/png;base64,AAAA")
+		_, usage, err := svc.describeAuxiliaryImageAttempt(context.Background(), account, vision.ID, "kimi-k3", "data:image/png;base64,AAAA")
 		require.NoError(t, err)
 		if shared {
 			require.Zero(t, counter.acquires)
@@ -93,29 +95,19 @@ func TestVisionFlashLowSharesMainAccountSlotAndPreservesEffort(t *testing.T) {
 		}
 		require.Equal(t, "low", gjson.GetBytes(upstream.lastBody, "reasoning_effort").String())
 		require.NotEqual(t, "disabled", gjson.GetBytes(upstream.lastBody, "thinking.type").String())
-		require.Equal(t, "z-ai/glm-5.3-flash", gjson.GetBytes(upstream.lastBody, "model").String())
-		require.Equal(t, "glm-5.3-flash", usage.Result.BillingModel)
+		require.Equal(t, "moonshotai/kimi-k3", gjson.GetBytes(upstream.lastBody, "model").String())
+		require.Equal(t, "kimi-k3", usage.Result.BillingModel)
 		require.Equal(t, "low", *usage.Result.ReasoningEffort)
 	}
 }
 
-func TestVisionNativeFlashBypassesConfiguredAuxiliaryTool(t *testing.T) {
-	account, _, _, _ := glmVisionFixture()
-	account.Extra["nvidia_image_tool"] = "configured"
-	account.Extra["glm_flash_native_vision"] = true
-	require.True(t, glmImageBridgeEnabled(account, "Nemotron-3.5"))
-	require.True(t, glmImageBridgeEnabled(account, "glm-5.3"))
-	require.False(t, glmImageBridgeEnabled(account, "glm-5.3-flash"))
-	require.False(t, glmImageBridgeEnabled(account, "z-ai/glm-5.3-flash"))
-}
-
-func TestGLMImageBridgeNamespacedVisionPreservesBillingAlias(t *testing.T) {
+func TestAuxiliaryImageBridgeNamespacedVisionPreservesBillingAlias(t *testing.T) {
 	for _, name := range []string{"kimi-k3", "deepseek-v4.1-flash", "qwen3.8-flash"} {
 		t.Run(name, func(t *testing.T) {
-			account, vision, svc, upstream := glmVisionFixture()
+			account, vision, svc, upstream := auxiliaryVisionFixture()
 			mapped := "provider/" + name
 			vision.Credentials["model_mapping"] = map[string]any{name: mapped}
-			_, usage, err := svc.describeGLMImageAttempt(context.Background(), account, vision.ID, name, "data:image/png;base64,AAAA")
+			_, usage, err := svc.describeAuxiliaryImageAttempt(context.Background(), account, vision.ID, name, "data:image/png;base64,AAAA")
 			require.NoError(t, err)
 			require.Equal(t, mapped, gjson.GetBytes(upstream.lastBody, "model").String())
 			require.Equal(t, name, usage.Result.Model)
@@ -136,10 +128,10 @@ func TestGLMImageBridgeNamespacedVisionPreservesBillingAlias(t *testing.T) {
 func TestNemotronImageToolUsesDeepSeekAndPreservesPublicControls(t *testing.T) {
 	for _, protocol := range []string{"chat", "messages", "responses"} {
 		t.Run(protocol, func(t *testing.T) {
-			account, vision, svc, upstream := glmVisionFixture()
+			account, vision, svc, upstream := auxiliaryVisionFixture()
 			account.ID = 66
 			account.Extra["nvidia_image_tool"] = "deepseek"
-			account.Extra["glm_image_bridge_model"] = "deepseek-v4.1-flash"
+			account.Extra["image_bridge_model"] = "deepseek-v4.1-flash"
 			account.Credentials["model_mapping"] = map[string]any{"Nemotron-3.5": "nvidia/nemotron-3.5-lightning-30b-a3b"}
 			vision.Credentials["model_mapping"] = map[string]any{"deepseek-v4.1-flash": "deepseek/deepseek-v4.1-flash-1017"}
 			upstream.responses = []*http.Response{upstream.resp, {StatusCode: http.StatusOK,
@@ -169,24 +161,24 @@ func TestNemotronImageToolUsesDeepSeekAndPreservesPublicControls(t *testing.T) {
 			require.Contains(t, string(upstream.lastBody), "4729")
 			require.NotContains(t, string(upstream.lastBody), "image_url")
 			require.Equal(t, "max", gjson.GetBytes(upstream.lastBody, "reasoning_effort").String())
-			require.Len(t, result.GLMVisionUsage, 1)
-			require.Equal(t, "deepseek-v4.1-flash", result.GLMVisionUsage[0].Result.BillingModel)
-			require.Equal(t, "deepseek/deepseek-v4.1-flash-1017", result.GLMVisionUsage[0].Result.UpstreamModel)
+			require.Len(t, result.AuxiliaryVisionUsage, 1)
+			require.Equal(t, "deepseek-v4.1-flash", result.AuxiliaryVisionUsage[0].Result.BillingModel)
+			require.Equal(t, "deepseek/deepseek-v4.1-flash-1017", result.AuxiliaryVisionUsage[0].Result.UpstreamModel)
 			require.True(t, accountCodexModelSupportsImageInput(account, "Nemotron-3.5"))
-			require.False(t, glmImageBridgeEnabled(account, "step-5-preview"))
-			require.False(t, glmImageBridgeEnabled(account, "glm-5.3-flash"))
+			require.False(t, auxiliaryImageBridgeEnabled(account, "step-5-preview"))
+			require.False(t, auxiliaryImageBridgeEnabled(account, "kimi-k3"))
 		})
 	}
 }
 
-func TestGLMImageBridgePreservesControlsAndCachesDuplicates(t *testing.T) {
+func TestAuxiliaryImageBridgePreservesControlsAndCachesDuplicates(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	for _, model := range []string{"glm-5.2", "glm-5.3"} {
+	for _, model := range []string{"Nemotron-3.5"} {
 		t.Run(model, func(t *testing.T) {
-			account, _, svc, upstream := glmVisionFixture()
+			account, _, svc, upstream := auxiliaryVisionFixture()
 			c, _ := gin.CreateTestContext(httptest.NewRecorder())
 			body := []byte(`{"model":"` + model + `","stream":true,"thinking":{"type":"enabled","budget_tokens":2048},"reasoning_effort":"low","temperature":0.4,"tools":[{"type":"function","function":{"name":"test"}}],"messages":[{"role":"user","content":[{"type":"text","text":"Read the image"},{"type":"image_url","image_url":{"url":"data:image/png;base64,AAAA"}},{"type":"image_url","image_url":{"url":"data:image/png;base64,AAAA"}},{"type":"file","file":{"file_id":"keep"}}]}]}`)
-			got, err := svc.bridgeGLMImageInputs(context.Background(), c, account, body)
+			got, err := svc.bridgeAuxiliaryImageInputs(context.Background(), c, account, body)
 			require.NoError(t, err)
 			require.Len(t, upstream.requests, 1)
 			require.Equal(t, "vision.example", upstream.lastReq.URL.Host)
@@ -198,17 +190,17 @@ func TestGLMImageBridgePreservesControlsAndCachesDuplicates(t *testing.T) {
 			require.Contains(t, gjson.GetBytes(got, "messages.0.content.1.text").String(), "4729")
 			require.Contains(t, gjson.GetBytes(got, "messages.0.content.2.text").String(), "4729")
 			require.Equal(t, "keep", gjson.GetBytes(got, "messages.0.content.3.file.file_id").String())
-			replayed, err := svc.bridgeGLMImageInputs(context.Background(), c, account, body)
+			replayed, err := svc.bridgeAuxiliaryImageInputs(context.Background(), c, account, body)
 			require.NoError(t, err)
 			require.Equal(t, got, replayed)
 			require.Len(t, upstream.requests, 1)
 			result := &OpenAIForwardResult{}
-			attachGLMVisionUsage(c, result)
-			require.Len(t, result.GLMVisionUsage, 1)
-			require.Equal(t, int64(5), result.GLMVisionUsage[0].Account.ID)
-			require.Equal(t, 195, result.GLMVisionUsage[0].Result.Usage.InputTokens)
-			require.Equal(t, 20, result.GLMVisionUsage[0].Result.Usage.OutputTokens)
-			id := result.GLMVisionUsage[0].Result.RequestID
+			attachAuxiliaryVisionUsage(c, result)
+			require.Len(t, result.AuxiliaryVisionUsage, 1)
+			require.Equal(t, int64(5), result.AuxiliaryVisionUsage[0].Account.ID)
+			require.Equal(t, 195, result.AuxiliaryVisionUsage[0].Result.Usage.InputTokens)
+			require.Equal(t, 20, result.AuxiliaryVisionUsage[0].Result.Usage.OutputTokens)
+			id := result.AuxiliaryVisionUsage[0].Result.RequestID
 			billingCtx := context.WithValue(context.Background(), ctxkey.ClientRequestID, "parent-request")
 			require.Equal(t, id, resolveUsageBillingRequestID(billingCtx, id))
 			require.True(t, accountCodexModelSupportsImageInput(account, model))
@@ -216,18 +208,18 @@ func TestGLMImageBridgePreservesControlsAndCachesDuplicates(t *testing.T) {
 	}
 }
 
-type glmVisionUsageLogRecorder struct {
+type auxiliaryVisionUsageLogRecorder struct {
 	openAIRecordUsageLogRepoStub
 	logs []*UsageLog
 }
 
-func (r *glmVisionUsageLogRecorder) Create(ctx context.Context, log *UsageLog) (bool, error) {
+func (r *auxiliaryVisionUsageLogRecorder) Create(ctx context.Context, log *UsageLog) (bool, error) {
 	r.logs = append(r.logs, log)
 	return r.openAIRecordUsageLogRepoStub.Create(ctx, log)
 }
 
-func TestGLMImageBridgeBillingUsesSeparateModelAndRequestID(t *testing.T) {
-	repo := &glmVisionUsageLogRecorder{openAIRecordUsageLogRepoStub: openAIRecordUsageLogRepoStub{inserted: true}}
+func TestAuxiliaryImageBridgeBillingUsesSeparateModelAndRequestID(t *testing.T) {
+	repo := &auxiliaryVisionUsageLogRecorder{openAIRecordUsageLogRepoStub: openAIRecordUsageLogRepoStub{inserted: true}}
 	users := &openAIRecordUsageUserRepoStub{}
 	svc := newOpenAIRecordUsageServiceForTest(repo, users, &openAIRecordUsageSubRepoStub{}, nil)
 	cheap, expensive, _, _ := orderedResponseBillingModels(t, svc.billingService,
@@ -236,8 +228,8 @@ func TestGLMImageBridgeBillingUsesSeparateModelAndRequestID(t *testing.T) {
 	err := svc.RecordUsage(ctx, &OpenAIRecordUsageInput{
 		Result: &OpenAIForwardResult{RequestID: "primary", Model: expensive,
 			Usage: OpenAIUsage{InputTokens: 20, OutputTokens: 10},
-			GLMVisionUsage: []glmVisionUsage{{Account: &Account{ID: 5},
-				Result: &OpenAIForwardResult{RequestID: "glm-vision:auxiliary", Model: cheap,
+			AuxiliaryVisionUsage: []auxiliaryVisionUsage{{Account: &Account{ID: 5},
+				Result: &OpenAIForwardResult{RequestID: "vision-bridge:auxiliary", Model: cheap,
 					BillingModel: cheap, UpstreamModel: cheap, Usage: OpenAIUsage{InputTokens: 20, OutputTokens: 10}}}}},
 		APIKey: &APIKey{ID: 10}, User: &User{ID: 20}, Account: &Account{ID: 9},
 		ChannelUsageFields: ChannelUsageFields{OriginalModel: expensive, ChannelMappedModel: expensive,
@@ -246,7 +238,7 @@ func TestGLMImageBridgeBillingUsesSeparateModelAndRequestID(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, repo.logs, 2)
 	require.Equal(t, 2, users.deductCalls)
-	require.Equal(t, "glm-vision:auxiliary", repo.logs[0].RequestID)
+	require.Equal(t, "vision-bridge:auxiliary", repo.logs[0].RequestID)
 	require.Equal(t, "client:parent-request", repo.logs[1].RequestID)
 	require.Equal(t, cheap, repo.logs[0].Model)
 	require.Equal(t, cheap, repo.logs[0].RequestedModel)
@@ -256,49 +248,49 @@ func TestGLMImageBridgeBillingUsesSeparateModelAndRequestID(t *testing.T) {
 	require.Less(t, repo.logs[0].ActualCost, repo.logs[1].ActualCost)
 }
 
-func TestGLMImageBridgeFailureDoesNotSendImageToTextModel(t *testing.T) {
-	account, _, svc, upstream := glmVisionFixture()
+func TestAuxiliaryImageBridgeFailureDoesNotSendImageToTextModel(t *testing.T) {
+	account, _, svc, upstream := auxiliaryVisionFixture()
 	upstream.resp.StatusCode = http.StatusBadGateway
-	body := []byte(`{"model":"glm-5.2","messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"https://example.com/test.png"}}]}]}`)
-	got, err := svc.bridgeGLMImageInputs(context.Background(), nil, account, body)
+	body := []byte(`{"model":"Nemotron-3.5","messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"https://example.com/test.png"}}]}]}`)
+	got, err := svc.bridgeAuxiliaryImageInputs(context.Background(), nil, account, body)
 	wrong := &Account{ID: 1, Platform: PlatformOpenAI}
 	require.Error(t, err)
 	require.Nil(t, got)
-	unchanged, err := svc.bridgeGLMImageInputs(context.Background(), nil, wrong, body)
+	unchanged, err := svc.bridgeAuxiliaryImageInputs(context.Background(), nil, wrong, body)
 	require.NoError(t, err)
 	require.Equal(t, body, unchanged)
 }
 
-func TestForwardAsAnthropic_GLMImageBridge(t *testing.T) {
+func TestForwardAsAnthropic_AuxiliaryImageBridge(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	account, _, svc, upstream := glmVisionFixture()
-	account.Credentials["model_mapping"] = map[string]any{"glm-5.2": "glm-5.2"}
+	account, _, svc, upstream := auxiliaryVisionFixture()
+	account.Credentials["model_mapping"] = map[string]any{"Nemotron-3.5": "Nemotron-3.5"}
 	upstream.responses = []*http.Response{upstream.resp, {StatusCode: http.StatusOK,
-		Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"id":"glm-probe","object":"chat.completion","model":"glm-5.2","choices":[{"message":{"role":"assistant","content":"4729"},"finish_reason":"stop"}],"usage":{"prompt_tokens":50,"completion_tokens":2,"total_tokens":52}}`))}}
+		Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"id":"text-probe","object":"chat.completion","model":"Nemotron-3.5","choices":[{"message":{"role":"assistant","content":"4729"},"finish_reason":"stop"}],"usage":{"prompt_tokens":50,"completion_tokens":2,"total_tokens":52}}`))}}
 	upstream.resp = nil
-	body := []byte(`{"model":"glm-5.2","max_tokens":128,"output_config":{"effort":"high"},"messages":[{"role":"user","content":[{"type":"text","text":"Read the number"},{"type":"image","source":{"type":"base64","media_type":"image/png","data":"AAAA"}}]}]}`)
+	body := []byte(`{"model":"Nemotron-3.5","max_tokens":128,"output_config":{"effort":"high"},"messages":[{"role":"user","content":[{"type":"text","text":"Read the number"},{"type":"image","source":{"type":"base64","media_type":"image/png","data":"AAAA"}}]}]}`)
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", bytes.NewReader(body))
 	result, err := svc.ForwardAsAnthropic(context.Background(), c, account, body, "", "")
 	require.NoError(t, err)
 	require.Len(t, upstream.requests, 2)
-	require.Equal(t, "disabled", gjson.GetBytes(upstream.lastBody, "thinking.type").String())
-	require.Equal(t, "none", gjson.GetBytes(upstream.lastBody, "reasoning_effort").String())
+	require.False(t, gjson.GetBytes(upstream.lastBody, "thinking.type").Exists())
+	require.Equal(t, "high", gjson.GetBytes(upstream.lastBody, "reasoning_effort").String())
 	require.Contains(t, string(upstream.lastBody), "4729")
 	require.NotContains(t, string(upstream.lastBody), "image_url")
-	require.Len(t, result.GLMVisionUsage, 1)
-	require.Equal(t, "kimi-k3", result.GLMVisionUsage[0].Result.Model)
+	require.Len(t, result.AuxiliaryVisionUsage, 1)
+	require.Equal(t, "kimi-k3", result.AuxiliaryVisionUsage[0].Result.Model)
 	require.Equal(t, 50, result.Usage.InputTokens)
 }
 
-type glmClaudeVisionForwarderStub struct {
+type nativeVisionBridgeForwarderStub struct {
 	body       []byte
 	accountID  int64
 	models     []string
 	failGemini bool
 }
 
-func (f *glmClaudeVisionForwarderStub) ForwardAsChatCompletions(ctx context.Context, c *gin.Context, account *Account, body []byte, _ *ParsedRequest) (*ForwardResult, error) {
+func (f *nativeVisionBridgeForwarderStub) ForwardAsChatCompletions(ctx context.Context, c *gin.Context, account *Account, body []byte, _ *ParsedRequest) (*ForwardResult, error) {
 	f.body, f.accountID = body, account.ID
 	model := gjson.GetBytes(body, "model").String()
 	f.models = append(f.models, model)
@@ -309,24 +301,24 @@ func (f *glmClaudeVisionForwarderStub) ForwardAsChatCompletions(ctx context.Cont
 	return &ForwardResult{Model: model, Usage: ClaudeUsage{InputTokens: 150, OutputTokens: 20, CacheReadInputTokens: 50}}, nil
 }
 
-func TestGLMImageBridgeGeminiLowThenSonnetFallback(t *testing.T) {
+func TestAuxiliaryImageBridgeGeminiLowThenSonnetFallback(t *testing.T) {
 	for _, fail := range []bool{false, true} {
 		t.Run(fmt.Sprintf("primary_failure_%v", fail), func(t *testing.T) {
-			account, primary, svc, _ := glmVisionFixture()
+			account, primary, svc, _ := auxiliaryVisionFixture()
 			primary.ID, primary.Platform, primary.Type = 1, PlatformAntigravity, AccountTypeOAuth
 			primary.Credentials["model_mapping"] = map[string]any{"gemini-3.8-flash": "gemini-3.8-flash-low"}
 			fallback := *primary
 			fallback.ID = 3
 			fallback.Credentials = map[string]any{"model_mapping": map[string]any{"claude-sonnet-4-6": "claude-sonnet-4-6"}}
-			account.Extra["glm_image_bridge_account_id"] = 1
-			account.Extra["glm_image_bridge_model"] = "gemini-3.8-flash"
-			account.Extra["glm_image_bridge_fallback_account_id"] = 3
-			account.Extra["glm_image_bridge_fallback_model"] = "claude-sonnet-4-6"
-			svc.accountRepo = glmVisionAccountRepo{accounts: map[int64]*Account{1: primary, 3: &fallback}}
-			forwarder := &glmClaudeVisionForwarderStub{failGemini: fail}
-			svc.ConfigureGLMClaudeVision(forwarder, &GatewayService{})
+			account.Extra["image_bridge_account_id"] = 1
+			account.Extra["image_bridge_model"] = "gemini-3.8-flash"
+			account.Extra["image_bridge_fallback_account_id"] = 3
+			account.Extra["image_bridge_fallback_model"] = "claude-sonnet-4-6"
+			svc.accountRepo = auxiliaryVisionAccountRepo{accounts: map[int64]*Account{1: primary, 3: &fallback}}
+			forwarder := &nativeVisionBridgeForwarderStub{failGemini: fail}
+			svc.ConfigureNativeVisionBridge(forwarder, &GatewayService{})
 			uri := "data:image/png;base64," + base64.StdEncoding.EncodeToString([]byte("\x89PNG\r\n\x1a\nfixture"))
-			description, usage, err := svc.describeGLMImage(context.Background(), account, uri)
+			description, usage, err := svc.describeAuxiliaryImage(context.Background(), account, uri)
 			require.NoError(t, err)
 			require.Contains(t, description, "4729")
 			if fail {
@@ -343,55 +335,55 @@ func TestGLMImageBridgeGeminiLowThenSonnetFallback(t *testing.T) {
 	}
 }
 
-func TestGLMImageBridgeNativeSonnetNoneDisablesThinking(t *testing.T) {
-	account, vision, svc, _ := glmVisionFixture()
+func TestAuxiliaryImageBridgeNativeSonnetNoneDisablesThinking(t *testing.T) {
+	account, vision, svc, _ := auxiliaryVisionFixture()
 	vision.ID, vision.Platform, vision.Type = 3, PlatformAntigravity, AccountTypeOAuth
 	vision.Credentials = newAntigravityCompatAccount(AccountTypeOAuth).Credentials
-	account.Extra["glm_image_bridge_account_id"] = 3
-	account.Extra["glm_image_bridge_model"] = "claude-sonnet-4-6"
-	account.Extra["glm_image_bridge_reasoning_effort"] = "none"
+	account.Extra["image_bridge_account_id"] = 3
+	account.Extra["image_bridge_model"] = "claude-sonnet-4-6"
+	account.Extra["image_bridge_reasoning_effort"] = "none"
 	upstream := &httpUpstreamRecorder{resp: antigravityCompatSuccessResponse()}
 	native := newAntigravityCompatService(rawChatCompletionsTestConfig().Gateway, upstream)
-	svc.ConfigureGLMClaudeVision(native, &GatewayService{})
+	svc.ConfigureNativeVisionBridge(native, &GatewayService{})
 	uri := "data:image/png;base64," + base64.StdEncoding.EncodeToString([]byte("\x89PNG\r\n\x1a\nfixture"))
-	_, _, err := svc.describeGLMImage(context.Background(), account, uri)
+	_, _, err := svc.describeAuxiliaryImage(context.Background(), account, uri)
 	require.NoError(t, err)
 	require.Equal(t, int64(0), gjson.GetBytes(upstream.lastBody, "request.generationConfig.thinkingConfig.thinkingBudget").Int())
 	require.False(t, gjson.GetBytes(upstream.lastBody, "request.generationConfig.thinkingConfig.includeThoughts").Bool())
 	require.Equal(t, int64(4096), gjson.GetBytes(upstream.lastBody, "request.generationConfig.maxOutputTokens").Int())
 }
 
-func TestGLMImageBridgeKeepaliveDoesNotBlockFailover(t *testing.T) {
-	account, _, _, _ := glmVisionFixture()
+func TestAuxiliaryImageBridgeKeepaliveDoesNotBlockFailover(t *testing.T) {
+	account, _, _, _ := auxiliaryVisionFixture()
 	c, rec := newAntigravityCompatContext(http.MethodPost, "/v1/messages", nil)
-	state := glmVisionRequestState(c)
+	state := auxiliaryVisionRequestState(c)
 	state.KeepaliveStarted = true
 	stop := startOpenAISSEKeepalive(c, 5*time.Millisecond)
 	time.Sleep(20 * time.Millisecond)
 	stop()
 	require.Contains(t, rec.Body.String(), ": keepalive\n\n")
 	require.Equal(t, -1, OpenAICompactKeepaliveAdjustedWrittenSize(c))
-	body := []byte(`{"model":"glm-5.3","messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"data:image/png;base64,AAAA"}}]}]}`)
-	startGLMVisionKeepalive(c, account, body, true)()
+	body := []byte(`{"model":"Nemotron-3.5","messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"data:image/png;base64,AAAA"}}]}]}`)
+	startAuxiliaryVisionKeepalive(c, account, body, true)()
 	require.Equal(t, -1, OpenAICompactKeepaliveAdjustedWrittenSize(c))
 }
 
-func TestGLMImageBridgeSilentBodyReadIsBounded(t *testing.T) {
+func TestAuxiliaryImageBridgeSilentBodyReadIsBounded(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	inner := newContextBoundBlockingReadCloser(nil)
 	inner.ctx = ctx
-	reader := &glmVisionIdleReadCloser{ReadCloser: inner, cancel: cancel, idle: 10 * time.Millisecond}
+	reader := &auxiliaryVisionIdleReadCloser{ReadCloser: inner, cancel: cancel, idle: 10 * time.Millisecond}
 	_, err := reader.Read(make([]byte, 1))
 	require.ErrorIs(t, err, context.Canceled)
 	require.NoError(t, reader.Close())
 }
 
-func TestGLMImageBridgeErrorsAfterKeepaliveTerminateInProtocol(t *testing.T) {
+func TestAuxiliaryImageBridgeErrorsAfterKeepaliveTerminateInProtocol(t *testing.T) {
 	for _, path := range []string{"/v1/messages", "/v1/chat/completions", "/v1/responses"} {
 		t.Run(path, func(t *testing.T) {
 			c, rec := newAntigravityCompatContext(http.MethodPost, path, nil)
-			glmVisionRequestState(c).KeepaliveStarted = true
+			auxiliaryVisionRequestState(c).KeepaliveStarted = true
 			stop := startOpenAISSEKeepalive(c, time.Hour)
 			value, _ := c.Get(openAICompactSSEKeepaliveKey)
 			require.True(t, value.(*openAICompactSSEKeepalive).beat())
@@ -409,21 +401,21 @@ func TestGLMImageBridgeErrorsAfterKeepaliveTerminateInProtocol(t *testing.T) {
 	}
 }
 
-func TestGLMImageBridgeUsesNativeClaudeAndBillsCacheTokensSeparately(t *testing.T) {
-	account, vision, svc, _ := glmVisionFixture()
-	account.Extra["glm_image_bridge_account_id"] = 3
-	account.Extra["glm_image_bridge_model"] = "claude-sonnet-4-6"
+func TestAuxiliaryImageBridgeUsesNativeClaudeAndBillsCacheTokensSeparately(t *testing.T) {
+	account, vision, svc, _ := auxiliaryVisionFixture()
+	account.Extra["image_bridge_account_id"] = 3
+	account.Extra["image_bridge_model"] = "claude-sonnet-4-6"
 	vision.ID, vision.Platform, vision.Type = 3, PlatformAntigravity, AccountTypeOAuth
 	vision.Credentials["model_mapping"] = map[string]any{"claude-sonnet-4-6": "claude-sonnet-4-6"}
-	forwarder := &glmClaudeVisionForwarderStub{}
-	repo := &glmVisionUsageLogRecorder{openAIRecordUsageLogRepoStub: openAIRecordUsageLogRepoStub{inserted: true}}
+	forwarder := &nativeVisionBridgeForwarderStub{}
+	repo := &auxiliaryVisionUsageLogRecorder{openAIRecordUsageLogRepoStub: openAIRecordUsageLogRepoStub{inserted: true}}
 	users := &openAIRecordUsageUserRepoStub{}
 	billing := newGatewayRecordUsageServiceForTest(repo, users, &openAIRecordUsageSubRepoStub{})
-	svc.ConfigureGLMClaudeVision(forwarder, billing)
+	svc.ConfigureNativeVisionBridge(forwarder, billing)
 	// Minimal PNG signature suffices for the downloader's format sniffing.
 	imageURL := "data:image/png;base64," + base64.StdEncoding.EncodeToString([]byte("\x89PNG\r\n\x1a\nimage fixture"))
-	check := func(url string) glmVisionUsage {
-		description, usage, err := svc.describeGLMImage(context.Background(), account, url)
+	check := func(url string) auxiliaryVisionUsage {
+		description, usage, err := svc.describeAuxiliaryImage(context.Background(), account, url)
 		require.NoError(t, err)
 		require.Contains(t, description, "4729")
 		require.Equal(t, int64(3), forwarder.accountID)
@@ -438,7 +430,7 @@ func TestGLMImageBridgeUsesNativeClaudeAndBillsCacheTokensSeparately(t *testing.
 	data, _ := base64.StdEncoding.DecodeString(strings.SplitN(imageURL, ",", 2)[1])
 	svc.httpUpstream = &httpUpstreamRecorder{resp: &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(bytes.NewReader(data))}}
 	check("https://images.example.test/fixture.png")
-	_, _, err := svc.describeGLMImage(context.Background(), account, "http://127.0.0.1/image.png")
+	_, _, err := svc.describeAuxiliaryImage(context.Background(), account, "http://127.0.0.1/image.png")
 	require.Error(t, err)
 	svc.billingService = billing.billingService
 	svc.usageLogRepo, svc.userRepo, svc.userSubRepo = repo, users, &openAIRecordUsageSubRepoStub{}
@@ -446,7 +438,7 @@ func TestGLMImageBridgeUsesNativeClaudeAndBillsCacheTokensSeparately(t *testing.
 	svc.cfg.Default.RateMultiplier = 1.1
 	ctx := context.WithValue(context.Background(), ctxkey.ClientRequestID, "same-client-id")
 	err = svc.RecordUsage(ctx, &OpenAIRecordUsageInput{
-		Result: &OpenAIForwardResult{RequestID: "primary", Model: openAICheapFixtureModel, Usage: OpenAIUsage{InputTokens: 20, OutputTokens: 10}, GLMVisionUsage: []glmVisionUsage{usage}},
+		Result: &OpenAIForwardResult{RequestID: "primary", Model: openAICheapFixtureModel, Usage: OpenAIUsage{InputTokens: 20, OutputTokens: 10}, AuxiliaryVisionUsage: []auxiliaryVisionUsage{usage}},
 		APIKey: &APIKey{ID: 10}, User: &User{ID: 20}, Account: account,
 		ChannelUsageFields: ChannelUsageFields{OriginalModel: openAICheapFixtureModel},
 	})
@@ -462,7 +454,7 @@ func TestGLMImageBridgeUsesNativeClaudeAndBillsCacheTokensSeparately(t *testing.
 	require.Positive(t, repo.logs[0].ActualCost)
 }
 
-func TestGLMImageBridgeAcceptsPaddedAndUnpaddedBase64Images(t *testing.T) {
+func TestAuxiliaryImageBridgeAcceptsPaddedAndUnpaddedBase64Images(t *testing.T) {
 	for _, content := range []string{"a", "ab", "abc"} {
 		encoded := base64.StdEncoding.EncodeToString([]byte(content))
 		for _, input := range []string{encoded, strings.TrimRight(encoded, "="), "data:image/png;base64," + encoded} {
@@ -474,12 +466,12 @@ func TestGLMImageBridgeAcceptsPaddedAndUnpaddedBase64Images(t *testing.T) {
 	}
 }
 
-func TestGLMImageBridgeFallbackUsesNativeChatForGLMOnly(t *testing.T) {
-	account, _, _, _ := glmVisionFixture()
+func TestAuxiliaryImageBridgeFallbackUsesNativeChatForConfiguredTextModel(t *testing.T) {
+	account, _, _, _ := auxiliaryVisionFixture()
 	account.Extra["openai_responses_mode"] = "auto"
 	account.Extra["openai_responses_supported"] = true
 	require.False(t, shouldForwardOpenAIResponsesViaRawChatCompletions(account))
-	for _, model := range []string{"glm-5.2", "glm-5.3"} {
+	for _, model := range []string{"Nemotron-3.5"} {
 		require.True(t, shouldForwardOpenAIResponsesViaRawChatCompletionsForBody(account, []byte(`{"model":"`+model+`"}`)))
 	}
 	require.False(t, shouldForwardOpenAIResponsesViaRawChatCompletionsForBody(account, []byte(`{"model":"gpt-5.1"}`)))

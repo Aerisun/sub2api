@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGLMVisionMessagesHeartbeatGetsTerminalErrorAndStillAllowsFailover(t *testing.T) {
+func TestAuxiliaryVisionMessagesHeartbeatGetsTerminalErrorAndStillAllowsFailover(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)

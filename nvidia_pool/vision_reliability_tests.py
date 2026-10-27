@@ -141,12 +141,12 @@ class VisionRelayTests(NvidiaRelayTests):
     def test_actual_private_vision_models_use_configured_image_deadlines(self):
         self.vision_policy()
         for model in ('nvidia/nemotron-3.5-super-vl-120b-a12b',
-                      'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', 'z-ai/glm-5.3-flash'):
+                      'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning'):
             body={'model':model,'metadata':{'aerisun_vision_helper':True},'messages':[
                 {'role':'user','content':[{'type':'image_url','image_url':{'url':'data:image/png;base64,fixture'}}]}]}
             with self.subTest(model=model):
                 policy=self.relay.request_policy(body)
-                self.assertEqual(policy['pre_output_timeout'],.8 if model=='z-ai/glm-5.3-flash' else .4)
+                self.assertEqual(policy['pre_output_timeout'],.4)
                 self.assertEqual(policy['first_event_seconds'],.4)
                 self.assertEqual(self.relay.request_options(time.monotonic()+1,body)['timeout'].read,.4)
 

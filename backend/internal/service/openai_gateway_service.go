@@ -295,8 +295,8 @@ type OpenAIForwardResult struct {
 	// SearchCount is Grok-native web_search / tool search call count (per 1k pricing).
 	SearchCount int
 	// AudioUsage carries Voice billing units when present.
-	AudioUsage     *AudioUsage
-	GLMVisionUsage []glmVisionUsage
+	AudioUsage           *AudioUsage
+	AuxiliaryVisionUsage []auxiliaryVisionUsage
 
 	wsReplayInput                []json.RawMessage
 	wsReplayInputExists          bool
@@ -444,37 +444,37 @@ var ErrNoAvailableCompactAccounts = errors.New("no available accounts support /r
 
 // OpenAIGatewayService handles OpenAI API gateway operations
 type OpenAIGatewayService struct {
-	glmVisionClaudeForwarder glmClaudeVisionForwarder
-	glmVisionClaudeBilling   glmClaudeVisionBilling
-	glmVisionDescriptions    glmVisionDescriptionCache
-	accountRepo              AccountRepository
-	usageLogRepo             UsageLogRepository
-	usageBillingRepo         UsageBillingRepository
-	userRepo                 UserRepository
-	userSubRepo              UserSubscriptionRepository
-	cache                    GatewayCache
-	cfg                      *config.Config
-	codexDetector            CodexClientRestrictionDetector
-	schedulerSnapshot        *SchedulerSnapshotService
-	concurrencyService       *ConcurrencyService
-	billingService           *BillingService
-	rateLimitService         *RateLimitService
-	billingCacheService      *BillingCacheService
-	userGroupRateResolver    *userGroupRateResolver
-	httpUpstream             HTTPUpstream
-	pluginManager            *PluginManager
-	deferredService          *DeferredService
-	openAITokenProvider      *OpenAITokenProvider
-	grokTokenProvider        *GrokTokenProvider
-	toolCorrector            *CodexToolCorrector
-	openaiWSResolver         OpenAIWSProtocolResolver
-	resolver                 *ModelPricingResolver
-	channelService           *ChannelService
-	balanceNotifyService     *BalanceNotifyService
-	settingService           *SettingService
-	userPlatformQuotaRepo    UserPlatformQuotaRepository
-	liveAttestation          liveattestation.Provider
-	liveAttestationCipher    SecretEncryptor
+	auxiliaryVisionClaudeForwarder nativeVisionBridgeForwarder
+	auxiliaryVisionClaudeBilling   nativeVisionBridgeBilling
+	auxiliaryVisionDescriptions    auxiliaryVisionDescriptionCache
+	accountRepo                    AccountRepository
+	usageLogRepo                   UsageLogRepository
+	usageBillingRepo               UsageBillingRepository
+	userRepo                       UserRepository
+	userSubRepo                    UserSubscriptionRepository
+	cache                          GatewayCache
+	cfg                            *config.Config
+	codexDetector                  CodexClientRestrictionDetector
+	schedulerSnapshot              *SchedulerSnapshotService
+	concurrencyService             *ConcurrencyService
+	billingService                 *BillingService
+	rateLimitService               *RateLimitService
+	billingCacheService            *BillingCacheService
+	userGroupRateResolver          *userGroupRateResolver
+	httpUpstream                   HTTPUpstream
+	pluginManager                  *PluginManager
+	deferredService                *DeferredService
+	openAITokenProvider            *OpenAITokenProvider
+	grokTokenProvider              *GrokTokenProvider
+	toolCorrector                  *CodexToolCorrector
+	openaiWSResolver               OpenAIWSProtocolResolver
+	resolver                       *ModelPricingResolver
+	channelService                 *ChannelService
+	balanceNotifyService           *BalanceNotifyService
+	settingService                 *SettingService
+	userPlatformQuotaRepo          UserPlatformQuotaRepository
+	liveAttestation                liveattestation.Provider
+	liveAttestationCipher          SecretEncryptor
 
 	openaiWSPoolOnce               sync.Once
 	openaiWSStateStoreOnce         sync.Once

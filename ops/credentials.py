@@ -9,7 +9,7 @@ from ops.admin_api import ROOT, credentials
 def accounts(account_ids):
     if not account_ids or any(type(ident) is not int or ident <= 0 for ident in account_ids):
         raise ValueError('Account IDs must be positive integers')
-    settings, _ = credentials()
+    settings = credentials()
     environment = dict(os.environ, PGPASSWORD=settings['POSTGRES_PASSWORD'])
     sql = ("SELECT json_build_object('id',id,'credentials',credentials) FROM accounts WHERE id IN ("
            + ','.join(str(ident) for ident in account_ids)+") AND deleted_at IS NULL")

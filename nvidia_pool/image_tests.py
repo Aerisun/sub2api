@@ -29,12 +29,13 @@ class ImageUploadTests(unittest.TestCase):
 
     def test_native_four_image_request_preserves_controls_original_and_image_detail(self):
         url='data:image/png;base64,'+base64.b64encode(self.large).decode()
-        body={'model':'z-ai/glm-5.3-flash','reasoning_effort':'max','messages':[{'role':'user','content':[
+        body={'model':'nvidia/nemotron-3.5-super-vl-120b-a12b','reasoning_effort':'max','messages':[{'role':'user','content':[
             {'type':'image_url','image_url':{'url':url,'detail':'high'}} for _ in range(4)]}]}
         original=deepcopy(body);out=prepare_request(body)
         self.assertEqual(body,original)
-        self.assertEqual(out['reasoning_effort'],'max')
-        self.assertEqual(out['chat_template_kwargs']['reasoning_effort'],'max')
+        self.assertNotIn('reasoning_effort',out)
+        self.assertEqual(out['reasoning_budget'],32768)
+        self.assertTrue(out['chat_template_kwargs']['enable_thinking'])
         self.assertEqual(len(out['messages'][0]['content']),4)
         for part in out['messages'][0]['content']:
             self.assertEqual(part['image_url']['detail'],'high')

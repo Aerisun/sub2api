@@ -36,10 +36,10 @@ func (c *blockedStartupPricingClient) FetchPricingJSON(context.Context, string) 
 
 func TestPricingWarmStartupDoesNotWaitForRemoteAndPreservesOverrides(t *testing.T) {
 	dir := t.TempDir()
-	body := []byte(`{"glm-5.3":{"input_cost_per_token":0.000001,"output_cost_per_token":0.000002}}`)
+	body := []byte(`{"startup-price-fixture":{"input_cost_per_token":0.000001,"output_cost_per_token":0.000002}}`)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "model_pricing.json"), body, 0600))
 	override := filepath.Join(dir, "override.json")
-	require.NoError(t, os.WriteFile(override, []byte(`{"glm-5.3":{"input_cost_per_token":0.000003,"output_cost_per_token":0.000004}}`), 0600))
+	require.NoError(t, os.WriteFile(override, []byte(`{"startup-price-fixture":{"input_cost_per_token":0.000003,"output_cost_per_token":0.000004}}`), 0600))
 	hash := sha256.Sum256(body)
 	client := &blockedStartupPricingClient{started: make(chan struct{}), release: make(chan struct{}), hash: hex.EncodeToString(hash[:])}
 	svc := NewPricingService(&config.Config{Pricing: config.PricingConfig{
@@ -56,7 +56,7 @@ func TestPricingWarmStartupDoesNotWaitForRemoteAndPreservesOverrides(t *testing.
 	case <-time.After(time.Second):
 		t.Fatal("remote freshness check was dropped instead of running in the background")
 	}
-	pricing, found := svc.pricingData["glm-5.3"]
+	pricing, found := svc.pricingData["startup-price-fixture"]
 	require.True(t, found)
 	require.Equal(t, 0.000003, pricing.InputCostPerToken)
 	require.Equal(t, 0.000004, pricing.OutputCostPerToken)
