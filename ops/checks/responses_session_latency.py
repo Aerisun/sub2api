@@ -98,6 +98,10 @@ def run_turn(client, key, model, effort, tier, session, turns, index, stream_lin
                     kind = event.get('type', '')
                     event_names.add(kind)
                     elapsed = round((time.monotonic()-started)*1000)
+                    if kind == 'response.output_text.delta':
+                        # Preserve standalone newlines/spaces in the answer;
+                        # only the latency clock ignores empty semantic chunks.
+                        answer += event.get('delta', '')
                     if kind in ('response.output_text.delta', 'response.reasoning_summary_text.delta',
                                 'response.reasoning_text.delta') and event.get('delta', '').strip():
                         if row['first_semantic_ms'] is None:
@@ -108,7 +112,6 @@ def run_turn(client, key, model, effort, tier, session, turns, index, stream_lin
                         if kind == 'response.output_text.delta':
                             if row['first_text_ms'] is None:
                                 row['first_text_ms'] = elapsed
-                            answer += event['delta']
                     if kind == 'response.completed':
                         result = event.get('response') or {}
                         usage = result.get('usage') or {}
@@ -122,8 +125,13 @@ def run_turn(client, key, model, effort, tier, session, turns, index, stream_lin
         correct = (answer.split() == list(map(str, range(1, stream_lines+1)))
                    if stream_lines else answer.strip() == expected)
         row.update(answer_correct=correct,
+                   answer_characters=len(answer), answer_lines=len(answer.splitlines()),
                    ok=bool(correct and row.get('completed') and row.get('usage')
                            and row.get('response_model') == model))
+        if row.get('completed') and not row['ok'] and 'error_type' not in row:
+            row['error_type'] = 'unexpected_output' if not correct else 'unexpected_model_or_usage'
+        elif not row.get('completed') and 'error_type' not in row:
+            row['error_type'] = 'incomplete_stream'
     except (httpx.HTTPError, ValueError, TypeError, AttributeError) as error:
         row['error_type'] = type(error).__name__
     row.update(total_ms=round((time.monotonic()-started)*1000), event_types=sorted(event_names))
