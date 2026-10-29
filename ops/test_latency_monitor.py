@@ -70,6 +70,29 @@ class LatencyMonitorTests(unittest.TestCase):
         self.assertEqual(self.read()['model_observation_error'], 'TimeoutExpired')
         self.assertNotIn('private command', log.getvalue())
 
+    def test_cached_long_context_is_reported_separately_from_short_requests(self):
+        model = {'model':'fixture','samples':3,'context_bucket':'long','reasoning_effort':'xhigh',
+                 'min_context_tokens':200000,'max_context_tokens':210000,
+                 'first_event_p50_ms':11000,'first_event_p95_ms':20000}
+        with patch.object(latency_monitor,'measure',return_value=self.site()), \
+                patch.object(latency_monitor,'model_latency',return_value=[model]),redirect_stdout(StringIO()):
+            latency_monitor.main()
+        report = self.read()
+        self.assertEqual(report['slow_models'],[])
+        self.assertEqual(report['long_context_latency'],[model])
+        self.assertEqual(report['model_latency'],[model])
+
+    def test_slow_long_context_remains_visible_even_when_short_requests_are_healthy(self):
+        model = {'model':'fixture','samples':3,'context_bucket':'long','reasoning_effort':'xhigh',
+                 'first_event_p50_ms':20000,'first_event_p95_ms':45000}
+        with patch.object(latency_monitor,'measure',return_value=self.site()), \
+                patch.object(latency_monitor,'model_latency',return_value=[model]),redirect_stdout(StringIO()):
+            latency_monitor.main()
+        report = self.read()
+        self.assertEqual(report['state'],'degraded')
+        self.assertEqual(report['slow_long_context_models'],['fixture'])
+        self.assertEqual(report['slow_models'],[])
+
     def test_early_gateway_events_cannot_hide_a_slow_first_text(self):
         row = {'model': 'fixture', 'streaming': True, 'with_tools': False, 'samples': 3,
                'first_text_p95_ms': 17000, 'semantic_gap_p95_ms': 16000}

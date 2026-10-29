@@ -1,5 +1,6 @@
 """Regress subscription removal, model gating, and safe pool replacement."""
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import tempfile
 import unittest
@@ -9,12 +10,74 @@ import yaml
 
 from image_hub.proxy_qualifier import (choose_pool, eligible_nodes, fingerprint,
                                        install_pool, read_yaml, reconcile, qualification_due, probe_live_pools, stable_pool,
-                                       diverse_candidates)
+                                       diverse_candidates, publish_pool_generation, pool_generation_report)
 
 
 def node(name):
     return {'name': name, 'type': 'socks5', 'server': '127.0.0.1', 'port': 9,
             'password': 'private-fixture-password'}
+
+
+class PoolGenerationTests(unittest.TestCase):
+    def fixture(self, root, port):
+        pool = root / (str(port)+'-pool.yaml')
+        pool.write_text(yaml.safe_dump({'proxies': [node('primary'), node('fallback')]}))
+        proxy = root / (str(port)+'-proxy.yaml')
+        proxy.write_text(yaml.safe_dump({'mixed-port': port}))
+        return {'name': str(port), 'group': 'fixture', 'provider_file': str(pool),
+                'mihomo_config': str(proxy)}
+
+    def test_actual_selected_fallback_published_once_without_secrets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root/'routes.json'
+            config = {'upstream_route_state_file': str(path)}
+            role = self.fixture(root, 17995)
+            class Client:
+                selected = 'fallback'
+                def request(self, path):
+                    return {'now': self.selected}
+            client = Client()
+            self.assertTrue(publish_pool_generation(config, role, client))
+            before = path.stat().st_mtime_ns
+            value = json.loads(path.read_text())
+            self.assertEqual(value['routes']['http://127.0.0.1:17995'], fingerprint([node('fallback')]))
+            self.assertNotIn('private-fixture-password', path.read_text())
+            self.assertNotIn('fallback', path.read_text())
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            self.assertFalse(publish_pool_generation(config, role, client))
+            self.assertEqual(before, path.stat().st_mtime_ns)
+            client.selected = 'primary'
+            self.assertTrue(publish_pool_generation(config, role, client))
+            client.selected = 'not-qualified'
+            before = path.read_bytes()
+            self.assertFalse(publish_pool_generation(config, role, client))
+            self.assertEqual(before, path.read_bytes())
+            client.selected = 'primary'
+            path.write_text('{broken')
+            self.assertTrue(publish_pool_generation(config, role, client))
+            self.assertEqual(json.loads(path.read_text())['routes']['http://127.0.0.1:17995'],
+                             fingerprint([node('primary')]))
+
+    def test_concurrent_roles_merge_generations(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root/'routes.json'
+            config = {'upstream_route_state_file': str(path)}
+            roles = [self.fixture(root, port) for port in (17991, 17995)]
+            class Client:
+                def request(self, path):
+                    return {'now': 'primary'}
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                changed = list(pool.map(lambda role: publish_pool_generation(config, role, Client()), roles))
+            self.assertEqual(changed, [True, True])
+            self.assertEqual(set(json.loads(path.read_text())['routes']),
+                             {'http://127.0.0.1:17991', 'http://127.0.0.1:17995'})
+
+    def test_marker_failure_does_not_fail_network_recovery(self):
+        with patch('image_hub.proxy_qualifier.publish_pool_generation', side_effect=OSError('private fixture')):
+            result = pool_generation_report({}, {})
+        self.assertEqual(result, {'route_state_error_type': 'OSError'})
 
 
 OLD = node('ASIA-Singapore-18')

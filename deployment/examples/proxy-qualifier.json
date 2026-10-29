@@ -8,6 +8,7 @@
   "poll_seconds": 10,
   "debounce_seconds": 5,
   "state_file": "@ROOT@/data/proxy-qualifier-state.json",
+  "upstream_route_state_file": "@ROOT@/data/upstream-proxy-routes.json",
   "roles": [
     {
       "name": "gemini",

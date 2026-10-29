@@ -10,8 +10,46 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 )
+
+func TestLoggerRecordsRequestPhasesWithoutRequestContent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	sink := initMiddlewareTestLogger(t)
+	r := gin.New()
+	r.Use(Logger())
+	r.POST("/v1/responses", func(c *gin.Context) {
+		service.SetOpsLatencyMs(c, service.OpsAuthLatencyMsKey, 3)
+		service.SetOpsLatencyMs(c, service.OpsRoutingLatencyMsKey, 12)
+		service.SetOpsLatencyMs(c, service.OpsUpstreamLatencyMsKey, 280)
+		service.SetOpsLatencyMs(c, service.OpsResponseLatencyMsKey, 62000)
+		service.SetOpsLatencyMs(c, service.OpsTimeToFirstTokenMsKey, 12000)
+		c.Status(http.StatusOK)
+	})
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader("private-prompt-fixture"))
+	req.Header.Set("Authorization", "Bearer private-key-fixture")
+	r.ServeHTTP(w, req)
+	for _, event := range sink.list() {
+		if event == nil || event.Message != "http request completed" {
+			continue
+		}
+		for field, want := range map[string]int64{"auth_latency_ms": 3, "routing_latency_ms": 12,
+			"upstream_headers_ms": 280, "forward_duration_ms": 62000, "first_token_ms": 12000} {
+			if got, ok := event.Fields[field].(int64); !ok || got != want {
+				t.Fatalf("phase %s=%v, want %d", field, event.Fields[field], want)
+			}
+		}
+		for _, value := range event.Fields {
+			if text, ok := value.(string); ok && strings.Contains(text, "private-") {
+				t.Fatal("request content or authorization leaked into access log")
+			}
+		}
+		return
+	}
+	t.Fatal("request completion log missing")
+}
 
 type testLogSink struct {
 	mu     sync.Mutex

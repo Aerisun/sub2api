@@ -168,6 +168,7 @@ type httpUpstreamService struct {
 	clients map[string]*upstreamClientEntry // 客户端缓存池，key 由隔离策略决定
 	// OpenAI 走 HTTP/HTTPS 代理时的 H2->H1 回退状态（key=标准化 proxyKey）
 	openAIHTTP2Fallbacks sync.Map
+	proxyRoutes          *proxyRouteGenerations
 }
 
 // NewHTTPUpstream 创建通用 HTTP 上游服务
@@ -179,9 +180,14 @@ type httpUpstreamService struct {
 // 返回:
 //   - service.HTTPUpstream 接口实现
 func NewHTTPUpstream(cfg *config.Config) service.HTTPUpstream {
+	var routes *proxyRouteGenerations
+	if cfg != nil && cfg.Gateway.ProxyRouteStateFile != "" {
+		routes = newProxyRouteGenerations(cfg.Gateway.ProxyRouteStateFile)
+	}
 	return &httpUpstreamService{
-		cfg:     cfg,
-		clients: make(map[string]*upstreamClientEntry),
+		cfg:         cfg,
+		clients:     make(map[string]*upstreamClientEntry),
+		proxyRoutes: routes,
 	}
 }
 
@@ -566,7 +572,8 @@ func (s *httpUpstreamService) getClientEntryWithTLS(proxyURL string, accountID i
 	settings = s.applyProfilePoolSettings(settings, upstreamProfile)
 	// TLS 指纹客户端使用独立的缓存键，加 "tls:" 前缀
 	cacheKey := "tls:" + buildCacheKey(isolation, proxyKey, accountID, upstreamProtocolModeDefault)
-	poolKey := buildPoolKey(settings, upstreamProtocolModeDefault) + ":tls"
+	basePoolKey := buildPoolKey(settings, upstreamProtocolModeDefault) + ":tls"
+	poolKey := s.proxyRoutePoolKey(proxyKey, basePoolKey)
 
 	now := time.Now()
 	nowUnix := now.UnixNano()
@@ -586,6 +593,7 @@ func (s *httpUpstreamService) getClientEntryWithTLS(proxyURL string, accountID i
 
 	// 写锁慢路径
 	s.mu.Lock()
+	poolKey = s.proxyRoutePoolKey(proxyKey, basePoolKey)
 	if entry, ok := s.clients[cacheKey]; ok {
 		if s.shouldReuseEntry(entry, isolation, proxyKey, poolKey) {
 			atomic.StoreInt64(&entry.lastUsed, nowUnix)
@@ -735,7 +743,8 @@ func (s *httpUpstreamService) getClientEntry(proxyURL string, accountID int64, a
 	// 构建缓存键（根据隔离策略不同）
 	cacheKey := buildCacheKey(isolation, proxyKey, accountID, protocolMode)
 	// 构建连接池配置键（用于检测配置变更）
-	poolKey := buildPoolKey(settings, protocolMode)
+	basePoolKey := buildPoolKey(settings, protocolMode)
+	poolKey := s.proxyRoutePoolKey(proxyKey, basePoolKey)
 
 	now := time.Now()
 	nowUnix := now.UnixNano()
@@ -754,6 +763,7 @@ func (s *httpUpstreamService) getClientEntry(proxyURL string, accountID int64, a
 
 	// 写锁慢路径：创建或重建客户端
 	s.mu.Lock()
+	poolKey = s.proxyRoutePoolKey(proxyKey, basePoolKey)
 	if entry, ok := s.clients[cacheKey]; ok {
 		if s.shouldReuseEntry(entry, isolation, proxyKey, poolKey) {
 			atomic.StoreInt64(&entry.lastUsed, nowUnix)

@@ -62,9 +62,81 @@ def fingerprint(nodes):
     return hashlib.sha256(value.encode()).hexdigest()
 
 
-def controller(role):
+def publish_pool_generation(config, role, client=None):
+    """Publish the selected qualified exit; never touch active connections."""
+    filename = config.get('upstream_route_state_file')
+    if not filename:
+        return False
+    client = client or controller(role)
+    selected = client.request('/proxies/' + quote(role['group'], safe='')).get('now')
+    nodes = read_yaml(role['provider_file']).get('proxies', [])
+    node = next((node for node in nodes if node.get('name') == selected), None)
+    if node is None:
+        return False
+    proxy = read_yaml(role['mihomo_config'])
+    port = proxy.get('mixed-port')
+    if type(port) is not int or not 1 <= port <= 65535:
+        raise ValueError('Invalid qualified proxy listener')
+    path = Path(filename)
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    # Live role checks run concurrently. Serialize the read/merge/rename so
+    # publishing Codex cannot erase Gemini's last verified generation.
+    with path.with_name(path.name+'.lock').open('a+b') as lock:
+        os.chmod(lock.name, 0o600)
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        try:
+            with path.open('rb') as source:
+                raw = source.read(32769)
+            if len(raw) > 32768:
+                raise ValueError('Oversized upstream route snapshot')
+            previous = json.loads(raw)
+            if (not isinstance(previous, dict) or previous.get('version') != 1
+                    or not isinstance(previous.get('routes'), dict) or len(previous['routes']) > 64
+                    or any(not re.fullmatch(r'http://127\.0\.0\.1:[0-9]{1,5}', key)
+                           or not isinstance(value, str) or not re.fullmatch(r'[0-9a-f]{64}', value)
+                           for key, value in previous['routes'].items())):
+                raise ValueError('Invalid upstream route snapshot')
+            previous = {'version': 1, 'routes': previous['routes']}
+        except (FileNotFoundError, ValueError):
+            # Reconstruct corrupt state from verified live selections; readers
+            # keep their last good generations until each role publishes again.
+            previous = {'version': 1, 'routes': {}}
+        key = 'http://127.0.0.1:'+str(port)
+        generation = fingerprint([node])
+        if previous['routes'].get(key) == generation:
+            return False
+        previous['routes'][key] = generation
+        atomic_write(path, (json.dumps(previous, sort_keys=True)+'\n').encode())
+    return True
+
+
+def pool_generation_report(config, role, client=None):
+    try:
+        return {'route_generation_changed': publish_pool_generation(config, role, client)}
+    except Exception as error:
+        # A marker/storage failure cannot undo a working route or prevent the
+        # normal network checks and recovery from continuing.
+        return {'route_state_error_type': type(error).__name__}
+
+
+def watch_pool_generation(config, role, stop):
+    """Track automatic fallback even while qualification is probing models."""
+    previous_error = None
+    while not stop.is_set():
+        try:
+            report = pool_generation_report(config, role, controller(role, timeout=2))
+        except Exception as error:
+            report = {'route_state_error_type': type(error).__name__}
+        error = report.get('route_state_error_type')
+        if error and error != previous_error:
+            LOG.warning('route_generation_deferred role=%s error_type=%s', role['name'], error)
+        previous_error = error
+        stop.wait(2)
+
+
+def controller(role, timeout=12):
     config = read_yaml(role['mihomo_config'])
-    return JSONClient('http://' + config['external-controller'], config.get('secret', ''), timeout=12)
+    return JSONClient('http://' + config['external-controller'], config.get('secret', ''), timeout=timeout)
 
 
 def wait_pool(client, group_path, names, timeout=20):
@@ -267,6 +339,7 @@ def probe_live_pools(config):
             with ThreadPoolExecutor(max_workers=max(1, min(4, len(names)))) as pool:
                 report['healthy_nodes'] = [name for name in pool.map(probe, names) if name]
             report['network_ok'] = bool(report['healthy_nodes'])
+            report.update(pool_generation_report(config, role, client))
         except Exception as error:
             report['error_type'] = type(error).__name__
         return role['name'], report
@@ -327,6 +400,8 @@ def reconcile(config, validate=None):
             'primary': pool[0]['node'] if pool else None,
             'pool': [r['node'] for r in pool],
             'results': [{k: v for k, v in r.items() if k != 'config'} for r in results]}
+        if pool:
+            report['roles'][role['name']].update(pool_generation_report(config, role))
     return report
 
 
@@ -423,6 +498,10 @@ def main():
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:
         raise SystemExit('A subscription qualification run is already active')
+    if config.get('upstream_route_state_file') and not args.once:
+        for role in config['roles']:
+            threading.Thread(target=watch_pool_generation, args=(config, role, stop),
+                             name='proxy-route-'+role['name'], daemon=True).start()
     previous = json.loads(state_path.read_text()) if state_path.exists() else {}
     last_live = last_model = float('-inf')
     network_failures, model_failures = {}, {}
