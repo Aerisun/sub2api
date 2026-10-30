@@ -21,6 +21,12 @@ Sub2API 的源码、运维入口、网络守护和部署模板统一保存在本
 
 每次创建快照都会刷新本地 `deployment/private/INVENTORY.json`，记录私有文件路径、权限、校验和及归档方式，不记录实际敏感值。新配置按上述分层加入后会自动进入清单与加密备份；解密密钥被明确标记为单独保存。
 
+## 新用户默认分组
+
+本站新注册用户自动加入“VIP 客户”（分组 103）。`deployment/site.json` 的 `signup_customer_group_id` 记录该分组，实际注册配置由 `deployment/private/config/runtime.env` 的 `DEFAULT_USER_ALLOWED_GROUPS=103`、`DEFAULT_USER_RESTRICT_PUBLIC_GROUPS=true`、`DEFAULT_USER_OPENAI_CONCURRENCY=2` 控制。邮箱注册和第三方首次注册均在创建用户的事务中保存分组授权；来源专属赠额和并发设置继续生效。
+
+修改环境变量后，等已接收请求结束再重启网关。默认分组必须保持活跃且未删除，不能指向已退役分组。已有账号的授权通过后台单独调整；商品供应和国产模型分组的设置不得覆盖本站的 VIP 注册默认值。
+
 ## 网络组件
 
 `ops/tailnet.py` 与 `systemd/service-tailnet.service` 管理网络恢复守护。实际配置为 `deployment/private/config/tailnet.json`，使用项目内 `bin/tailscaled`。它先接管已有的 VPN 连接；只有不存在同用户守护进程时才尝试用原身份状态恢复，避免重复占用状态。重启守护不会终止它接管的主机 VPN 进程。

@@ -1679,12 +1679,15 @@ type TurnstileConfig struct {
 }
 
 type DefaultConfig struct {
-	AdminEmail      string  `mapstructure:"admin_email"`
-	AdminPassword   string  `mapstructure:"admin_password"`
-	UserConcurrency int     `mapstructure:"user_concurrency"`
-	UserBalance     float64 `mapstructure:"user_balance"`
-	APIKeyPrefix    string  `mapstructure:"api_key_prefix"`
-	RateMultiplier  float64 `mapstructure:"rate_multiplier"`
+	AdminEmail               string  `mapstructure:"admin_email"`
+	AdminPassword            string  `mapstructure:"admin_password"`
+	UserConcurrency          int     `mapstructure:"user_concurrency"`
+	UserOpenAIConcurrency    int     `mapstructure:"user_openai_concurrency"`
+	UserAllowedGroups        []int64 `mapstructure:"user_allowed_groups"`
+	UserRestrictPublicGroups bool    `mapstructure:"user_restrict_public_groups"`
+	UserBalance              float64 `mapstructure:"user_balance"`
+	APIKeyPrefix             string  `mapstructure:"api_key_prefix"`
+	RateMultiplier           float64 `mapstructure:"rate_multiplier"`
 }
 
 type RateLimitConfig struct {
@@ -2299,6 +2302,9 @@ func setDefaults() {
 	viper.SetDefault("default.admin_email", "")
 	viper.SetDefault("default.admin_password", "")
 	viper.SetDefault("default.user_concurrency", 5)
+	viper.SetDefault("default.user_openai_concurrency", 0)
+	viper.SetDefault("default.user_allowed_groups", []int64{})
+	viper.SetDefault("default.user_restrict_public_groups", false)
 	viper.SetDefault("default.user_balance", 0)
 	viper.SetDefault("default.api_key_prefix", "sk-")
 	viper.SetDefault("default.rate_multiplier", 1.0)
@@ -2673,6 +2679,17 @@ func setEnvReachableDefaults() {
 }
 
 func (c *Config) Validate() error {
+	if c.Default.UserOpenAIConcurrency < 0 {
+		return fmt.Errorf("default.user_openai_concurrency must be non-negative")
+	}
+	for _, groupID := range c.Default.UserAllowedGroups {
+		if groupID <= 0 {
+			return fmt.Errorf("default.user_allowed_groups must contain positive group IDs")
+		}
+	}
+	if c.Default.UserRestrictPublicGroups && len(c.Default.UserAllowedGroups) == 0 {
+		return fmt.Errorf("default.user_restrict_public_groups requires at least one allowed group")
+	}
 	forwardedClientIPHeaders, err := NormalizeForwardedClientIPHeaders(c.Security.ForwardedClientIPHeaders)
 	if err != nil {
 		return fmt.Errorf("security.forwarded_client_ip_headers: %w", err)

@@ -24,6 +24,7 @@
   "model_configuration_policy": "Preserve deployed model IDs, inference controls, prices and provider mappings; user-retired models remain absent.",
   "operator_environment": "deployment/private/config/operator.env",
   "customer_group_id": 9,
+  "signup_customer_group_id": 103,
   "configuration": {
     "proxy-qualifier": "deployment/private/config/proxy-qualifier.json",
     "nvidia-egress": "deployment/private/config/nvidia-egress.json",
