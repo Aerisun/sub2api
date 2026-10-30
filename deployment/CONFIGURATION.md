@@ -27,6 +27,10 @@ Sub2API 的源码、运维入口、网络守护和部署模板统一保存在本
 
 修改环境变量后，等已接收请求结束再重启网关。默认分组必须保持活跃且未删除，不能指向已退役分组。已有账号的授权通过后台单独调整；商品供应和国产模型分组的设置不得覆盖本站的 VIP 注册默认值。
 
+## Fast 计费
+
+本站 Codex 文本模型的 Fast / priority 自 2026-10-30 起按同模型标准档费用的 2 倍计费。输入、输出与缓存读写均使用分组定价中的 `fast_multiplier=2`，再乘用户所属分组的既有倍率。普通档、Flex、长上下文规则和上游档位设置沿用现有配置。策略记录在 `resources/model-pricing/official-site-prices.json`，聊天提示和公开价格说明同步使用 ×2。
+
 ## 网络组件
 
 `ops/tailnet.py` 与 `systemd/service-tailnet.service` 管理网络恢复守护。实际配置为 `deployment/private/config/tailnet.json`，使用项目内 `bin/tailscaled`。它先接管已有的 VPN 连接；只有不存在同用户守护进程时才尝试用原身份状态恢复，避免重复占用状态。重启守护不会终止它接管的主机 VPN 进程。
@@ -57,7 +61,7 @@ Sub2API 的源码、运维入口、网络守护和部署模板统一保存在本
 
 代码中的型号识别、计费兜底、网页原生图片入口、思考选项需要同步接入。公开价格与来源记录在 `resources/model-pricing/official-site-prices.json`；通过 `ops.generate_guide`、`ops.generate_prices` 更新共享目录与说明页，再用 `ops.web build` 发布。不能用其他模型替代新型号来通过测试。
 
-`gpt-6.1-terra` 按 [OpenAI 型号说明](https://developers.openai.com/api/docs/models/gpt-6.1-terra) 接入：标准输入/输出为每百万 Token $1/$5，缓存读取/写入为 $0.05/$1.25；本站 Fast ×3、Flex ×0.5。当前 Codex 通道初始上下文 500,000、最大 872,000 Token，优先采用真实通道元数据；网页默认低强度，允许关闭思考和显式选择其他档位。新增型号不改变现有型号的默认值或价格。
+`gpt-6.1-terra` 按 [OpenAI 型号说明](https://developers.openai.com/api/docs/models/gpt-6.1-terra) 接入：标准输入/输出为每百万 Token $1/$5，缓存读取/写入为 $0.05/$1.25；本站 Fast ×2、Flex ×0.5。当前 Codex 通道初始上下文 500,000、最大 872,000 Token，优先采用真实通道元数据；网页默认低强度，允许关闭思考和显式选择其他档位。新增型号不改变现有型号的默认值或价格。
 
 上线后从公网核对真实返回型号、首段内容时间、完整结束事件、用量和扣费，并通过网页图片上传验证。确认旧配置逐项未变后提交代码，使用系统缤纷云完成包含数据库的加密快照和恢复校验。真实测试记录保留在忽略上传的 `var/reports/`。
 

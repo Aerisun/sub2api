@@ -453,7 +453,7 @@ function App() {
         />
       )}
       <main className="chat-main">
-        {fastNotice && <div className="fast-toast" role="status">Fast 已开启，计费 ×3</div>}
+        {fastNotice && <div className="fast-toast" role="status">Fast 已开启，费率 ×2</div>}
         <Button
           variant="ghost"
           size="icon"

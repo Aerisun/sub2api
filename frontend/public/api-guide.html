@@ -289,7 +289,7 @@ experimental_bearer_token = "sk-REPLACE_WITH_YOUR_API_KEY"</code></pre>
   <div class="docs-command-panel" role="tabpanel" id="codex-run-panel-linux" aria-labelledby="codex-run-tab-linux" data-command-panel="linux"><pre><code id="codex-run-code">codex</code></pre></div>
   <div class="docs-command-panel" role="tabpanel" id="codex-run-panel-windows" aria-labelledby="codex-run-tab-windows" data-command-panel="windows" hidden><pre><code id="codex-run-windows-code">codex</code></pre></div>
 </div>
-<p>底部状态栏显示 <code>Fast on</code> / <code>Fast off</code>；输入 <code>/fast</code> 切换档位。本站 Fast 按标准 Token 单价的 3 倍计费。</p>
+<p>底部状态栏显示 <code>Fast on</code> / <code>Fast off</code>；输入 <code>/fast</code> 切换档位。本站 Fast 按标准 Token 单价的 2 倍计费。</p>
 </section>
 <section class="docs-guide-section" id="opencode" data-guide-builder="config">
 <h2>OpenCode</h2>
@@ -463,7 +463,7 @@ print(ranking["results"])</code></pre></div></div></details>
 <p>Claude 默认 Low；支持 Medium、High、XHigh、Max、Auto。Sonnet 支持关闭思考；显式 <code>thinking.budget_tokens</code> 优先。</p>
 <p>Gemini 3.8 Flash 默认 Low；支持 Medium、High、Auto。XHigh / Max 映射 High，Auto 由上游动态分配。</p>
 <p>客户端工具使用 <code>tools</code>、<code>tool_choice</code>；保留工具结果后继续对话。</p>
-<p id="codex-fast">Codex Fast：请求加 <code>"service_tier": "fast"</code>，费用为标准模式的 3 倍；与思考强度分别设置。</p>
+<p id="codex-fast">Codex Fast：请求加 <code>"service_tier": "fast"</code>，费用为标准模式的 2 倍；与思考强度分别设置。</p>
 
 </section>
 

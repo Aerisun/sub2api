@@ -7,7 +7,7 @@
     "gpt-6-astra": {
       "source": "https://developers.openai.com/api/docs/pricing",
       "status": "developer_standard",
-      "note": "标准 Token 单价参考 OpenAI；本站 Fast ×3；Flex ×0.5。输入超过 272,000 Token 时，整次请求输入/缓存 ×2，输出 ×1.5。",
+      "note": "标准 Token 单价参考 OpenAI；本站 Fast ×2；Flex ×0.5。输入超过 272,000 Token 时，整次请求输入/缓存 ×2，输出 ×1.5。",
       "pricing": {
         "platform": "openai",
         "models": [
@@ -18,14 +18,14 @@
         "output_price": 5e-05,
         "cache_write_price": 1.25e-05,
         "cache_read_price": 1e-06,
-        "fast_multiplier": 3,
+        "fast_multiplier": 2,
         "flex_multiplier": 0.5
       }
     },
     "gpt-6-sol": {
       "source": "https://developers.openai.com/api/docs/pricing",
       "status": "developer_standard",
-      "note": "标准 Token 单价参考 OpenAI；本站 Fast ×3；Flex ×0.5。输入超过 272,000 Token 时，整次请求输入/缓存 ×2，输出 ×1.5。",
+      "note": "标准 Token 单价参考 OpenAI；本站 Fast ×2；Flex ×0.5。输入超过 272,000 Token 时，整次请求输入/缓存 ×2，输出 ×1.5。",
       "pricing": {
         "platform": "openai",
         "models": [
@@ -36,14 +36,14 @@
         "output_price": 1e-05,
         "cache_write_price": 2.5e-06,
         "cache_read_price": 2.0000000000000002e-07,
-        "fast_multiplier": 3,
+        "fast_multiplier": 2,
         "flex_multiplier": 0.5
       }
     },
     "gpt-6-luna": {
       "source": "https://developers.openai.com/api/docs/pricing",
       "status": "developer_standard",
-      "note": "标准 Token 单价参考 OpenAI；本站 Fast ×3；Flex ×0.5。输入超过 272,000 Token 时，整次请求输入/缓存 ×2，输出 ×1.5。",
+      "note": "标准 Token 单价参考 OpenAI；本站 Fast ×2；Flex ×0.5。输入超过 272,000 Token 时，整次请求输入/缓存 ×2，输出 ×1.5。",
       "pricing": {
         "platform": "openai",
         "models": [
@@ -54,14 +54,14 @@
         "output_price": 5e-07,
         "cache_write_price": 1.25e-07,
         "cache_read_price": 1e-08,
-        "fast_multiplier": 3,
+        "fast_multiplier": 2,
         "flex_multiplier": 0.5
       }
     },
     "gpt-5.6-sol": {
       "source": "https://developers.openai.com/api/docs/pricing",
       "status": "developer_standard",
-      "note": "标准 Token 单价参考 OpenAI；本站 Fast ×3；Flex ×0.5。输入超过 272,000 Token 时，整次请求输入/缓存 ×2，输出 ×1.5。GPT-5.6 Sol 使用当前官方优惠价（至少至 2026-11-21）。",
+      "note": "标准 Token 单价参考 OpenAI；本站 Fast ×2；Flex ×0.5。输入超过 272,000 Token 时，整次请求输入/缓存 ×2，输出 ×1.5。GPT-5.6 Sol 使用当前官方优惠价（至少至 2026-11-21）。",
       "pricing": {
         "platform": "openai",
         "models": [
@@ -72,14 +72,14 @@
         "output_price": 2e-05,
         "cache_write_price": 5e-06,
         "cache_read_price": 4.0000000000000003e-07,
-        "fast_multiplier": 3,
+        "fast_multiplier": 2,
         "flex_multiplier": 0.5
       }
     },
     "gpt-5.6-terra": {
       "source": "https://developers.openai.com/api/docs/pricing",
       "status": "developer_standard",
-      "note": "标准 Token 单价参考 OpenAI；本站 Fast ×3；Flex ×0.5。输入超过 272,000 Token 时，整次请求输入/缓存 ×2，输出 ×1.5。",
+      "note": "标准 Token 单价参考 OpenAI；本站 Fast ×2；Flex ×0.5。输入超过 272,000 Token 时，整次请求输入/缓存 ×2，输出 ×1.5。",
       "pricing": {
         "platform": "openai",
         "models": [
@@ -90,14 +90,14 @@
         "output_price": 1.2e-05,
         "cache_write_price": 2.5e-06,
         "cache_read_price": 2.0000000000000002e-07,
-        "fast_multiplier": 3,
+        "fast_multiplier": 2,
         "flex_multiplier": 0.5
       }
     },
     "gpt-5.6-luna": {
       "source": "https://developers.openai.com/api/docs/pricing",
       "status": "developer_standard",
-      "note": "标准 Token 单价参考 OpenAI；本站 Fast ×3；Flex ×0.5。输入超过 272,000 Token 时，整次请求输入/缓存 ×2，输出 ×1.5。",
+      "note": "标准 Token 单价参考 OpenAI；本站 Fast ×2；Flex ×0.5。输入超过 272,000 Token 时，整次请求输入/缓存 ×2，输出 ×1.5。",
       "pricing": {
         "platform": "openai",
         "models": [
@@ -108,14 +108,14 @@
         "output_price": 1.2e-06,
         "cache_write_price": 2.5e-07,
         "cache_read_price": 2e-08,
-        "fast_multiplier": 3,
+        "fast_multiplier": 2,
         "flex_multiplier": 0.5
       }
     },
     "gpt-6.1-sol": {
       "source": "https://developers.openai.com/api/docs/pricing",
       "status": "developer_standard",
-      "note": "标准 Token 单价参考 OpenAI；本站 Fast ×3；Flex ×0.5。输入超过 272,000 Token 时，整次请求输入/缓存 ×2，输出 ×1.5。",
+      "note": "标准 Token 单价参考 OpenAI；本站 Fast ×2；Flex ×0.5。输入超过 272,000 Token 时，整次请求输入/缓存 ×2，输出 ×1.5。",
       "pricing": {
         "platform": "openai",
         "models": [
@@ -126,7 +126,7 @@
         "output_price": 1e-05,
         "cache_write_price": 2.5e-06,
         "cache_read_price": 1e-07,
-        "fast_multiplier": 3,
+        "fast_multiplier": 2,
         "flex_multiplier": 0.5
       }
     },
@@ -801,7 +801,7 @@
       "source": "https://developers.openai.com/api/docs/models/gpt-6.1-terra",
       "status": "developer_standard",
       "checked_at": "2026-10-27",
-      "note": "标准 Token 单价参考 OpenAI；本站 Fast ×3；Flex ×0.5。输入超过 272,000 Token 时，整次请求输入/缓存 ×2，输出 ×1.5。现有 Codex 通道最大上下文为 872,000 Token。",
+      "note": "标准 Token 单价参考 OpenAI；本站 Fast ×2；Flex ×0.5。输入超过 272,000 Token 时，整次请求输入/缓存 ×2，输出 ×1.5。现有 Codex 通道最大上下文为 872,000 Token。",
       "pricing": {
         "platform": "openai",
         "models": [
@@ -812,7 +812,7 @@
         "output_price": 5e-06,
         "cache_write_price": 1.25e-06,
         "cache_read_price": 5e-08,
-        "fast_multiplier": 3,
+        "fast_multiplier": 2,
         "flex_multiplier": 0.5
       }
     }
@@ -830,8 +830,8 @@
     }
   },
   "site_fast_policy": {
-    "multiplier": 3,
-    "effective_date": "2026-10-23",
+    "multiplier": 2,
+    "effective_date": "2026-10-30",
     "scope": "Codex text models",
     "source": "Owner instruction; site service-tier price, not OpenAI subscription pricing."
   }
