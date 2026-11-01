@@ -1,16 +1,19 @@
 """Regress subscription removal, model gating, and safe pool replacement."""
 import json
+import base64
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import tempfile
 import unittest
+from urllib.parse import parse_qs, urlsplit
 from unittest.mock import patch
 
 import yaml
 
 from image_hub.proxy_qualifier import (choose_pool, eligible_nodes, fingerprint,
                                        install_pool, read_yaml, reconcile, qualification_due, probe_live_pools, stable_pool,
-                                       diverse_candidates, publish_pool_generation, pool_generation_report)
+                                       diverse_candidates, publish_pool_generation, pool_generation_report,
+                                       credential_expiry, evaluate)
 
 
 def node(name):
@@ -105,6 +108,39 @@ class FileController:
 
 
 class QualificationTests(unittest.TestCase):
+    def test_oauth_expiry_accepts_rfc3339_offsets_and_unix_formats(self):
+        expected = 1794231824
+        for value in ['2026-11-09T21:43:44+08:00', '2026-11-09T13:43:44Z',
+                      expected, str(expected), expected*1000, str(expected*1000)]:
+            with self.subTest(value=value):
+                self.assertEqual(credential_expiry({'expires_at': value}), expected)
+
+    def test_expiry_recovers_from_bad_metadata_and_honors_jwt_expiration(self):
+        payload = base64.urlsafe_b64encode(json.dumps({'exp': 1700000000}).encode()).decode().rstrip('=')
+        token = 'fixture.'+payload+'.fixture'
+        for value in [None, '', 'invalid', {}, False, float('nan'), float('inf'),
+                      '2026-11-09T21:43:44+08:00']:
+            with self.subTest(value=value):
+                self.assertEqual(credential_expiry({'expires_at': value, 'access_token': token}), 1700000000)
+        self.assertEqual(credential_expiry({'expires_at': 'bad', 'access_token': 'opaque'}), 0)
+
+    def test_rfc3339_account_expiry_does_not_abort_network_requalification(self):
+        class NoCandidates:
+            def __enter__(self):
+                return self, 'http://127.0.0.1:1'
+            def __exit__(self, *args):
+                pass
+        config = {'roles': [{'name': 'codex', 'account_id': 91, 'provider_file': 'fixture'}]}
+        credentials = {91: {'expires_at': '2026-11-09T21:43:44+08:00', 'access_token': 'opaque'}}
+        with patch('ops.admin_api.login', return_value='fixture'), \
+             patch('ops.admin_api.request', return_value={}) as request, \
+             patch('ops.credentials.accounts', return_value=credentials), \
+             patch('image_hub.proxy_qualifier.read_yaml', return_value={'proxies': []}), \
+             patch('image_hub.proxy_qualifier.isolated_proxy', return_value=NoCandidates()), \
+             patch('image_hub.proxy_qualifier.time.time', return_value=1793530000):
+            self.assertEqual(evaluate(config, []), {'codex': []})
+        self.assertFalse(any('/refresh' in call.args[0] for call in request.call_args_list))
+
     def test_region_rejection_does_not_hide_working_spares_in_other_regions(self):
         rank = ['NA-UnitedStates-'+str(n) for n in range(20)]
         rank += ['ASIA-Japan-'+str(n) for n in range(4)]
@@ -151,6 +187,23 @@ class QualificationTests(unittest.TestCase):
         self.assertEqual(report['gemini']['healthy_nodes'],['working'])
         self.assertEqual(report['gemini']['selected'],'broken')
         self.assertTrue(all('/v1/chat/completions' not in path for path in client.paths))
+
+    def test_codex_network_check_uses_unauthenticated_trace_not_generation_endpoint(self):
+        class Client:
+            paths = []
+            def request(self, path):
+                self.paths.append(path)
+                if path == '/proxies/fixture':
+                    return {'now': 'working', 'all': ['working']}
+                if path == '/providers/proxies':
+                    return {'providers': {}}
+                query = parse_qs(urlsplit(path).query)
+                if query.get('url') == ['https://chatgpt.com/cdn-cgi/trace'] and query.get('expected') == ['200']:
+                    return {'delay': 100}
+                raise RuntimeError('Authenticated generation endpoint rejects GET')
+        with patch('image_hub.proxy_qualifier.controller', return_value=Client()):
+            report = probe_live_pools({'roles': [{'name': 'codex', 'group': 'fixture'}]})
+        self.assertTrue(report['codex']['network_ok'])
 
     def test_file_provider_members_use_provider_health_endpoint(self):
         class Client:

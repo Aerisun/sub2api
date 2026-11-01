@@ -3,10 +3,12 @@ import argparse
 import base64
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from datetime import datetime, timezone
 import hashlib
 import fcntl
 import json
 import logging
+import math
 import os
 from pathlib import Path
 import re
@@ -275,6 +277,34 @@ def codex_generation(credentials, proxy, version):
     return result
 
 
+def credential_expiry(credentials):
+    """Accept Unix seconds/milliseconds and the admin API's RFC3339 format."""
+    def timestamp(value):
+        if isinstance(value, bool) or value is None:
+            return 0
+        try:
+            result = float(value)
+        except (ValueError, TypeError):
+            try:
+                date = datetime.fromisoformat(str(value).strip().replace('Z', '+00:00'))
+                result = date.replace(tzinfo=date.tzinfo or timezone.utc).timestamp()
+            except (ValueError, TypeError, OverflowError):
+                return 0
+        if not math.isfinite(result) or result <= 0:
+            return 0
+        return result / 1000 if result > 100_000_000_000 else result
+
+    values = [timestamp(credentials.get('expires_at'))]
+    try:
+        encoded = credentials['access_token'].split('.')[1]
+        claims = json.loads(base64.urlsafe_b64decode(encoded + '=' * (-len(encoded) % 4)))
+        values.append(timestamp(claims.get('exp')))
+    except (KeyError, ValueError, IndexError, AttributeError, TypeError):
+        pass
+    # An expired JWT must still refresh when separate expiry metadata is stale.
+    return min((value for value in values if value), default=0)
+
+
 def real_check(role, credentials, proxy, version, confirm=False):
     if role['name'] == 'codex':
         return codex_generation(credentials, proxy, version)
@@ -323,8 +353,11 @@ def probe_live_pools(config):
             providers = client.request('/providers/proxies').get('providers', {})
             owners = {node['name']: name for name, provider in providers.items()
                       for node in provider.get('proxies', [])}
+            # The authenticated generation endpoint can reject an unauthenticated
+            # GET even when paid POSTs work. Probe TLS separately from the real
+            # model checks below, using the same URL as node qualification.
             url, expected = (('https://oauth2.googleapis.com/token', '404') if role['name'] == 'gemini'
-                             else ('https://chatgpt.com/backend-api/codex/responses', '405'))
+                             else ('https://chatgpt.com/cdn-cgi/trace', '200'))
             query = urlencode({'url': url, 'expected': expected,
                                'timeout': config.get('live_probe_timeout_ms', 2500)})
             def probe(name):
@@ -412,13 +445,7 @@ def evaluate(config, source):
     token = auth.login()
     for role in config['roles']:
         current = accounts([role['account_id']])[role['account_id']]
-        expires = int(current.get('expires_at') or 0)
-        if not expires:
-            try:
-                encoded = current['access_token'].split('.')[1]
-                expires = int(json.loads(base64.urlsafe_b64decode(encoded + '=' * (-len(encoded) % 4))).get('exp', 0))
-            except (KeyError, ValueError, IndexError):
-                pass
+        expires = credential_expiry(current)
         if expires and expires <= time.time() + 120:
             admin.request('/api/v1/admin/accounts/' + str(role['account_id']) + '/refresh', token, {}, 'POST')
     credentials = accounts([r['account_id'] for r in config['roles']])
