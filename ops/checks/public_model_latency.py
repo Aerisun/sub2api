@@ -17,6 +17,7 @@ import httpx
 
 from ops import admin_api as api
 from ops import admin_api as auth
+from ops.checks.responses_session_latency import drain_temporary_user
 
 ROOT = Path(__file__).resolve().parents[2]
 PUBLIC = "https://aerisun.top/sub2api"
@@ -244,12 +245,13 @@ def main():
         report["error_type"] = type(error).__name__
         raise
     finally:
-        try:
+        if drain_temporary_user(user['id']):
             if key:
                 api.request("/api/v1/keys/"+str(key["id"]), token, method="DELETE")
-        finally:
             api.request("/api/v1/admin/users/"+str(user["id"]), admin, method="DELETE")
-        report["temporary_credentials_removed"] = True
+            report["temporary_credentials_removed"] = True
+        else:
+            report['cleanup_deferred'] = {'user_id': user['id'], 'key_id': key['id'] if key else None}
         save()
     if not report.get("all_calls_passed") or not report.get("all_chat_latency_passed") or not report.get("all_chat_text_latency_passed"):
         raise SystemExit(1)

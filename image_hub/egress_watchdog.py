@@ -1,6 +1,6 @@
 """Fast, bounded failover for the dedicated Claude/Gemini outbound route."""
 import argparse
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 import fcntl
 import json
@@ -236,23 +236,31 @@ class Watchdog:
         candidates = [node for node in nodes if node.name != current and
                       self.cooldown.get(node.name, 0) <= started]
         with ThreadPoolExecutor(max_workers=max(1, min(8, len(candidates)))) as executor:
-            checked = list(executor.map(self.controller.probe, candidates))
-        usable = sorted(((delay, node) for node, delay in zip(candidates, checked)
-                         if delay is not None), key=lambda item: item[0])
-        for latency, alternative in usable:
-            self.controller.select(alternative)
-            # Re-read the group: a concurrent native fallback/config reload may win.
-            selected, refreshed = self.controller.snapshot()
-            actual = next((node for node in refreshed if node.name == selected), None)
-            verified = self.controller.probe(actual) if actual else None
-            if verified is not None:
-                elapsed = round((self.clock() - started) * 1000)
-                LOG.info('failover_verified old=%s new=%s recovery_ms=%s',
-                         current, actual.name, elapsed)
-                self.last_recovery = float('-inf')
-                return self.healthy(actual, verified, previous_node=current,
-                                    last_switch_at=time.time(), recovery_ms=elapsed)
-            self.cooldown[alternative.name] = self.clock() + self.config['cooldown_seconds']
+            if self.config.get('first_verified_spare'):
+                futures = {executor.submit(self.controller.probe, node): node for node in candidates}
+                usable = ((future.result(), futures[future]) for future in as_completed(futures))
+            else:
+                checked = list(executor.map(self.controller.probe, candidates))
+                usable = sorted(((delay, node) for node, delay in zip(candidates, checked)
+                                 if delay is not None), key=lambda item: item[0])
+            for latency, alternative in usable:
+                if latency is None:
+                    continue
+                self.controller.select(alternative)
+                # Re-read the group: native fallback/qualification may win.
+                selected, refreshed = self.controller.snapshot()
+                actual = next((node for node in refreshed if node.name == selected), None)
+                verified = self.controller.probe(actual) if actual else None
+                if verified is not None:
+                    elapsed = round((self.clock() - started) * 1000)
+                    LOG.info('failover_verified old=%s new=%s recovery_ms=%s',
+                             current, actual.name, elapsed)
+                    self.last_recovery = float('-inf')
+                    # Switch/publish immediately, then let any other accepted
+                    # diagnostic generation finish during executor shutdown.
+                    return self.healthy(actual, verified, previous_node=current,
+                                        last_switch_at=time.time(), recovery_ms=elapsed)
+                self.cooldown[alternative.name] = self.clock() + self.config['cooldown_seconds']
         return self.publish(state='no_healthy_nodes', node=current)
 
     def prefer_faster(self, current, delay, nodes):

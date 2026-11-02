@@ -20,6 +20,7 @@ import httpx
 from PIL import Image, ImageDraw, ImageFont
 from ops import admin_api as api
 from ops import admin_api as auth
+from ops.checks.responses_session_latency import drain_temporary_user
 from internal_tools.vision_quality import QUALITY_PROMPT, accepts
 from internal_tools.vision_routing import ROOT, VisionRouter
 
@@ -255,11 +256,13 @@ def main():
         report['all_passed'] = (report['all_calls_passed'] and report['capacity_verified']
                                 and report['billing']['verified'])
     finally:
-        try:
+        if drain_temporary_user(user['id']):
             if key: api.request('/api/v1/keys/'+str(key['id']), token, method='DELETE')
-        finally:
             api.request('/api/v1/admin/users/'+str(user['id']), admin, method='DELETE')
-            report['temporary_credentials_removed'] = True; save(args.output, report)
+            report['temporary_credentials_removed'] = True
+        else:
+            report['cleanup_deferred'] = {'user_id': user['id'], 'key_id': key['id'] if key else None}
+        save(args.output, report)
     print(json.dumps({'all_passed':report['all_passed'], 'cost_usd':report.get('billing',{}).get('cost_usd'),
                       'output':str(args.output)}), flush=True)
     if not report['all_passed']: raise SystemExit(1)

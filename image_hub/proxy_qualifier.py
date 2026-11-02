@@ -231,7 +231,7 @@ def isolated_proxy(nodes, config):
                 process.wait()
 
 
-def codex_generation(credentials, proxy, version):
+def codex_generation(credentials, proxy, version, model='gpt-6-sol'):
     headers = {'Authorization': 'Bearer ' + credentials['access_token'], 'Content-Type': 'application/json',
                'Accept': 'text/event-stream', 'Originator': 'codex_cli_rs', 'Version': version,
                'OpenAI-Beta': 'responses=experimental',
@@ -246,7 +246,7 @@ def codex_generation(credentials, proxy, version):
                 break
         except (KeyError, ValueError, IndexError):
             pass
-    payload = {'model': 'gpt-6-sol', 'instructions': 'You are a coding assistant. Reply with OK only.',
+    payload = {'model': model, 'instructions': 'You are a coding assistant. Reply with OK only.',
                'input': [{'role': 'user', 'content': [{'type': 'input_text', 'text': 'Reply with OK only.'}]}],
                'stream': True, 'store': False, 'reasoning': {'effort': 'low'}}
     started = time.monotonic()
@@ -394,6 +394,9 @@ def probe_live_models(config, health):
     version = settings.get('openai_codex_client_version') or settings.get('openai_codex_client_version_synced') or '0.163.0'
     def check(role):
         try:
+            pause = codex_probe_pause(role, token)
+            if pause:
+                return role['name'], {'ok': None, 'skipped': pause, 'checked_at': time.time()}
             proxy = read_yaml(role['mihomo_config'])
             result = real_check(role, credentials[role['account_id']],
                                 'http://127.0.0.1:' + str(proxy['mixed-port']), version)
@@ -405,12 +408,42 @@ def probe_live_models(config, health):
         return dict(pool.map(check, roles))
 
 
+def codex_probe_pause(role, token):
+    if role['name'] != 'codex':
+        return None
+    from ops import admin_api as api
+    from ops.quota_policy import probe_pause
+    account = api.request('/api/v1/admin/accounts/'+str(role['account_id']), token)
+    settings = api.request('/api/v1/admin/ops/advanced-settings', token)
+    return probe_pause(account, settings.get('openai_account_quota_auto_pause'))
+
+
 def qualification_due(config, previous, signature, now, unhealthy=False):
     retry_at = previous.get('retry_at', 0)
     if retry_at and now < retry_at:
         return signature != previous.get('source_fingerprint')
     return (signature != previous.get('source_fingerprint') or unhealthy or bool(retry_at) or
             now - previous.get('checked_at', 0) >= config.get('revalidate_seconds', 3600))
+
+
+def guard_exclusions(role):
+    """A background scan must not immediately reselect a quarantined exit."""
+    filename = role.get('guard_state_file')
+    if not filename:
+        return set()
+    try:
+        with Path(filename).open('rb') as source:
+            raw = source.read(32769)
+        if len(raw) > 32768:
+            return set()
+        state = json.loads(raw)
+        if state.get('account_id') != role['account_id'] or state.get('group') != role['group']:
+            return set()
+        now = time.time()
+        return {name for name, until in state.get('excluded_nodes', {}).items()
+                if type(until) in (int, float) and now < until <= now+3600}
+    except (OSError, ValueError, TypeError, AttributeError, KeyError):
+        return set()
 
 
 def reconcile(config, validate=None):
@@ -423,16 +456,21 @@ def reconcile(config, validate=None):
     report = {'state': 'completed', 'source_fingerprint': source_hash, 'checked_at': time.time(), 'roles': {}}
     for role in config['roles']:
         results = role_reports.get(role['name'], [])
-        pool = choose_pool(results, config.get('pool_size', 3))
+        excluded = guard_exclusions(role)
+        pool = choose_pool([row for row in results if row.get('node') not in excluded],
+                           config.get('pool_size', 3))
         if pool:
             if role.get('mihomo_config'):
                 selected = controller(role).request('/proxies/' + quote(role['group'], safe=''))['now']
                 pool = stable_pool(pool, selected)
             install_pool(role, [r['config'] for r in pool])
-        report['roles'][role['name']] = {'state': 'applied' if pool else 'retained',
+        paused = next((row['skipped'] for row in results if row.get('skipped')), None)
+        report['roles'][role['name']] = {'state': 'applied' if pool else 'paused' if paused else 'retained',
             'primary': pool[0]['node'] if pool else None,
             'pool': [r['node'] for r in pool],
             'results': [{k: v for k, v in r.items() if k != 'config'} for r in results]}
+        if paused:
+            report['roles'][role['name']]['pause'] = paused
         if pool:
             report['roles'][role['name']].update(pool_generation_report(config, role))
     return report
@@ -443,12 +481,18 @@ def evaluate(config, source):
     from ops import admin_api as admin
     from ops import admin_api as auth
     token = auth.login()
-    for role in config['roles']:
+    pauses = {r['name']: codex_probe_pause(r, token) for r in config['roles']}
+    active = [r for r in config['roles'] if not pauses[r['name']]]
+    reports = {r['name']: [{'ok': None, 'node': None, 'skipped': pauses[r['name']]}]
+               for r in config['roles'] if r not in active}
+    if not active:
+        return reports
+    for role in active:
         current = accounts([role['account_id']])[role['account_id']]
         expires = credential_expiry(current)
         if expires and expires <= time.time() + 120:
             admin.request('/api/v1/admin/accounts/' + str(role['account_id']) + '/refresh', token, {}, 'POST')
-    credentials = accounts([r['account_id'] for r in config['roles']])
+    credentials = accounts([r['account_id'] for r in active])
     settings = admin.request('/api/v1/admin/settings', token)
     version = settings.get('openai_codex_client_version') or settings.get('openai_codex_client_version_synced') or '0.163.0'
     all_nodes = {n['name']: n for n in source}
@@ -470,8 +514,7 @@ def evaluate(config, source):
             return node, values
         with ThreadPoolExecutor(max_workers=6) as pool:
             delays = dict(pool.map(network, all_nodes))
-        reports = {}
-        for role in config['roles']:
+        for role in active:
             rank = sorted([n for n in all_nodes if delays[n].get(role['name'])],
                           key=lambda n: delays[n][role['name']])
             candidates = diverse_candidates(rank, config.get('max_candidates_per_role', 12))
@@ -558,7 +601,8 @@ def main():
                         model_results = {}
                     last_model = clock
                     for name, result in model_results.items():
-                        model_failures[name] = 0 if result.get('ok') else model_failures.get(name, 0) + 1
+                        model_failures[name] = (0 if result.get('ok') or result.get('skipped')
+                                                else model_failures.get(name, 0) + 1)
                     previous['model_health'] = model_results
                 previous['live_health'] = live_health
                 atomic_write(state_path, (json.dumps(previous, ensure_ascii=False, indent=2) + '\n').encode())

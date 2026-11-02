@@ -1,0 +1,17 @@
+[Unit]
+Description=Independent GPT generation and qualified-route failover watchdog
+After=network-online.target sub2api.service sub2api-codex-egress.service
+Wants=network-online.target sub2api.service sub2api-codex-egress.service
+
+[Service]
+Type=simple
+WorkingDirectory=@ROOT@
+ExecStart=/usr/bin/python3 -m image_hub.codex_watchdog
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=150
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

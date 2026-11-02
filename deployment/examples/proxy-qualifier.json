@@ -20,6 +20,7 @@
     },
     {
       "name": "codex",
+      "guard_state_file": "@ROOT@/data/codex-watchdog-state.json",
       "mihomo_config": "@ROOT@/deployment/private/egress/mihomo-codex/config.yaml",
       "provider_file": "@ROOT@/deployment/private/egress/mihomo-codex/qualified-nodes.yaml",
       "group": "Codex egress",

@@ -27,6 +27,7 @@
   "signup_customer_group_id": 103,
   "configuration": {
     "proxy-qualifier": "deployment/private/config/proxy-qualifier.json",
+    "codex-watchdog": "deployment/private/config/codex-watchdog.json",
     "nvidia-egress": "deployment/private/config/nvidia-egress.json",
     "egress-watchdog": "deployment/private/config/egress-watchdog.json",
     "egress-subscriptions": "deployment/private/config/egress-subscriptions.json",

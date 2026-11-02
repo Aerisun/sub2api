@@ -1,0 +1,11 @@
+{
+  "qualifier_config": "@ROOT@/deployment/private/config/proxy-qualifier.json",
+  "state_file": "@ROOT@/data/codex-watchdog-state.json",
+  "interval": 5,
+  "timeout_ms": 4000,
+  "failure_threshold": 2,
+  "cooldown_seconds": 180,
+  "model_probe_seconds": 60,
+  "probe_models": ["gpt-6.1-sol", "gpt-6-luna", "gpt-6-sol"],
+  "error_poll_seconds": 10
+}
