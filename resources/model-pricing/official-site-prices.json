@@ -130,23 +130,6 @@
         "flex_multiplier": 0.5
       }
     },
-    "kimi-k3": {
-      "source": "https://platform.kimi.ai/docs/pricing/chat",
-      "status": "developer_standard",
-      "note": "Kimi 国际站官方美元 API 价；缓存写入分别为默认 5min 和 1h。",
-      "pricing": {
-        "platform": "openai",
-        "models": [
-          "kimi-k3"
-        ],
-        "billing_mode": "token",
-        "input_price": 3e-06,
-        "output_price": 1.5e-05,
-        "cache_read_price": 3e-07,
-        "cache_write_price": 3e-06,
-        "cache_write_1h_price": 6e-06
-      }
-    },
     "deepseek-v4.1-flash": {
       "source": "https://www.qiniu.com/ai/models",
       "status": "upstream_official",

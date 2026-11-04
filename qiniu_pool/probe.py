@@ -15,10 +15,9 @@ SELECTED = {
     "deepseek-v4.1-flash": "deepseek/deepseek-v4.1-flash-1017",
     "qwen3.8-flash": "qwen/qwen3.8-flash-next",
     "qwen3.8-max": "qwen/qwen3.8-max",
-    "kimi-k3": "moonshotai/kimi-k3",
 }
 # Internal physical targets are deliberately absent from the public catalog.
-INTERNAL_MODELS = {"moonshotai/kimi-k3-free": "moonshotai/kimi-k3-free"}
+INTERNAL_MODELS = {}
 ACCOUNT_MODELS = {**SELECTED, **INTERNAL_MODELS}
 RETIRED_PUBLIC_MODELS = {"kimi-k3-free"}
 

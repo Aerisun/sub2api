@@ -240,8 +240,10 @@ class RelayTests(unittest.TestCase):
     def test_kimi_keeps_local_affinity_without_sending_private_routing_fields(self):
         self.check_kimi_fields("moonshotai/kimi-k3")
 
-    def test_kimi_free_keeps_native_cache_and_reasoning(self):
-        self.check_kimi_fields("moonshotai/kimi-k3-free")
+    def test_retired_kimi_free_is_rejected_without_a_provider_request(self):
+        status, _ = self.send(json.dumps({"model": "moonshotai/kimi-k3-free", "messages": []}).encode())
+        self.assertEqual(status, 404)
+        self.assertEqual(self.received, [])
 
     def check_kimi_fields(self, model):
         self.relay.models.add(model)

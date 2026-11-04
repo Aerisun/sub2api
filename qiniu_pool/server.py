@@ -478,7 +478,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(504, {"error": {"message": "Upstream response deadline exceeded", "type": "upstream_timeout"}})
             native = {**body, "model": model}
             affinity = pool.fingerprint(native, self.headers)
-            if model.rsplit("/", 1)[-1] in ("kimi-k3", "kimi-k3-free"):
+            if model.rsplit("/", 1)[-1] == "kimi-k3":
                 # Local routing identifiers are not accepted by K3's strict API.
                 for field in ("prompt_cache_key", "metadata", "conversation_id"):
                     native.pop(field, None)

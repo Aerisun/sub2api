@@ -341,7 +341,7 @@
     if (!sidebar) return;
     const catalog = [...document.querySelectorAll('[data-model-id]')].map(button => button.dataset.modelId);
     for (const section of document.querySelectorAll('[data-guide-builder]')) {
-      builders.push({ section, defaultModel: 'kimi-k3',
+      builders.push({ section, defaultModel: catalog.includes('gpt-6-sol') ? 'gpt-6-sol' : catalog[0],
         templates: [...section.querySelectorAll('pre code[id]')].map(code => [code, code.textContent]),
       });
     }

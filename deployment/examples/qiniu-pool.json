@@ -5,7 +5,6 @@
     "qwen/qwen3.8-flash-next",
     "qwen/qwen3.8-max",
     "moonshotai/kimi-k3",
-    "moonshotai/kimi-k3-free",
     "deepseek/deepseek-v4.1-flash"
   ],
   "capacity": 9,
