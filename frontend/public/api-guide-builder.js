@@ -35,12 +35,16 @@
 
     const toolPrompts = new Map([['image_generation','画一只坐在窗边的橘猫'],['image_recognition','描述图片并读出文字']]);
     let previousTool = 'image_generation';
+    const realtimeUrl = document.getElementById('realtime-url');
+    const realtimeModels = [...document.querySelectorAll('[data-realtime-model]')];
+    const defaultRealtimeUrl = realtimeUrl?.textContent.trim();
+    const isRealtimeHash = () => ['#realtime', '#realtime-prices'].includes(location.hash);
 
     function renderToolCode(builder) {
       const tool = fields.tool.value;
       if (tool !== previousTool) {
-        if (previousTool !== 'web_search') toolPrompts.set(previousTool, fields.imagePrompt.value);
-        if (tool !== 'web_search') fields.imagePrompt.value = toolPrompts.get(tool) || '';
+        if (toolPrompts.has(previousTool)) toolPrompts.set(previousTool, fields.imagePrompt.value);
+        if (toolPrompts.has(tool)) fields.imagePrompt.value = toolPrompts.get(tool);
         previousTool = tool;
       }
       const prompt = fields.imagePrompt.value;
@@ -80,6 +84,18 @@
         'tools-search-code': curl('web_search', { query, max_results:20 }),
         'tools-search-windows-code': powershell('web_search', [['query',powershellString(query)],['max_results','20']]),
       };
+      if (tool === 'realtime' && defaultRealtimeUrl) {
+        const url = new URL(defaultRealtimeUrl);
+        url.searchParams.set('model', fields.realtimeModel.value);
+        realtimeUrl.textContent = url.href;
+        for (const label of realtimeModels) {
+          const row = label.closest('tr');
+          if (label.textContent === fields.realtimeModel.value) row.setAttribute('aria-current', 'true');
+          else row.removeAttribute('aria-current');
+        }
+        const example = builder.templates.find(([code]) => code.id === 'realtime-python-code');
+        if (example) outputs['realtime-python-code'] = example[1].replace(defaultRealtimeUrl, url.href);
+      }
       for (const [code] of builder.templates) {
         code.textContent = outputs[code.id] ?? code.textContent;
         code.dataset.requiresKey = String(code.textContent.includes(placeholderKey));
@@ -401,7 +417,11 @@
     embeddingField.hidden = true;
     const toolField = field('tool', '工具', 'select');
     for (const [value,label] of [['image_generation','生图'],['image_recognition','识图'],['web_search','联网搜索']]) fields.tool.append(new Option(label,value));
+    if (realtimeModels.length) fields.tool.append(new Option('实时语音', 'realtime'));
     toolField.hidden = true;
+    const realtimeModelField = field('realtimeModel', '语音模型', 'select');
+    for (const label of realtimeModels) fields.realtimeModel.append(new Option(label.textContent, label.textContent));
+    realtimeModelField.hidden = true;
     const keyField = field('key', '选择你的密钥', 'select');
     const actions = document.createElement('div');
     actions.className = 'docs-builder-key-actions';
@@ -439,7 +459,9 @@
     const searchWordsField = field('searchWords', '搜索词', 'textarea');
     fields.searchWords.rows = 3;
     fields.searchWords.value = '今天的科技新闻';
-    for (const el of [imageSizeField,imagePromptField,toolImageField,imageTaskField,searchWordsField]) el.hidden = true;
+    const toolParams = [imageModelField, imageSizeField, imagePromptField, toolImageField, imageTaskField, searchWordsField];
+    for (const el of toolParams) el.hidden = true;
+    for (const el of toolParams.slice(2)) el.classList.add('docs-builder-wide');
     sidebar.append(form);
     const modelEfforts = new Map([[fields.model.value, fields.effort.value]]);
     let previousModel = fields.model.value;
@@ -457,7 +479,16 @@
       updateActiveSection();
     };
     form.addEventListener('submit', event => event.preventDefault());
-    form.addEventListener('input', event => { if (event.target !== fields.key) renderAll(); });
+    function renderInput(event) {
+      if (![fields.key, fields.tool, fields.realtimeModel].includes(event.target)) renderAll();
+    }
+    form.addEventListener('input', renderInput);
+    fields.tool.addEventListener('change', () => {
+      if (isRealtimeHash() && fields.tool.value !== 'realtime') history.replaceState(null, '', '#vision');
+      renderAll();
+      if (toolsSection.getBoundingClientRect().top < 0) toolsSection.scrollIntoView();
+    });
+    fields.realtimeModel.addEventListener('change', renderAll);
     fields.model.addEventListener('change', () => {
       fields.customModel.hidden = fields.model.value !== 'custom';
       effortField.hidden = !hasEffort(fields.model.value);
@@ -470,26 +501,40 @@
     });
     const sections = [...document.querySelectorAll('.docs-guide-section')];
     const links = [...sidebar.querySelectorAll('.docs-sidenav a')];
+    const toolsSection = document.getElementById('vision');
+    const mobileToolSwitch = toolsSection?.querySelector('.docs-mobile-tool-switch');
+    const mobileTools = matchMedia('(max-width: 900px)');
+    function placeToolSwitch() {
+      if (mobileTools.matches && mobileToolSwitch) mobileToolSwitch.append(toolField, realtimeModelField, ...toolParams);
+      else {
+        grid.insertBefore(toolField, keyField);
+        grid.insertBefore(realtimeModelField, keyField);
+        grid.append(...toolParams);
+      }
+      updateActiveSection();
+    }
     function updateActiveSection() {
       let active = sections[0];
       for (const section of sections) {
         if (section.getBoundingClientRect().top <= 100) active = section;
       }
-      const toolsSection = sections.find(section => section.id === 'vision');
       const toolsRect = toolsSection?.getBoundingClientRect();
-      if (location.hash === '#vision' && toolsSection && toolsRect && toolsRect.top < innerHeight && toolsRect.bottom > 0) active = toolsSection;
+      if ((location.hash === '#vision' || isRealtimeHash()) && toolsRect && toolsRect.top < innerHeight && toolsRect.bottom > 0) active = toolsSection;
       for (const link of links) {
         if (link.hash === '#' + active.id) link.setAttribute('aria-current', 'location');
         else link.removeAttribute('aria-current');
       }
       const toolsActive = active.id === 'vision';
-      toolField.hidden = !toolsActive;
-      imageModelField.hidden = !toolsActive || fields.tool.value !== 'image_generation';
-      imageSizeField.hidden = !toolsActive || fields.tool.value !== 'image_generation';
-      imagePromptField.hidden = !toolsActive || fields.tool.value === 'web_search';
-      toolImageField.hidden = !toolsActive || fields.tool.value !== 'image_recognition';
-      imageTaskField.hidden = !toolsActive || fields.tool.value !== 'image_generation';
-      searchWordsField.hidden = !toolsActive || fields.tool.value !== 'web_search';
+      const toolControlsVisible = toolsActive || (mobileTools.matches && mobileToolSwitch);
+      const tool = fields.tool.value;
+      toolField.hidden = !toolControlsVisible;
+      realtimeModelField.hidden = !toolControlsVisible || tool !== 'realtime';
+      imageModelField.hidden = !toolControlsVisible || tool !== 'image_generation';
+      imageSizeField.hidden = !toolControlsVisible || tool !== 'image_generation';
+      imagePromptField.hidden = !toolControlsVisible || !toolPrompts.has(tool);
+      toolImageField.hidden = !toolControlsVisible || tool !== 'image_recognition';
+      imageTaskField.hidden = !toolControlsVisible || tool !== 'image_generation';
+      searchWordsField.hidden = !toolControlsVisible || tool !== 'web_search';
       modelField.hidden = ['embedding', 'rerank', 'vision'].includes(active.id);
       contentField.hidden = active.id === 'rerank' || active.id === 'vision';
       const currentModel = fields.model.value === 'custom' ? fields.customModel.value.trim() : fields.model.value;
@@ -503,8 +548,19 @@
       if (scrollFrame) return;
       scrollFrame = requestAnimationFrame(() => { updateActiveSection(); scrollFrame = null; });
     }, { passive: true });
-    updateActiveSection();
-    renderAll();
+    function openToolFromHash() {
+      if (!isRealtimeHash() || !realtimeModels.length) return;
+      fields.tool.value = 'realtime';
+      renderAll();
+      document.getElementById(location.hash.slice(1))?.scrollIntoView();
+      updateActiveSection();
+    }
+    mobileToolSwitch?.addEventListener('input', renderInput);
+    mobileTools.addEventListener('change', placeToolSwitch);
+    window.addEventListener('hashchange', openToolFromHash);
+    placeToolSwitch();
+    if (isRealtimeHash() && realtimeModels.length) openToolFromHash();
+    else renderAll();
     loadKeys();
     window.addEventListener('storage', event => {
       if (event.key === 'auth_token' || event.key === 'auth_user' || event.key === null) loadKeys();
