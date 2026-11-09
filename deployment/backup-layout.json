@@ -35,7 +35,7 @@
     "inference/reranker/scripts/pool.py",
     "realtime_bridge/server.py",
     "systemd/sub2api-realtime-bridge.service",
-    "var/www/realtime-guide.html",
+    "var/www/api-guide.html",
     "var/www/index.html"
   ],
   "host_files": [
