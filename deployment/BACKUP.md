@@ -78,6 +78,6 @@ python3 -m ops.backup_store backups/具体文件.tar.gz.age
 5. 处理共享 VPN：原身份仍在运行的主机不要覆盖其状态；新增主机应单独注册身份。如果确需恢复包内 VPN 身份，先确认所有使用该状态的旧守护进程已经停止，再安装 `host/tailscale/tailscaled.state` 并恢复权限。验证 `python3 -m ops.tailnet --check`。
 6. 检查外置 `auto-get-api` 的账户、兑换库存和账本；按新路径调整 `host/systemd/auto-get-api.service` 后注册。确认同一账户没有另一个自动续期进程，再启动。
 7. 依次启动数据库、Redis、出口、远端推理连接、供应商池、工具、网关、Web 和隧道。CPU 推理端恢复按 `inference/README.md` 操作，保留原模型和量化规格。
-8. 检查 `python3 -m ops.services status`、网络守护、订阅与监控定时器；GPT 独立守护为 `sub2api-codex-watchdog.service`，实际配置在私有 `config/codex-watchdog.json`。先确认账号额度保护状态，再做小规模真实调用。恢复验证与云端验证回执放入 `var/reports/`，完成后清理临时解密目录。
+8. 检查 `python3 -m ops.services status`、网络守护、订阅与监控定时器；GPT 独立守护为 `sub2api-codex-watchdog.service`，实际配置在私有 `config/codex-watchdog.json`。先确认账号额度保护状态，再做小规模真实调用。Google 渠道已退役；恢复时保持 Google 专用出口 `sub2api-gemini-egress.service` 和旧守护 `sub2api-egress-watchdog.service` 停用。 恢复验证与云端验证回执放入 `var/reports/`，完成后清理临时解密目录。
 
 新增功能的配置与备份登记规则见 [CONFIGURATION.md](CONFIGURATION.md)。

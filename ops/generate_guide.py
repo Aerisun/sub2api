@@ -23,15 +23,11 @@ FAMILIES = (
     ('nemotron-', 'NVIDIA'), ('step-', '阶跃星辰'),
 )
 # Image understanding confirmed through routed endpoints; text-only Nemotron uses internal vision tools.
-VERIFIED_IMAGE_MODELS = {'claude-sonnet-4-6', 'claude-opus-4-6-thinking', 'gemini-3.8-flash', 'deepseek-v4.1-flash', 'qwen3.8-flash', 'qwen3.8-max', 'Nemotron-3.5'}
+VERIFIED_IMAGE_MODELS = {'deepseek-v4.1-flash', 'qwen3.8-flash', 'qwen3.8-max', 'Nemotron-3.5'}
 # Endpoint constraints, checked against Qiniu's model_constraints and NVIDIA model cards.
 # These describe the active routing pool, rather than Claude's assumed alias window.
 MODEL_LIMITS = {
     'gpt-6.1-terra': (872000,128000),
-    # Account 54's current Antigravity catalog caps these Claude routes.
-    'claude-sonnet-4-6': (250000,64000),
-    'claude-opus-4-6-thinking': (250000,64000),
-    'gemini-3.8-flash': (1048576,65536),
     'deepseek-v4.1-flash': (1000000,384000),
     'qwen3.8-flash': (1000000,128000), 'qwen3.8-max': (1000000,128000),
     'Nemotron-3.5': (1000000,128000),

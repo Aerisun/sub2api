@@ -2,6 +2,8 @@
 
 Kimi free 已下架；对应的公开别名、监控和价卡同时移除。原有使用记录保留。
 
+Google 渠道退役后，原由它承载的 Gemini 与 Claude 型号及监控已下线。订阅资格检查仅启用 Codex，Google 专用出口和旧守护保留为停用定义。
+
 这是当前线上服务的项目，基于 `Wei-Shaw/sub2api`，在 `Aerisun/sub2api` 的 `aerisun` 分支维护。Sub2API 及网络守护只保留这一份源码与部署目录；自动续期 `auto-get-api` 按要求保留在同级外部目录，`Gemini-API` 已删除。模型 ID、推理参数、价格及文本供应商映射沿用线上配置；已按要求下架的 Step、GLM 5.2/5.3 和 GLM Flash 不再发布。
 
 配置分层与新功能接入见 [CONFIGURATION.md](CONFIGURATION.md)，网站发布、持续巡检与延迟验收见 [LATENCY.md](LATENCY.md)，缤纷云备份范围与完整恢复步骤见 [BACKUP.md](BACKUP.md)。

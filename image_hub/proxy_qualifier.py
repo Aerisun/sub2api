@@ -30,6 +30,10 @@ from image_hub.egress_control import route_lock
 ROOT = Path(__file__).resolve().parent.parent
 REGIONS = r'^(?:NA-UnitedStates-|ASIA-Japan-|ASIA-Singapore-).+$'
 ALLOWED_COUNTRIES = {'US', 'JP', 'SG'}
+NETWORK_PROBES = {
+    'gemini': ('https://oauth2.googleapis.com/token', '404'),
+    'codex': ('https://chatgpt.com/cdn-cgi/trace', '200'),
+}
 LOG = logging.getLogger('proxy-qualifier')
 LOADER = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)
 
@@ -356,8 +360,7 @@ def probe_live_pools(config):
             # The authenticated generation endpoint can reject an unauthenticated
             # GET even when paid POSTs work. Probe TLS separately from the real
             # model checks below, using the same URL as node qualification.
-            url, expected = (('https://oauth2.googleapis.com/token', '404') if role['name'] == 'gemini'
-                             else ('https://chatgpt.com/cdn-cgi/trace', '200'))
+            url, expected = NETWORK_PROBES[role['name']]
             query = urlencode({'url': url, 'expected': expected,
                                'timeout': config.get('live_probe_timeout_ms', 2500)})
             def probe(name):
@@ -503,9 +506,9 @@ def evaluate(config, source):
     with isolated_proxy(list(all_nodes.values()), config) as (client, proxy):
         def network(node):
             values = {}
-            for name, url, expected in (
-                ('gemini', 'https://oauth2.googleapis.com/token', '404'),
-                ('codex', 'https://chatgpt.com/cdn-cgi/trace', '200')):
+            for role in active:
+                name = role['name']
+                url, expected = NETWORK_PROBES[name]
                 query = urlencode({'url': url, 'expected': expected, 'timeout': 4000})
                 try:
                     values[name] = client.request('/proxies/' + quote(node, safe='') + '/delay?' + query).get('delay')

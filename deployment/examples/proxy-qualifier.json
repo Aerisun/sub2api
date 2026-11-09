@@ -11,14 +11,6 @@
   "upstream_route_state_file": "@ROOT@/data/upstream-proxy-routes.json",
   "roles": [
     {
-      "name": "gemini",
-      "mihomo_config": "@ROOT@/deployment/private/egress/mihomo-sub2api/config.yaml",
-      "provider_file": "@ROOT@/deployment/private/egress/mihomo-sub2api/qualified-nodes.yaml",
-      "group": "Sub2API egress",
-      "account_id": 54,
-      "proxy_id": 3
-    },
-    {
       "name": "codex",
       "guard_state_file": "@ROOT@/data/codex-watchdog-state.json",
       "mihomo_config": "@ROOT@/deployment/private/egress/mihomo-codex/config.yaml",

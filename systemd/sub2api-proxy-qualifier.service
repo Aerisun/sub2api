@@ -1,7 +1,7 @@
 [Unit]
-Description=Qualify subscription changes for Gemini and Codex before live promotion
-After=network-online.target sub2api.service sub2api-gemini-egress.service sub2api-codex-egress.service
-Wants=network-online.target sub2api-gemini-egress.service sub2api-codex-egress.service
+Description=Qualify Codex subscription changes before live promotion
+After=network-online.target sub2api.service sub2api-codex-egress.service
+Wants=network-online.target sub2api-codex-egress.service
 
 [Service]
 Type=simple

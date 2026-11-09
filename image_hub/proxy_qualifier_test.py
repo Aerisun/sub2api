@@ -125,11 +125,15 @@ class QualificationTests(unittest.TestCase):
         self.assertEqual(credential_expiry({'expires_at': 'bad', 'access_token': 'opaque'}), 0)
 
     def test_rfc3339_account_expiry_does_not_abort_network_requalification(self):
+        urls = []
         class NoCandidates:
             def __enter__(self):
                 return self, 'http://127.0.0.1:1'
             def __exit__(self, *args):
                 pass
+            def request(self, path):
+                urls.append(parse_qs(urlsplit(path).query)['url'][0])
+                return {}
         config = {'roles': [{'name': 'codex', 'account_id': 91, 'provider_file': 'fixture'}]}
         credentials = {91: {'expires_at': '2026-11-09T21:43:44+08:00', 'access_token': 'opaque'}}
         with patch('ops.admin_api.login', return_value='fixture'), \
@@ -138,8 +142,9 @@ class QualificationTests(unittest.TestCase):
              patch('image_hub.proxy_qualifier.read_yaml', return_value={'proxies': []}), \
              patch('image_hub.proxy_qualifier.isolated_proxy', return_value=NoCandidates()), \
              patch('image_hub.proxy_qualifier.time.time', return_value=1793530000):
-            self.assertEqual(evaluate(config, []), {'codex': []})
+            self.assertEqual(evaluate(config, [node('NA-UnitedStates-fixture')]), {'codex': []})
         self.assertFalse(any('/refresh' in call.args[0] for call in request.call_args_list))
+        self.assertEqual(urls, ['https://chatgpt.com/cdn-cgi/trace'])
 
     def test_region_rejection_does_not_hide_working_spares_in_other_regions(self):
         rank = ['NA-UnitedStates-'+str(n) for n in range(20)]
