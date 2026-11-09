@@ -1,0 +1,17 @@
+[Unit]
+Description=Sub2API realtime media bridge
+After=network-online.target sub2api-codex-egress.service
+Wants=network-online.target sub2api-codex-egress.service
+
+[Service]
+WorkingDirectory=@ROOT@
+Environment=PYTHONPATH=@ROOT@/runtime/python-site:@ROOT@
+ExecStart=/usr/bin/python3 -m realtime_bridge.server
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=20
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

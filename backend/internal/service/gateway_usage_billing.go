@@ -242,6 +242,7 @@ func isForcedUsageBillingRequestID(requestID string) bool {
 		strings.HasPrefix(id, "vision-bridge:") ||
 		strings.HasPrefix(id, "grok-video:") ||
 		strings.HasPrefix(id, "grok_audio:") ||
+		strings.HasPrefix(id, "openai-realtime:") ||
 		strings.HasPrefix(id, "grok_realtime:")
 }
 

@@ -4,6 +4,86 @@
   "unit": "1M tokens",
   "policy": "Review all 21 model cards and 3 tool capabilities. Keep verified developer/DeepSeek reference cards and owner-approved image tiers; lower five site token cards to moderate service margins. Local vector/scoring outputs remain free. Tool aliases retain delegated billing and are not flattened into independent model tariffs.",
   "models": {
+    "gpt-realtime-2.1": {
+      "source": "https://developers.openai.com/api/docs/pricing#realtime-and-audio-generation-models",
+      "status": "developer_standard",
+      "note": "标准文本和音频用量按各自的 Token 单价结算。价格单位为美元 / 百万 Token。",
+      "pricing": {
+        "platform": "openai",
+        "models": [
+          "gpt-realtime-2.1"
+        ],
+        "billing_mode": "token",
+        "input_price": 4e-06,
+        "output_price": 2.4e-05,
+        "cache_read_price": 4.0000000000000003e-07
+      },
+      "audio_usd_per_million_tokens": {
+        "input": 32,
+        "output": 64,
+        "cached_input": 0.4
+      }
+    },
+    "gpt-realtime-2.1-mini": {
+      "source": "https://developers.openai.com/api/docs/pricing#realtime-and-audio-generation-models",
+      "status": "developer_standard",
+      "note": "标准文本和音频用量按各自的 Token 单价结算。价格单位为美元 / 百万 Token。",
+      "pricing": {
+        "platform": "openai",
+        "models": [
+          "gpt-realtime-2.1-mini"
+        ],
+        "billing_mode": "token",
+        "input_price": 6e-07,
+        "output_price": 2.4e-06,
+        "cache_read_price": 6e-08
+      },
+      "audio_usd_per_million_tokens": {
+        "input": 10,
+        "output": 20,
+        "cached_input": 0.3
+      }
+    },
+    "gpt-realtime-2": {
+      "source": "https://developers.openai.com/api/docs/pricing#realtime-and-audio-generation-models",
+      "status": "developer_standard",
+      "note": "标准文本和音频用量按各自的 Token 单价结算。价格单位为美元 / 百万 Token。",
+      "pricing": {
+        "platform": "openai",
+        "models": [
+          "gpt-realtime-2"
+        ],
+        "billing_mode": "token",
+        "input_price": 4e-06,
+        "output_price": 2.4e-05,
+        "cache_read_price": 4.0000000000000003e-07
+      },
+      "audio_usd_per_million_tokens": {
+        "input": 32,
+        "output": 64,
+        "cached_input": 0.4
+      }
+    },
+    "gpt-realtime-1.5": {
+      "source": "https://developers.openai.com/api/docs/pricing#realtime-and-audio-generation-models",
+      "status": "developer_standard",
+      "note": "标准文本和音频用量按各自的 Token 单价结算。价格单位为美元 / 百万 Token。",
+      "pricing": {
+        "platform": "openai",
+        "models": [
+          "gpt-realtime-1.5"
+        ],
+        "billing_mode": "token",
+        "input_price": 4e-06,
+        "output_price": 1.6e-05,
+        "cache_read_price": 4.0000000000000003e-07
+      },
+      "audio_usd_per_million_tokens": {
+        "input": 32,
+        "output": 64,
+        "cached_input": 0.4
+      }
+    },
     "gpt-6-astra": {
       "source": "https://developers.openai.com/api/docs/pricing",
       "status": "developer_standard",

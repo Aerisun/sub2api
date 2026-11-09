@@ -20,6 +20,7 @@ MANIFEST = Path(__file__).resolve().parents[1] / "resources/model-pricing/offici
 TOOL_IDS = frozenset({"image_generation", "image_recognition", "web_search"})
 FAMILY = {
     "gpt-image-": "图片生成",
+    "gpt-realtime-": "实时语音",
     "gpt-6": "Codex", "gpt-5.6": "Codex",
     "claude-": "Claude", "gemini-": "Gemini", "deepseek-": "DeepSeek",
     "glm-": "GLM", "kimi-": "Kimi", "minimax-": "MiniMax", "qwen": "Qwen",

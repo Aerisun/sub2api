@@ -33,6 +33,9 @@
     "deployment/private/config/backup-store.json",
     "inference/embedding/scripts/embedding_pool.py",
     "inference/reranker/scripts/pool.py",
+    "realtime_bridge/server.py",
+    "systemd/sub2api-realtime-bridge.service",
+    "var/www/realtime-guide.html",
     "var/www/index.html"
   ],
   "host_files": [

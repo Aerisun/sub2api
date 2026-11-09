@@ -21,6 +21,7 @@ import (
 // OpenAIRecordUsageInput input for recording usage
 type OpenAIRecordUsageInput struct {
 	Result             *OpenAIForwardResult
+	RealtimeUsage      *RealtimeTokenUsage
 	APIKey             *APIKey
 	User               *User
 	Account            *Account
@@ -265,20 +266,24 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		serviceTier = strings.TrimSpace(*result.ServiceTier)
 	}
 	longContextBillingGate := openAILongContextBillingGate(billingAccount)
-	cost, err = s.calculateOpenAIRecordUsageCost(
-		ctx,
-		result,
-		apiKey,
-		billingModels,
-		multiplier,
-		imageMultiplier,
-		videoMultiplier,
-		baseMultiplier,
-		tokens,
-		serviceTier,
-		longContextBillingGate,
-		pricingAt,
-	)
+	if input.RealtimeUsage != nil {
+		cost, err = input.RealtimeUsage.cost(result.Model, multiplier)
+	} else {
+		cost, err = s.calculateOpenAIRecordUsageCost(
+			ctx,
+			result,
+			apiKey,
+			billingModels,
+			multiplier,
+			imageMultiplier,
+			videoMultiplier,
+			baseMultiplier,
+			tokens,
+			serviceTier,
+			longContextBillingGate,
+			pricingAt,
+		)
+	}
 	if err != nil {
 		if !isUsagePricingUnavailableError(err) {
 			return err

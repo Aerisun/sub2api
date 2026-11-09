@@ -133,7 +133,7 @@ def live_models():
     group = api.request(f'/api/v1/admin/groups/{CUSTOMER_GROUP_ID}', unified.login())
     if group['status'] != 'active' or not group['model_allowlist']['enabled']:
         raise RuntimeError('Guide requires the active customer model allowlist')
-    models = {model for model in group['model_allowlist']['models'] if model not in TOOL_IDS and not model.startswith('gpt-image-')}
+    models = {model for model in group['model_allowlist']['models'] if model not in TOOL_IDS and not model.startswith(('gpt-image-', 'gpt-realtime-'))}
     priced = {model for entry in group['model_pricing'] for model in entry['models']}
     if not models or models - priced:
         raise RuntimeError('Guide models must have configured prices')

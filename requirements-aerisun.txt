@@ -5,3 +5,5 @@ PyYAML>=5.4.1,<7
 Pillow==12.3.0
 boto3==1.43.81
 cryptography==50.0.2
+aiortc==1.15.0
+av==17.1.0
