@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -1300,6 +1301,9 @@ func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *
 }
 
 func writeModelsList(c *gin.Context, platform string, modelIDs []string) {
+	if c.GetBool("internal_chat_authenticated") {
+		modelIDs = slices.DeleteFunc(slices.Clone(modelIDs), service.IsStandardOpenAIRealtimeModel)
+	}
 	if platform == service.PlatformOpenAI {
 		writeOpenAIModelsList(c, modelIDs)
 		return
@@ -1321,10 +1325,6 @@ func writeModelsList(c *gin.Context, platform string, modelIDs []string) {
 }
 
 func writeAllowlistedModelsList(c *gin.Context, platform string, modelIDs []string) {
-	if platform == service.PlatformOpenAI {
-		writeOpenAIModelsList(c, modelIDs)
-		return
-	}
 	writeModelsList(c, platform, modelIDs)
 }
 

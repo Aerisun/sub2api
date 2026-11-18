@@ -23,6 +23,8 @@ var realtimeTariffs = map[string]realtimeTariff{
 	"gpt-realtime-1.5":      {4, .4, 16, 32, .4, 64, 5, .5},
 }
 
+const StandardOpenAIRealtimeEndpointMessage = "Use /v1/realtime over WebSocket for this voice model. See Tools → Realtime in the API guide."
+
 func IsStandardOpenAIRealtimeModel(model string) bool {
 	_, ok := realtimeTariffs[model]
 	return ok

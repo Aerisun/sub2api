@@ -19,6 +19,15 @@ import (
 	"go.uber.org/zap"
 )
 
+func rejectRealtimeTextModel(c *gin.Context, model string, writeError func(*gin.Context, int, string, string)) bool {
+	if !service.IsStandardOpenAIRealtimeModel(strings.TrimSpace(model)) {
+		return false
+	}
+	service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalModelConfiguration)
+	writeError(c, http.StatusBadRequest, "invalid_request_error", service.StandardOpenAIRealtimeEndpointMessage)
+	return true
+}
+
 // OpenAIRealtime exposes the standard realtime event protocol. The worker
 // translates the verified upstream WebRTC media leg, not its billing events.
 func (h *OpenAIGatewayHandler) OpenAIRealtime(c *gin.Context) {

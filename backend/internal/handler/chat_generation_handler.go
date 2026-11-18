@@ -70,6 +70,10 @@ func (h *ChatHistoryHandler) Generate(c *gin.Context) {
 		response.Success(c, item)
 		return
 	}
+	if service.IsStandardOpenAIRealtimeModel(strings.TrimSpace(item.Model)) {
+		response.BadRequest(c, "实时语音模型请使用 API 接入指南中的「工具 → 实时语音」入口")
+		return
+	}
 	tx, err := h.db.BeginTx(c.Request.Context(), nil)
 	if err != nil {
 		response.ErrorFrom(c, err)

@@ -212,7 +212,7 @@ function App() {
           .map((m: { id: string }) => m.id)
           .filter(
             (m: string) =>
-              !/embedding|rerank|image|tts|whisper|sora|video|^web_search$/i.test(m),
+              !/embedding|rerank|image|tts|whisper|sora|video|^web_search$|^gpt-realtime-/i.test(m),
           )
           .sort();
         setModels(available);
@@ -533,7 +533,11 @@ function App() {
                         tool={item.tools?.some(tool=>tool.name === "web_search" && tool.status === "running") ? "web_search" : item.tools?.some(tool=>tool.name === "image_recognition" && tool.status === "running") ? "image_recognition" : undefined}/>
                     )}
                     {item.error && (
-                      <p className="message-error">{item.error}</p>
+                      <p className="message-error">
+                        {item.model?.startsWith("gpt-realtime-") ? (
+                          <a href="../api-guide.html#realtime" target="_blank" rel="noopener noreferrer">此型号使用实时语音入口，查看接入指南</a>
+                        ) : item.error}
+                      </p>
                     )}
                   </MessageContent>
                   {item.role === "assistant" && !busy && (

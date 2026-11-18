@@ -94,3 +94,31 @@ func setImageChatTestAuth(c *gin.Context) {
 	c.Set(string(middleware.ContextKeyAPIKey), apiKey)
 	c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: apiKey.UserID, Concurrency: 1})
 }
+
+func TestTextEndpointsRejectRealtimeModelBeforeScheduling(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	openAI := newOpenAIImageChatRejectionHandler(t)
+	for _, endpoint := range []struct {
+		path string
+		call func(*gin.Context)
+	}{
+		{"/v1/chat/completions", openAI.ChatCompletions},
+		{"/v1/chat/completions", (&GatewayHandler{}).ChatCompletions},
+		{"/v1/responses", openAI.Responses},
+		{"/v1/messages", openAI.Messages},
+	} {
+		t.Run(endpoint.path, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(recorder)
+			c.Request = httptest.NewRequest(http.MethodPost, endpoint.path, bytes.NewBufferString(
+				`{"model":"gpt-realtime-2.1","messages":[{"role":"user","content":"123"}],"input":"123"}`,
+			))
+			setImageChatTestAuth(c)
+			endpoint.call(c)
+			require.Equal(t, http.StatusBadRequest, recorder.Code)
+			require.Contains(t, recorder.Body.String(), "/v1/realtime")
+			_, selected := c.Get(opsAccountIDKey)
+			require.False(t, selected)
+		})
+	}
+}

@@ -76,6 +76,9 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 		return
 	}
 	reqModel := modelResult.String()
+	if rejectRealtimeTextModel(c, reqModel, h.errorResponse) {
+		return
+	}
 	bindRequestedReasoningEffort(c, body, reqModel)
 	ensureCompositeTargetPlatform(c, apiKey, reqModel)
 	if !compositeTargetPlatformResolved(c, apiKey, reqModel) {

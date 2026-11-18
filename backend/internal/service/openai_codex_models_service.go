@@ -93,7 +93,7 @@ func FilterCodexModelIDsForGroup(modelIDs []string, group *Group) []string {
 
 func isCodexDedicatedMediaModel(modelID string) bool {
 	canonical := codexProviderQualifiedModelID(modelID)
-	return IsGPTImageGenerationModel(canonical) ||
+	return IsStandardOpenAIRealtimeModel(canonical) || IsGPTImageGenerationModel(canonical) ||
 		isImageGenerationModel(canonical) ||
 		xai.IsGrokImagineModel(modelID)
 }
