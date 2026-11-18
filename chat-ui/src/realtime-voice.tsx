@@ -320,12 +320,11 @@ export function RealtimeVoice({ apiBase, isSignedIn }: { apiBase: string; isSign
   return (
     <>
       {models.length > 0 && (
-        <button ref={button} type="button" className="realtime-trigger" aria-haspopup="dialog" onClick={() => {
+        <button ref={button} type="button" className="realtime-trigger" aria-label="实时语音" aria-haspopup="dialog" onClick={() => {
           dialog.current?.showModal();
           start();
         }}>
-          <AudioLines size={15} aria-hidden="true" />
-          <span>实时语音</span>
+          <AudioLines size={16} aria-hidden="true" />
         </button>
       )}
       {createPortal(<>

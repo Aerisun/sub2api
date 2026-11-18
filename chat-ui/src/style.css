@@ -986,8 +986,8 @@ html, body, #root { height: 100%; overscroll-behavior: none; }
 .search-full-extract pre, .search-source-extract pre { margin:8px 0 0; padding:12px; max-height:380px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; border:1px solid var(--border); border-radius:8px; background:var(--muted); color:var(--foreground); font-family:inherit; font-size:12px; line-height:1.7; }
 
 .realtime-trigger {
-  display: inline-flex; align-items: center; gap: 5px; min-height: 30px;
-  padding: 4px 8px; border-radius: 7px; white-space: nowrap; font-size: 12px;
+  display: inline-grid; place-items: center; width: 32px; height: 32px;
+  border-radius: 8px;
   color: var(--muted-foreground);
 }
 .realtime-trigger:hover, .realtime-trigger:focus-visible { background: var(--muted); color: var(--foreground); }
