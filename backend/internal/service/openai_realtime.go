@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"os"
+	"slices"
 	"time"
 )
 
@@ -24,6 +26,10 @@ var realtimeTariffs = map[string]realtimeTariff{
 }
 
 const StandardOpenAIRealtimeEndpointMessage = "Use /v1/realtime over WebSocket for this voice model. See Tools → Realtime in the API guide."
+
+func StandardOpenAIRealtimeModels() []string {
+	return slices.Sorted(maps.Keys(realtimeTariffs))
+}
 
 func IsStandardOpenAIRealtimeModel(model string) bool {
 	_, ok := realtimeTariffs[model]

@@ -198,9 +198,7 @@ func RegisterGatewayRoutes(
 		// The optional tool bridge holds only the login JWT; reserved API keys stay
 		// inside the final gateway route and are never exposed to the browser.
 		r.POST("/api/v1/chat/completions", bodyLimit, gin.HandlerFunc(chatJWT[0]), middleware.BackendModeUserGuard(settingService), chatImageAgentProxy())
-		chat := r.Group("/api/v1/chat")
-		chat.Use(bodyLimit, gin.HandlerFunc(chatJWT[0]), middleware.BackendModeUserGuard(settingService))
-		chat.Use(func(c *gin.Context) {
+		chatCredential := func(c *gin.Context) {
 			subject, ok := middleware.GetAuthSubjectFromContext(c)
 			if !ok {
 				c.AbortWithStatus(http.StatusUnauthorized)
@@ -213,15 +211,18 @@ func RegisterGatewayRoutes(
 			}
 			// Normalize before endpoint detection and routing. No caller-supplied key,
 			// user ID or group ID can change the credential selected above.
-			if c.Request.Method == http.MethodGet {
+			switch {
+			case c.FullPath() == "/api/v1/chat/realtime":
+				c.Request.URL.Path = "/v1/realtime"
+			case c.Request.Method == http.MethodGet:
 				c.Request.URL.Path = "/v1/models"
-			} else if strings.HasSuffix(c.Request.URL.Path, "/images/generations") {
+			case strings.HasSuffix(c.Request.URL.Path, "/images/generations"):
 				c.Request.URL.Path = "/v1/images/generations"
-			} else if strings.HasSuffix(c.Request.URL.Path, "/alpha/search") {
+			case strings.HasSuffix(c.Request.URL.Path, "/alpha/search"):
 				c.Request.URL.Path = "/v1/alpha/search"
-			} else if strings.HasSuffix(c.Request.URL.Path, "/images/recognitions") {
+			case strings.HasSuffix(c.Request.URL.Path, "/images/recognitions"):
 				c.Request.URL.Path = "/v1/images/recognitions"
-			} else {
+			default:
 				c.Request.URL.Path = "/v1/chat/completions"
 			}
 			originalAuth := c.Request.Header.Get("Authorization")
@@ -232,9 +233,17 @@ func RegisterGatewayRoutes(
 			c.Header("Cache-Control", "no-store")
 			defer c.Request.Header.Set("Authorization", originalAuth)
 			c.Next()
-		})
-		chat.Use(clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth))
+		}
+		chatAuth := gin.HandlerFunc(chatJWT[0])
+		chatUserGuard := middleware.BackendModeUserGuard(settingService)
+		chat := r.Group("/api/v1/chat")
+		chat.Use(bodyLimit, chatAuth, chatUserGuard, chatCredential,
+			clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth))
 		chat.GET("/models", modelsHandler)
+		chat.GET("/realtime/models", groupModelAllowlist, h.OpenAIGateway.BrowserRealtimeModels)
+		r.GET("/api/v1/chat/realtime", middleware.BrowserWebSocketJWT(), chatAuth, chatUserGuard,
+			chatCredential, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth),
+			groupModelAllowlist, compositeTarget, requireGroupAnthropic, h.OpenAIGateway.OpenAIRealtime)
 		chat.Use(groupImageGeneration, groupModelAllowlist, compositeTarget, requireGroupAnthropic)
 		chat.POST("/images/generations", imagesHandler)
 		chat.POST("/alpha/search", h.OpenAIGateway.AlphaSearch)

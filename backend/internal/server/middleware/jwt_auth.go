@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"errors"
+	"net/http"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -113,3 +114,33 @@ func jwtAuth(
 }
 
 // Deprecated: prefer GetAuthSubjectFromContext in auth_subject.go.
+
+const BrowserVoiceWebSocketProtocol = "sub2api-voice"
+
+// BrowserWebSocketJWT allows a browser to authenticate a dedicated WebSocket
+// route using the same JWT transport as the admin WebSocket. Never negotiate or
+// forward the credential-bearing header.
+func BrowserWebSocketJWT() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !isWebSocketUpgradeRequest(c) {
+			AbortWithError(c, http.StatusUpgradeRequired, "UPGRADE_REQUIRED", "WebSocket upgrade required")
+			return
+		}
+		protocol := false
+		for _, item := range strings.Split(c.GetHeader("Sec-WebSocket-Protocol"), ",") {
+			if strings.TrimSpace(item) == BrowserVoiceWebSocketProtocol {
+				protocol = true
+				break
+			}
+		}
+		token := extractJWTFromWebSocketSubprotocol(c)
+		c.Request.Header.Del("Sec-WebSocket-Protocol")
+		if !protocol || token == "" {
+			AbortWithError(c, http.StatusUnauthorized, "UNAUTHORIZED", "Authorization required")
+			return
+		}
+		c.Request.Header.Set("Authorization", "Bearer "+token)
+		c.Request.Header.Set("Sec-WebSocket-Protocol", BrowserVoiceWebSocketProtocol)
+		c.Next()
+	}
+}

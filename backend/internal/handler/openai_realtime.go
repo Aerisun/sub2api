@@ -28,6 +28,22 @@ func rejectRealtimeTextModel(c *gin.Context, model string, writeError func(*gin.
 	return true
 }
 
+func realtimeAPIKeyGroupEnabled(key *service.APIKey) bool {
+	return key != nil && key.Group != nil && key.Group.ModelAllowlistEnabled() &&
+		(key.Group.Platform == service.PlatformOpenAI || key.Group.Platform == service.PlatformComposite)
+}
+
+// BrowserRealtimeModels lists the voice choices authorized for the current
+// site's chat credential.
+func (h *OpenAIGatewayHandler) BrowserRealtimeModels(c *gin.Context) {
+	key, _ := middleware2.GetAPIKeyFromContext(c)
+	models := []string{}
+	if realtimeAPIKeyGroupEnabled(key) {
+		models = key.Group.ModelAllowlist.FilterForListing(service.StandardOpenAIRealtimeModels())
+	}
+	c.JSON(http.StatusOK, gin.H{"models": models})
+}
+
 // OpenAIRealtime exposes the standard realtime event protocol. The worker
 // translates the verified upstream WebRTC media leg, not its billing events.
 func (h *OpenAIGatewayHandler) OpenAIRealtime(c *gin.Context) {
@@ -35,9 +51,13 @@ func (h *OpenAIGatewayHandler) OpenAIRealtime(c *gin.Context) {
 		h.errorResponse(c, http.StatusUpgradeRequired, "invalid_request_error", "WebSocket upgrade required")
 		return
 	}
-	key, ok := middleware2.GetAPIKeyFromContext(c)
-	if !ok || key.Group == nil || !key.Group.ModelAllowlistEnabled() ||
-		(key.Group.Platform != service.PlatformOpenAI && key.Group.Platform != service.PlatformComposite) {
+	key, _ := middleware2.GetAPIKeyFromContext(c)
+	if c.GetBool("internal_chat_authenticated") {
+		// The exact browser endpoint may sit under a different public mount.
+		// Cross-origin handshakes are rejected by websocket.Accept.
+		c.Header("Cache-Control", "no-store")
+	}
+	if !realtimeAPIKeyGroupEnabled(key) {
 		h.errorResponse(c, http.StatusForbidden, "permission_error", "Realtime is not enabled for this group")
 		return
 	}
@@ -90,7 +110,11 @@ func (h *OpenAIGatewayHandler) OpenAIRealtime(c *gin.Context) {
 		return
 	}
 	defer bridge.Close()
-	ws, err := coderws.Accept(c.Writer, c.Request, nil)
+	var accepts *coderws.AcceptOptions
+	if c.GetBool("internal_chat_authenticated") {
+		accepts = &coderws.AcceptOptions{Subprotocols: []string{middleware2.BrowserVoiceWebSocketProtocol}}
+	}
+	ws, err := coderws.Accept(c.Writer, c.Request, accepts)
 	if err != nil {
 		return
 	}

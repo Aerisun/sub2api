@@ -52,6 +52,7 @@ import type { Item, Chat } from "./chat-types";
 import { historyRequest } from "./history-api";
 import "./style.css";
 import { BrandIcon, ModelControls } from "./model-controls";
+import { RealtimeVoice } from "./realtime-voice";
 import {
   validEffort,
   chatParams,
@@ -85,6 +86,7 @@ function identity() {
   }
 }
 const userID = identity();
+const isChatUserSignedIn = () => userID != null && identity() === userID && !!localStorage.getItem("auth_token");
 const storageKey = `aerisun:chat:${userID}`;
 function headers() {
   return {
@@ -619,6 +621,7 @@ function App() {
                   onServiceTier={(value) => { patchDraft(composerID, { serviceTier: value }); setFastNotice(value === "fast"); }}
                 />
                 <UploadImageButton disabled={!historyReady || loadingModels || !uploadLimit} maxFiles={uploadLimit} />
+                <RealtimeVoice apiBase={apiBase} isSignedIn={isChatUserSignedIn} />
               </PromptInputTools>
               <ComposerSubmit busy={busy} stopping={stopping.has(composerID)} enabled={!!model && !loadingModels && historyReady && !detailLoading} input={input} stop={() => void stopGeneration()} />
             </PromptInputFooter>
