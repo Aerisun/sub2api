@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { AudioLines, Mic, PhoneOff } from "lucide-react";
+import { createPortal } from "react-dom";
+import { AudioLines, Mic, PhoneOff, X } from "lucide-react";
 import captureURL from "./realtime-capture.js?url&no-inline";
+import dialogStyles from "./realtime-dialog.css?url&no-inline";
 
 const preferredModel = "gpt-realtime-2.1-mini";
 const phases = {
@@ -233,11 +235,29 @@ export function RealtimeVoice({ apiBase, isSignedIn }: { apiBase: string; isSign
   const button = useRef<HTMLButtonElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const session = useRef<VoiceSession | null>(null);
+  const [modalRoot] = useState(() => document.createElement("div"));
   const [models, setModels] = useState<string[]>([]);
   const [model, setModel] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState("");
   const [caption, setCaption] = useState("");
+
+  useEffect(() => {
+    const container = window.frameElement?.parentElement ?? document.body;
+    const mount = () => container.append(modalRoot);
+    const detach = () => {
+      dialog.current?.close();
+      modalRoot.remove();
+    };
+    mount();
+    window.addEventListener("pageshow", mount);
+    window.addEventListener("pagehide", detach);
+    return () => {
+      window.removeEventListener("pageshow", mount);
+      window.removeEventListener("pagehide", detach);
+      detach();
+    };
+  }, [modalRoot]);
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -308,35 +328,40 @@ export function RealtimeVoice({ apiBase, isSignedIn }: { apiBase: string; isSign
           <span>实时语音</span>
         </button>
       )}
-      <dialog ref={dialog} className="realtime-dialog" aria-labelledby="voice-title" onCancel={event => {
-        event.preventDefault();
-        dismiss();
-      }}>
-        <div className="realtime-panel">
-          <header>
-            <h2 id="voice-title">实时语音</h2>
-            <button type="button" className="realtime-close" onClick={dismiss} aria-label="关闭实时语音">×</button>
-          </header>
-          <div className="realtime-voice-status" data-phase={phase}>
-            <Mic size={26} aria-hidden="true" />
-            <p role="status">{phases[phase]}</p>
-          </div>
-          {error && <p role="alert" className="realtime-error">{error}</p>}
-          {caption && <div className="realtime-caption">{caption}</div>}
-          <footer>
-            <select value={model} onChange={event => setModel(event.currentTarget.value)} disabled={phase !== "idle"} aria-label="语音模型">
-              {models.map(name => <option value={name} key={name}>{name}</option>)}
-            </select>
-            {phase === "idle" ? (
-              <button type="button" className="realtime-action" onClick={start}>开始通话</button>
-            ) : (
-              <button type="button" className="realtime-action realtime-stop" onClick={() => session.current?.close()}>
-                <PhoneOff size={15} aria-hidden="true" />结束通话
+      {createPortal(<>
+        <link rel="stylesheet" href={dialogStyles} />
+        <dialog ref={dialog} className="realtime-dialog" aria-labelledby="voice-title" onCancel={event => {
+          event.preventDefault();
+          dismiss();
+        }}>
+          <div className="realtime-panel">
+            <header>
+              <h2 id="voice-title">实时语音</h2>
+              <button type="button" className="realtime-close" onClick={dismiss} aria-label="关闭实时语音">
+                <X size={18} aria-hidden="true" />
               </button>
-            )}
-          </footer>
-        </div>
-      </dialog>
+            </header>
+            <div className="realtime-voice-status" data-phase={phase}>
+              <Mic size={26} aria-hidden="true" />
+              <p role="status">{phases[phase]}</p>
+            </div>
+            {error && <p role="alert" className="realtime-error">{error}</p>}
+            {caption && <div className="realtime-caption">{caption}</div>}
+            <footer>
+              <select value={model} onChange={event => setModel(event.currentTarget.value)} disabled={phase !== "idle"} aria-label="语音模型">
+                {models.map(name => <option value={name} key={name}>{name}</option>)}
+              </select>
+              {phase === "idle" ? (
+                <button type="button" className="realtime-action" onClick={start}>开始通话</button>
+              ) : (
+                <button type="button" className="realtime-action realtime-stop" onClick={() => session.current?.close()}>
+                  <PhoneOff size={15} aria-hidden="true" />结束通话
+                </button>
+              )}
+            </footer>
+          </div>
+        </dialog>
+      </>, modalRoot)}
     </>
   );
 }

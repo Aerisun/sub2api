@@ -991,27 +991,3 @@ html, body, #root { height: 100%; overscroll-behavior: none; }
   color: var(--muted-foreground);
 }
 .realtime-trigger:hover, .realtime-trigger:focus-visible { background: var(--muted); color: var(--foreground); }
-.realtime-dialog {
-  position: fixed; inset: 0; margin: auto; width: min(410px, calc(100vw - 32px));
-  max-height: calc(100dvh - 32px); overflow: auto; border: 1px solid var(--border);
-  border-radius: 16px; background: var(--background); color: var(--foreground);
-}
-.realtime-dialog::backdrop { background: rgb(0 0 0 / .54); }
-.realtime-panel { display: grid; gap: 16px; padding: 20px; }
-.realtime-panel header, .realtime-panel footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.realtime-panel h2 { margin: 0; font-size: 18px; font-weight: 650; }
-.realtime-close { width: 32px; height: 32px; border-radius: 8px; font-size: 24px; line-height: 1; color: var(--muted-foreground); }
-.realtime-close:hover { background: var(--muted); }
-.realtime-voice-status { display: grid; place-items: center; gap: 10px; padding: 20px 12px; border-radius: 12px; background: var(--muted); }
-.realtime-voice-status svg { color: var(--muted-foreground); }
-.realtime-voice-status[data-phase="recording"] svg, .realtime-voice-status[data-phase="speaking"] svg { color: var(--primary); }
-.realtime-voice-status p { margin: 0; font-size: 14px; font-weight: 550; }
-.realtime-caption { max-height: 140px; overflow-y: auto; font-size: 14px; line-height: 1.6; }
-.realtime-error { font-size: 13px; color: #d05b48; }
-.realtime-panel footer { flex-wrap: wrap; }
-.realtime-panel footer select, .realtime-action {
-  min-height: 34px; border-radius: 8px; padding: 6px 9px; font-size: 13px;
-  border: 1px solid var(--border); background: var(--background); color: var(--foreground);
-}
-.realtime-action { display: inline-flex; align-items: center; gap: 5px; background: var(--primary); color: var(--primary-foreground); }
-.realtime-stop { background: var(--muted); color: var(--foreground); }

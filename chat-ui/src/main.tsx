@@ -621,9 +621,11 @@ function App() {
                   onServiceTier={(value) => { patchDraft(composerID, { serviceTier: value }); setFastNotice(value === "fast"); }}
                 />
                 <UploadImageButton disabled={!historyReady || loadingModels || !uploadLimit} maxFiles={uploadLimit} />
-                <RealtimeVoice apiBase={apiBase} isSignedIn={isChatUserSignedIn} />
               </PromptInputTools>
-              <ComposerSubmit busy={busy} stopping={stopping.has(composerID)} enabled={!!model && !loadingModels && historyReady && !detailLoading} input={input} stop={() => void stopGeneration()} />
+              <PromptInputTools className="shrink-0">
+                <RealtimeVoice apiBase={apiBase} isSignedIn={isChatUserSignedIn} />
+                <ComposerSubmit busy={busy} stopping={stopping.has(composerID)} enabled={!!model && !loadingModels && historyReady && !detailLoading} input={input} stop={() => void stopGeneration()} />
+              </PromptInputTools>
             </PromptInputFooter>
           </PromptInput>
         </div>
