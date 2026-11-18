@@ -1404,6 +1404,10 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 	// previous_response_id，避免携带状态字段被上游拒绝。
 	body = normalizeDeepSeekResponsesRequestBody(account, body)
 
+	body, err := rewriteCodexFastUpstreamBody(ctx, account, body)
+	if err != nil {
+		return nil, fmt.Errorf("rewrite Codex upstream service tier: %w", err)
+	}
 	req, err := http.NewRequestWithContext(ctx, "POST", targetURL, bytes.NewReader(body))
 	if err != nil {
 		return nil, err

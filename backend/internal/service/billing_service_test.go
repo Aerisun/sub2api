@@ -1983,3 +1983,27 @@ func TestNewModelPricingAliasesRetainExplicitOverrides(t *testing.T) {
 		require.Same(t, zero, svc.GetModelPricing(model))
 	}
 }
+
+func TestGPT62UltrafastBilling(t *testing.T) {
+	svc := NewBillingService(&config.Config{}, nil)
+	usage := UsageTokens{InputTokens: 101, OutputTokens: 37, CacheReadTokens: 79, CacheCreationTokens: 57}
+	for _, model := range []string{"gpt-6.2-sol", "gpt-6.2-astra", "gpt-6.1-terra"} {
+		t.Run(model, func(t *testing.T) {
+			tierMultiplier := 5.0
+			if model == "gpt-6.1-terra" {
+				tierMultiplier = 2
+			}
+			for _, rate := range []float64{1, 2} {
+				standard, err := svc.CalculateCostWithServiceTier(model, usage, rate, "default")
+				require.NoError(t, err)
+				cost, err := svc.CalculateCostWithServiceTier(model, usage, rate, OpenAIFastTierUltrafast)
+				require.NoError(t, err)
+				require.InDelta(t, standard.InputCost*tierMultiplier, cost.InputCost, 1e-12)
+				require.InDelta(t, standard.OutputCost*tierMultiplier, cost.OutputCost, 1e-12)
+				require.InDelta(t, standard.CacheReadCost*tierMultiplier, cost.CacheReadCost, 1e-12)
+				require.InDelta(t, standard.CacheCreationCost*tierMultiplier, cost.CacheCreationCost, 1e-12)
+				require.InDelta(t, standard.ActualCost*tierMultiplier, cost.ActualCost, 1e-12)
+			}
+		})
+	}
+}

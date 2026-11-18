@@ -12,6 +12,13 @@ test("Fast is a separate opt-in field and never changes effort or another provid
   assert.deepEqual(chatParams("gpt-6-sol", "none", true), {reasoning_effort:"none",service_tier:"fast"});
   assert.deepEqual(chatParams("kimi-k3", "max", true), {reasoning_effort:"max"});
 });
+test("GPT-6.2 uses the selected Ultrafast tier with its own reasoning effort", () => {
+  for (const model of ["gpt-6.2-sol", "gpt-6.2-astra"]) {
+    assert.deepEqual(chatParams(model, undefined, "ultrafast"), {reasoning_effort:"low",service_tier:"ultrafast"});
+    assert.deepEqual(chatParams(model, "max", "fast"), {reasoning_effort:"max",service_tier:"fast"});
+  }
+  assert.deepEqual(chatParams("gpt-6.1-sol", "low", "ultrafast"), {reasoning_effort:"low"});
+});
 test("Codex chat preserves every supported effort and refuses unsupported Off", () => {
   for (const model of ["gpt-6.1-terra", "gpt-6.1-sol", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]) {
     assert.equal(validEffort(model, undefined), model === "gpt-6.1-terra" ? "low" : "medium");

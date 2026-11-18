@@ -114,7 +114,7 @@ func openAICompatAnthropicReasoningEffort(req *apicompat.AnthropicRequest, upstr
 	// cannot disable reasoning; use its lowest supported level without claiming
 	// that reasoning has been disabled.
 	if req.Thinking != nil && strings.EqualFold(strings.TrimSpace(req.Thinking.Type), "disabled") {
-		if isOpenAIGPT6AstraModel(upstreamModel) || isOpenAIGPT61SolModel(upstreamModel) {
+		if isOpenAIGPT62Model(upstreamModel) || isOpenAIGPT6AstraModel(upstreamModel) || isOpenAIGPT61SolModel(upstreamModel) {
 			return "low"
 		}
 		if isOpenAIGPT6Model(upstreamModel) || isOpenAIGPT56Model(upstreamModel) {

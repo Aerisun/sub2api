@@ -89,6 +89,7 @@ func (s *OpenAIGatewayService) buildOpenAIWSHeaders(
 	routingServiceTier string,
 ) (http.Header, openAIWSSessionHeaderResolution, error) {
 	headers := make(http.Header)
+	routingServiceTier = codexUpstreamServiceTier(ctx, account, routingModel, routingServiceTier)
 	if account == nil || !account.IsOpenAIAgentIdentity() {
 		headers.Set("authorization", "Bearer "+token)
 	}

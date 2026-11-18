@@ -162,8 +162,13 @@ func firstUsageBillingModel(candidates []string) string {
 	return ""
 }
 
+func isOpenAIGPT62Model(model string) bool {
+	normalized := canonicalizeOpenAIModelAliasSpelling(model)
+	return normalized == "gpt-6.2-astra" || normalized == "gpt-6.2-sol"
+}
+
 func isOpenAIGPT6Model(model string) bool {
-	return isOpenAIGPT6AstraModel(model) || isOpenAIGPT61SolModel(model) || isOpenAIGPT61TerraModel(model) || openai.IsGPT6SolOrLunaModelSpelling(model)
+	return isOpenAIGPT62Model(model) || isOpenAIGPT6AstraModel(model) || isOpenAIGPT61SolModel(model) || isOpenAIGPT61TerraModel(model) || openai.IsGPT6SolOrLunaModelSpelling(model)
 }
 
 func isOpenAIGPT61TerraModel(model string) bool {

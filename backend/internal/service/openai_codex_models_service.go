@@ -589,7 +589,7 @@ func configuredCodexSupportsPriorityServiceTier(modelID string) bool {
 }
 
 func configuredCodexSupportsUltrafastServiceTier(modelID string) bool {
-	return normalizeKnownOpenAICodexModel(modelID) == "gpt-5.6-sol"
+	return isOpenAIGPT62Model(modelID) || normalizeKnownOpenAICodexModel(modelID) == "gpt-5.6-sol"
 }
 
 func configuredCodexGrokReasoningLevels(modelID string) []configuredCodexReasoningLevel {

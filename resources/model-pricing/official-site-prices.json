@@ -192,6 +192,40 @@
         "flex_multiplier": 0.5
       }
     },
+      "gpt-6.2-astra": {
+        "source": "https://developers.openai.com/api/docs/models/gpt-6.2-astra",
+        "status": "developer_standard",
+        "note": "OpenAI 标准短上下文价。本站 Fast ×2。超过 272,000 输入 Token 时，按分组长上下文规则计费。",
+        "pricing": {
+          "platform": "openai",
+          "models": [
+            "gpt-6.2-astra"
+          ],
+          "billing_mode": "token",
+          "input_price": 8e-06,
+          "output_price": 4e-05,
+          "cache_read_price": 4.0000000000000003e-07,
+          "cache_write_price": 1e-05,
+          "fast_multiplier": 2
+        }
+      },
+      "gpt-6.2-sol": {
+        "source": "https://developers.openai.com/api/docs/models/gpt-6.2-sol",
+        "status": "developer_standard",
+        "note": "OpenAI 标准短上下文价。本站 Fast ×2。超过 272,000 输入 Token 时，按分组长上下文规则计费。",
+        "pricing": {
+          "platform": "openai",
+          "models": [
+            "gpt-6.2-sol"
+          ],
+          "billing_mode": "token",
+          "input_price": 2e-06,
+          "output_price": 1e-05,
+          "cache_read_price": 1.0000000000000001e-07,
+          "cache_write_price": 2.5e-06,
+          "fast_multiplier": 2
+        }
+      },
     "gpt-6.1-sol": {
       "source": "https://developers.openai.com/api/docs/pricing",
       "status": "developer_standard",

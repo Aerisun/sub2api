@@ -718,6 +718,20 @@ func (_c *GroupCreate) SetNillableForceOpenaiFast(v *bool) *GroupCreate {
 	return _c
 }
 
+// SetOpenaiFastUpstreamStandard sets the "openai_fast_upstream_standard" field.
+func (_c *GroupCreate) SetOpenaiFastUpstreamStandard(v bool) *GroupCreate {
+	_c.mutation.SetOpenaiFastUpstreamStandard(v)
+	return _c
+}
+
+// SetNillableOpenaiFastUpstreamStandard sets the "openai_fast_upstream_standard" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableOpenaiFastUpstreamStandard(v *bool) *GroupCreate {
+	if v != nil {
+		_c.SetOpenaiFastUpstreamStandard(*v)
+	}
+	return _c
+}
+
 // SetFreeOpenaiFast sets the "free_openai_fast" field.
 func (_c *GroupCreate) SetFreeOpenaiFast(v bool) *GroupCreate {
 	_c.mutation.SetFreeOpenaiFast(v)
@@ -1155,6 +1169,10 @@ func (_c *GroupCreate) defaults() error {
 		v := group.DefaultForceOpenaiFast
 		_c.mutation.SetForceOpenaiFast(v)
 	}
+	if _, ok := _c.mutation.OpenaiFastUpstreamStandard(); !ok {
+		v := group.DefaultOpenaiFastUpstreamStandard
+		_c.mutation.SetOpenaiFastUpstreamStandard(v)
+	}
 	if _, ok := _c.mutation.FreeOpenaiFast(); !ok {
 		v := group.DefaultFreeOpenaiFast
 		_c.mutation.SetFreeOpenaiFast(v)
@@ -1360,6 +1378,9 @@ func (_c *GroupCreate) check() error {
 	}
 	if _, ok := _c.mutation.ForceOpenaiFast(); !ok {
 		return &ValidationError{Name: "force_openai_fast", err: errors.New(`ent: missing required field "Group.force_openai_fast"`)}
+	}
+	if _, ok := _c.mutation.OpenaiFastUpstreamStandard(); !ok {
+		return &ValidationError{Name: "openai_fast_upstream_standard", err: errors.New(`ent: missing required field "Group.openai_fast_upstream_standard"`)}
 	}
 	if _, ok := _c.mutation.FreeOpenaiFast(); !ok {
 		return &ValidationError{Name: "free_openai_fast", err: errors.New(`ent: missing required field "Group.free_openai_fast"`)}
@@ -1652,6 +1673,10 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ForceOpenaiFast(); ok {
 		_spec.SetField(group.FieldForceOpenaiFast, field.TypeBool, value)
 		_node.ForceOpenaiFast = value
+	}
+	if value, ok := _c.mutation.OpenaiFastUpstreamStandard(); ok {
+		_spec.SetField(group.FieldOpenaiFastUpstreamStandard, field.TypeBool, value)
+		_node.OpenaiFastUpstreamStandard = value
 	}
 	if value, ok := _c.mutation.FreeOpenaiFast(); ok {
 		_spec.SetField(group.FieldFreeOpenaiFast, field.TypeBool, value)
@@ -2732,6 +2757,18 @@ func (u *GroupUpsert) SetForceOpenaiFast(v bool) *GroupUpsert {
 // UpdateForceOpenaiFast sets the "force_openai_fast" field to the value that was provided on create.
 func (u *GroupUpsert) UpdateForceOpenaiFast() *GroupUpsert {
 	u.SetExcluded(group.FieldForceOpenaiFast)
+	return u
+}
+
+// SetOpenaiFastUpstreamStandard sets the "openai_fast_upstream_standard" field.
+func (u *GroupUpsert) SetOpenaiFastUpstreamStandard(v bool) *GroupUpsert {
+	u.Set(group.FieldOpenaiFastUpstreamStandard, v)
+	return u
+}
+
+// UpdateOpenaiFastUpstreamStandard sets the "openai_fast_upstream_standard" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateOpenaiFastUpstreamStandard() *GroupUpsert {
+	u.SetExcluded(group.FieldOpenaiFastUpstreamStandard)
 	return u
 }
 
@@ -3981,6 +4018,20 @@ func (u *GroupUpsertOne) SetForceOpenaiFast(v bool) *GroupUpsertOne {
 func (u *GroupUpsertOne) UpdateForceOpenaiFast() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateForceOpenaiFast()
+	})
+}
+
+// SetOpenaiFastUpstreamStandard sets the "openai_fast_upstream_standard" field.
+func (u *GroupUpsertOne) SetOpenaiFastUpstreamStandard(v bool) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetOpenaiFastUpstreamStandard(v)
+	})
+}
+
+// UpdateOpenaiFastUpstreamStandard sets the "openai_fast_upstream_standard" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateOpenaiFastUpstreamStandard() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateOpenaiFastUpstreamStandard()
 	})
 }
 
@@ -5427,6 +5478,20 @@ func (u *GroupUpsertBulk) SetForceOpenaiFast(v bool) *GroupUpsertBulk {
 func (u *GroupUpsertBulk) UpdateForceOpenaiFast() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateForceOpenaiFast()
+	})
+}
+
+// SetOpenaiFastUpstreamStandard sets the "openai_fast_upstream_standard" field.
+func (u *GroupUpsertBulk) SetOpenaiFastUpstreamStandard(v bool) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetOpenaiFastUpstreamStandard(v)
+	})
+}
+
+// UpdateOpenaiFastUpstreamStandard sets the "openai_fast_upstream_standard" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateOpenaiFastUpstreamStandard() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateOpenaiFastUpstreamStandard()
 	})
 }
 

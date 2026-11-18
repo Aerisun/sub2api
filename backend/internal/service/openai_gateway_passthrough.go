@@ -608,6 +608,10 @@ func (s *OpenAIGatewayService) buildUpstreamRequestOpenAIPassthrough(
 	// DeepSeek / Kimi 原生 Responses 端点为无状态实现（见 normalizeDeepSeekResponsesRequestBody）。
 	body = normalizeDeepSeekResponsesRequestBody(account, body)
 
+	body, err := rewriteCodexFastUpstreamBody(ctx, account, body)
+	if err != nil {
+		return nil, fmt.Errorf("rewrite Codex upstream service tier: %w", err)
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, targetURL, bytes.NewReader(body))
 	if err != nil {
 		return nil, err

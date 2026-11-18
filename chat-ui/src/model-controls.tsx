@@ -6,7 +6,7 @@ import {
   PromptInputSelectItem,
 } from "@/components/ai-elements/prompt-input";
 import { SelectGroup, SelectLabel } from "@/components/ui/select";
-import { effortDetails, modelProfile, type Effort } from "./model-settings";
+import { effortDetails, modelProfile, supportsUltrafast, type ChatServiceTier, type Effort } from "./model-settings";
 import { providerIcons, type ProviderIconKey } from "./provider-icons";
 
 const brandIconKeys: Record<string, ProviderIconKey> = {
@@ -50,25 +50,26 @@ type Props = {
   model: string;
   models: string[];
   effort: Effort;
-  fast: boolean;
+  serviceTier?: ChatServiceTier;
   disabled: boolean;
   loading: boolean;
   onModel: (value: string) => void;
   onEffort: (value: Effort) => void;
-  onFast: (value: boolean) => void;
+  onServiceTier: (value: ChatServiceTier | undefined) => void;
 };
 export function ModelControls({
   model,
   models,
   effort,
-  fast,
+  serviceTier,
   disabled,
   loading,
   onModel,
   onEffort,
-  onFast,
+  onServiceTier,
 }: Props) {
   const profile = modelProfile(model);
+  const fast = serviceTier === "fast";
   const details = (value: Effort) => profile.family === "gemini-web"
     ? { label: value === "low" ? "标准思考" : "扩展思考",
         description: value === "low" ? "更快响应，适合日常问答" : "延长思考，适合代码与复杂问题" }
@@ -181,11 +182,30 @@ export function ModelControls({
           </PromptInputSelect>
         </>
       )}
-      {profile.family === "codex" && (
+      {supportsUltrafast(model) ? (
+        <PromptInputSelect
+          value={serviceTier ?? "default"}
+          disabled={disabled || loading}
+          onValueChange={(value) => {
+            if (value === "default") onServiceTier(undefined);
+            if (value === "fast" || value === "ultrafast") onServiceTier(value);
+          }}
+        >
+          <PromptInputSelectTrigger className="effort-trigger" aria-label="处理模式">
+            <Zap className="size-3.5" aria-hidden="true" />
+            <span>{serviceTier === "ultrafast" ? "Ultrafast" : fast ? "Fast" : "Standard"}</span>
+          </PromptInputSelectTrigger>
+          <PromptInputSelectContent position="popper" side="top" align="start" sideOffset={10} className="settings-menu">
+            <PromptInputSelectItem value="default">Standard</PromptInputSelectItem>
+            <PromptInputSelectItem value="fast">Fast</PromptInputSelectItem>
+            <PromptInputSelectItem value="ultrafast">Ultrafast</PromptInputSelectItem>
+          </PromptInputSelectContent>
+        </PromptInputSelect>
+      ) : profile.family === "codex" && (
         <button type="button" className={`fast-toggle${fast ? " active" : ""}`}
           disabled={disabled || loading} aria-label="Fast 模式，2 倍费用" aria-pressed={fast}
           title={fast ? "Fast 已开启 · 2 倍费用，点击关闭" : "开启 Fast · 2 倍费用"}
-          onClick={() => onFast(!fast)}>
+          onClick={() => onServiceTier(fast ? undefined : "fast")}>
           <Zap className="size-4" fill={fast ? "currentColor" : "none"} aria-hidden="true" />
         </button>
       )}

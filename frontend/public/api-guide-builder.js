@@ -358,7 +358,7 @@
     const catalog = [...document.querySelectorAll('[data-model-id]')].map(button => button.dataset.modelId);
     for (const section of document.querySelectorAll('[data-guide-builder]')) {
       builders.push({ section, defaultModel: catalog.includes('gpt-6-sol') ? 'gpt-6-sol' : catalog[0],
-        templates: [...section.querySelectorAll('pre code[id]')].map(code => [code, code.textContent]),
+        templates: [...section.querySelectorAll('pre code[id]:not([data-static-example])')].map(code => [code, code.textContent]),
       });
     }
     const form = document.createElement('form');
@@ -409,7 +409,8 @@
     for (const [value, label] of [['low', '低'], ['medium', '中'], ['high', '高'], ['xhigh', '超高'], ['max', '最大']]) {
       fields.effort.append(new Option(label, value));
     }
-    fields.effort.value = codexGuideDefault ? 'xhigh' : fields.model.value.startsWith('gpt-') ? 'medium' : 'low';
+    fields.effort.value = codexGuideDefault ? 'xhigh'
+      : fields.model.value.startsWith('gpt-') && !fields.model.value.startsWith('gpt-6.2-') ? 'medium' : 'low';
     effortField.hidden = !hasEffort(fields.model.value);
     const embeddingField = field('embeddingModel', '向量模型', 'select');
     for (const model of catalog.filter(model => model.includes('embedding'))) fields.embeddingModel.append(new Option(model, model));
@@ -470,7 +471,7 @@
       if (model !== previousModel) {
         modelEfforts.set(previousModel, fields.effort.value);
         const defaultEffort = model === 'gpt-6.1-sol' && location.hash === '#codex' ? 'xhigh'
-          : model.startsWith('gpt-') ? 'medium' : 'low';
+          : model.startsWith('gpt-') && !model.startsWith('gpt-6.2-') ? 'medium' : 'low';
         fields.effort.value = modelEfforts.get(model) || defaultEffort;
         previousModel = model;
       }

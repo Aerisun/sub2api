@@ -236,6 +236,80 @@
       ]
     }
   },
+    "gpt-6.2-astra": {
+      "name": "gpt-6.2-astra",
+      "limit": {
+        "context": 872000,
+        "output": 128000
+      },
+      "reasoning": true,
+      "options": {
+        "reasoningEffort": "low"
+      },
+      "variants": {
+        "low": {
+          "reasoningEffort": "low"
+        },
+        "medium": {
+          "reasoningEffort": "medium"
+        },
+        "high": {
+          "reasoningEffort": "high"
+        },
+        "xhigh": {
+          "reasoningEffort": "xhigh"
+        },
+        "max": {
+          "reasoningEffort": "max"
+        }
+      },
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      }
+    },
+    "gpt-6.2-sol": {
+      "name": "gpt-6.2-sol",
+      "limit": {
+        "context": 872000,
+        "output": 128000
+      },
+      "reasoning": true,
+      "options": {
+        "reasoningEffort": "low"
+      },
+      "variants": {
+        "low": {
+          "reasoningEffort": "low"
+        },
+        "medium": {
+          "reasoningEffort": "medium"
+        },
+        "high": {
+          "reasoningEffort": "high"
+        },
+        "xhigh": {
+          "reasoningEffort": "xhigh"
+        },
+        "max": {
+          "reasoningEffort": "max"
+        }
+      },
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      }
+    },
   "gpt-6.1-sol": {
     "name": "gpt-6.1-sol",
     "limit": {

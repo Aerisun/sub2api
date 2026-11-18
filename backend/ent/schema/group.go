@@ -245,6 +245,9 @@ func (Group) Fields() []ent.Field {
 		field.Bool("force_openai_fast").
 			Default(false).
 			Comment("是否强制此 OpenAI/Composite 分组请求使用 service_tier=priority"),
+		field.Bool("openai_fast_upstream_standard").
+			Default(false).
+			Comment("Codex Fast 请求使用标准上游档位，保留原有 Fast 计费"),
 		field.Bool("free_openai_fast").
 			Default(false).
 			Comment("是否让此 OpenAI/Composite 分组的 Fast 请求按 Standard 价格计费"),

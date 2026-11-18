@@ -57,6 +57,7 @@ import {
   chatParams,
   effortDetails,
   modelProfile,
+  type ChatServiceTier,
   type Effort,
 } from "./model-settings";
 
@@ -121,7 +122,7 @@ function App() {
   const [models, setModels] = useState<string[]>([]);
   const [draftID, setDraftID] = useState(id);
   const composerID = current || draftID;
-  const [drafts, setDrafts] = useState<Record<string, { text?: string; model?: string; fast?: boolean; files?: PromptInputAttachment[]; error?: string }>>({});
+  const [drafts, setDrafts] = useState<Record<string, { text?: string; model?: string; serviceTier?: ChatServiceTier; files?: PromptInputAttachment[]; error?: string }>>({});
   const draftsRef = useRef(drafts); draftsRef.current = drafts;
   const activeComposer = useRef(composerID); activeComposer.current = composerID;
   const draft = drafts[composerID];
@@ -131,7 +132,7 @@ function App() {
   const input = draft?.text || "";
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const setInput = (text: string) => patchDraft(composerID, { text });
-  const setModel = (model: string) => patchDraft(composerID, { model, fast: false });
+  const setModel = (model: string) => patchDraft(composerID, { model, serviceTier: undefined });
   const setFiles = (action: SetStateAction<PromptInputAttachment[]>) => setDrafts((all) => ({
     ...all, [composerID]: { ...all[composerID], files: typeof action === "function" ? action(all[composerID]?.files || []) : action },
   }));
@@ -146,7 +147,7 @@ function App() {
     }
   });
   const effort = validEffort(model, efforts?.[model]);
-  const fast = modelProfile(model).family === "codex" && !!draft?.fast;
+  const serviceTier = modelProfile(model).family === "codex" ? draft?.serviceTier : undefined;
   const [fastNotice, setFastNotice] = useState(false);
   useEffect(() => {
     if (!fastNotice) return;
@@ -263,7 +264,7 @@ function App() {
       reasoning: "",
       model,
       effort,
-      serviceTier: fast ? "fast" : undefined,
+      serviceTier,
     };
     const pending = { id: assistant.id, stopRequested: false };
     pendingGenerations.current.set(chatID, pending);
@@ -302,7 +303,7 @@ function App() {
       }
       const payload={requestID:assistant.id,append,retry,imageInputs,
         base:{messageCount:messages.length,lastMessageID:messages.at(-1)?.id || ""},
-        params:chatParams(model,effort,fast),chat:{...snapshot,messages:uploaded.map(m=>({...m,images:m.images?.map(({url,...image})=>image)}))}};
+        params:chatParams(model,effort,serviceTier),chat:{...snapshot,messages:uploaded.map(m=>({...m,images:m.images?.map(({url,...image})=>image)}))}};
       let accepted: Chat;
       try {
         const response=await historyRequest(`/conversations/${chatID}/generations`,{method:"POST",body:JSON.stringify(payload)});
@@ -513,6 +514,7 @@ function App() {
                           </span>
                         )}
                         {item.serviceTier === "fast" && <span className="message-effort">· Fast · 2 倍费用</span>}
+                        {item.serviceTier === "ultrafast" && <span className="message-effort">· Ultrafast</span>}
                       </div>
                     )}
                     {item.role === "assistant" ? (
@@ -601,7 +603,7 @@ function App() {
                   model={model}
                   models={models}
                   effort={effort}
-                  fast={fast}
+                  serviceTier={serviceTier}
                   disabled={!historyReady}
                   loading={loadingModels}
                   onModel={(value) => {
@@ -610,7 +612,7 @@ function App() {
                   onEffort={(value) =>
                     setEfforts((all) => ({ ...all, [model]: value }))
                   }
-                  onFast={(value) => { patchDraft(composerID, { fast: value }); setFastNotice(value); }}
+                  onServiceTier={(value) => { patchDraft(composerID, { serviceTier: value }); setFastNotice(value === "fast"); }}
                 />
                 <UploadImageButton disabled={!historyReady || loadingModels || !uploadLimit} maxFiles={uploadLimit} />
               </PromptInputTools>

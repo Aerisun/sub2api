@@ -256,7 +256,8 @@ type OpenAIForwardResult struct {
 	// UpstreamEndpoint is the actual upstream API path used for this request.
 	// It avoids guessing when one downstream protocol can use multiple upstream endpoints.
 	UpstreamEndpoint string
-	// ServiceTier is the final tier sent upstream after policy rewriting.
+	// ServiceTier is the billable request tier after policy rewriting. A group's
+	// Codex transport override can use standard while retaining Fast billing.
 	// The upstream response declaration remains separate above and is reconciled
 	// at usage-recording time, where the credential protocol is available.
 	ServiceTier *string

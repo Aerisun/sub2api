@@ -63,6 +63,9 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 	)
 
 	payload := s.buildOpenAIWSCreatePayload(reqBody, account)
+	if tier, ok := payload["service_tier"].(string); ok {
+		payload["service_tier"] = codexUpstreamServiceTier(ctx, account, openAIWSPayloadString(payload, "model"), tier)
+	}
 	payloadStrategy, removedKeys := applyOpenAIWSRetryPayloadStrategy(payload, attempt)
 	turnState := ""
 	turnMetadata := ""

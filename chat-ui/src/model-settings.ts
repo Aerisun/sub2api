@@ -7,6 +7,8 @@ export type Effort =
   | "high"
   | "xhigh"
   | "max";
+export type ChatServiceTier = "fast" | "ultrafast";
+
 export type ModelProfile = {
   brand: string;
   mark: string;
@@ -47,8 +49,8 @@ export function modelProfile(model: string = ""): ModelProfile {
       efforts: ["low", "medium", "high", "auto"],
       alwaysThinking: true,
     };
-  if (/^gpt-(6(?:\.1)?-(?:astra|sol|luna)|6\.1-terra|5\.6-(?:sol|terra|luna))(?:-|$)/.test(name)) {
-    const alwaysThinking = /^gpt-(6-astra|6\.1-sol)(?:-|$)/.test(name);
+  if (/^gpt-(6(?:\.1)?-(?:astra|sol|luna)|6\.2-(?:astra|sol)|6\.1-terra|5\.6-(?:sol|terra|luna))(?:-|$)/.test(name)) {
+    const alwaysThinking = /^gpt-(6-astra|6\.1-sol|6\.2-(?:astra|sol))(?:-|$)/.test(name);
     return {
       brand: "OpenAI", mark: "O", color: "openai", family: "codex",
       efforts: [...(alwaysThinking ? [] : ["none" as Effort]), "low", "medium", "high", "xhigh", "max"],
@@ -124,7 +126,8 @@ export function validEffort(model: string, value: string | undefined): Effort {
     qwen: "xhigh", kimi: "low",
     deepseek: "low", nemotron: "low", "gemini-web": "low",
   };
-  if (model.toLowerCase().split("/").at(-1) === "gpt-6.1-terra") return "low";
+  const name = model.toLowerCase().split("/").at(-1);
+  if (name === "gpt-6.1-terra" || name === "gpt-6.2-astra" || name === "gpt-6.2-sol") return "low";
   return initial[profile.family] || "default";
 }
 export function reasoningParams(
@@ -146,9 +149,17 @@ export function reasoningParams(
   };
 }
 
-export function chatParams(model: string, effort: string | undefined, fast = false): Record<string, unknown> {
+export function supportsUltrafast(model: string): boolean {
+  const name = model.toLowerCase().split("/").at(-1);
+  return name === "gpt-6.2-sol" || name === "gpt-6.2-astra";
+}
+
+export function chatParams(model: string, effort: string | undefined, tier?: ChatServiceTier | boolean): Record<string, unknown> {
+  const serviceTier = tier === true ? "fast" : tier;
+  const eligible = serviceTier === "ultrafast" ? supportsUltrafast(model)
+    : serviceTier === "fast" && modelProfile(model).family === "codex";
   return {
     ...reasoningParams(model, effort),
-    ...(fast && modelProfile(model).family === "codex" ? { service_tier: "fast" } : {}),
+    ...(eligible ? { service_tier: serviceTier } : {}),
   };
 }

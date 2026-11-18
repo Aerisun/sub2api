@@ -108,6 +108,7 @@ type ModelPricing struct {
 	CacheReadPricePerToken             float64            // 缓存读取每token价格 (USD)
 	CacheReadPricePerTokenPriority     float64            // priority service tier 下缓存读取每token价格 (USD)
 	FastMultiplier                     *float64           // 渠道显式 Fast/priority 倍率；nil 时沿用模型目录行为
+	UltrafastMultiplier                float64            // 模型特定档位倍率
 	FlexMultiplier                     *float64           // 渠道显式 Flex 倍率；nil 时沿用默认行为
 	ReasoningEffortMultipliers         map[string]float64 // 最终转发的推理等级对应的计费倍率；未配置的等级按 1 倍计费
 	CacheCreation5mPrice               float64            // 5分钟缓存创建每token价格 (USD)
@@ -157,6 +158,10 @@ func configuredServiceTierMultiplier(serviceTier string, pricing *ModelPricing) 
 		case "priority", "fast":
 			if pricing.FastMultiplier != nil {
 				return *pricing.FastMultiplier
+			}
+		case OpenAIFastTierUltrafast:
+			if pricing.UltrafastMultiplier > 0 {
+				return pricing.UltrafastMultiplier
 			}
 		case "flex":
 			if pricing.FlexMultiplier != nil {
@@ -526,6 +531,9 @@ func (s *BillingService) initFallbackPricing() {
 		CacheReadPricePerToken:     30e-6,
 		SupportsCacheBreakdown:     false,
 	}
+
+	s.fallbackPrices["gpt-6.2-astra"] = openAIGPT62FallbackPricing(8e-6)
+	s.fallbackPrices["gpt-6.2-sol"] = openAIGPT62FallbackPricing(2e-6)
 
 	s.fallbackPrices["gpt-6-astra"] = &ModelPricing{
 		InputPricePerToken:                 10e-6,
@@ -1145,7 +1153,7 @@ func (s *BillingService) getFallbackPricing(model string) *ModelPricing {
 	// OpenAI（GPT-5 / Codex 族）：仅匹配已知型号，避免未知 OpenAI 型号误计价。
 	if normalized := normalizeKnownOpenAICodexModel(modelLower); normalized != "" {
 		switch normalized {
-		case "gpt-6-sol", "gpt-6-luna", "gpt-6.1-terra":
+		case "gpt-6-sol", "gpt-6-luna", "gpt-6.1-terra", "gpt-6.2-astra", "gpt-6.2-sol":
 			return s.fallbackPrices[normalized]
 		case "gpt-6-astra":
 			return s.fallbackPrices["gpt-6-astra"]
@@ -1833,10 +1841,14 @@ func (s *BillingService) applyModelSpecificPricingPolicyEx(model string, pricing
 		(pricing.InputPricePerTokenPriority > 0 && pricing.CacheCreationPricePerTokenPriority <= 0))
 	fastRatio := openAIModelFastPricingRatio(normalized)
 	needsOpus55FastMultiplier := claude.IsOpus55(model) && pricing.FastMultiplier == nil
-	if !needsCacheCreationPolicy && fastRatio <= 0 && !needsOpus55FastMultiplier {
+	isGPT62 := isOpenAIGPT62Model(normalized)
+	if !needsCacheCreationPolicy && fastRatio <= 0 && !needsOpus55FastMultiplier && !isGPT62 {
 		return pricing
 	}
 	cloned := *pricing
+	if isGPT62 {
+		cloned.UltrafastMultiplier = 5
+	}
 	if needsOpus55FastMultiplier {
 		multiplier := 2.0
 		cloned.FastMultiplier = &multiplier
@@ -1856,6 +1868,18 @@ func (s *BillingService) applyModelSpecificPricingPolicyEx(model string, pricing
 		}
 	}
 	return &cloned
+}
+
+func openAIGPT62FallbackPricing(input float64) *ModelPricing {
+	return pricingWithPriorityMultiplier(&ModelPricing{
+		InputPricePerToken:          input,
+		OutputPricePerToken:         input * 5,
+		CacheCreationPricePerToken:  input * 1.25,
+		CacheReadPricePerToken:      input * 0.05,
+		LongContextInputThreshold:   272_000,
+		LongContextInputMultiplier:  2,
+		LongContextOutputMultiplier: 1.5,
+	}, 2)
 }
 
 // openAIModelFastPricingRatio 返回业务口径下 OpenAI GPT 模型 Fast/priority

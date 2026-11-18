@@ -27,6 +27,8 @@ VERIFIED_IMAGE_MODELS = {'deepseek-v4.1-flash', 'qwen3.8-flash', 'qwen3.8-max', 
 # Endpoint constraints, checked against Qiniu's model_constraints and NVIDIA model cards.
 # These describe the active routing pool, rather than Claude's assumed alias window.
 MODEL_LIMITS = {
+    'gpt-6.2-astra': (872000,128000),
+    'gpt-6.2-sol': (872000,128000),
     'gpt-6.1-terra': (872000,128000),
     'deepseek-v4.1-flash': (1000000,384000),
     'qwen3.8-flash': (1000000,128000), 'qwen3.8-max': (1000000,128000),
@@ -96,10 +98,10 @@ def opencode_config(models):
                 entry['variants']['off'] = {'reasoningEffort': 'none'}
         if model.startswith(('gpt-6', 'gpt-5.6')):
             entry['reasoning'] = True
-            entry['options'] = {'reasoningEffort': 'low' if model == 'gpt-6.1-terra' else 'medium'}
+            entry['options'] = {'reasoningEffort': 'low' if model in ('gpt-6.1-terra', 'gpt-6.2-astra', 'gpt-6.2-sol') else 'medium'}
             entry['variants'] = {effort: {'reasoningEffort': effort}
                                  for effort in ('low', 'medium', 'high', 'xhigh', 'max')}
-            if model not in ('gpt-6-astra', 'gpt-6.1-sol'):
+            if model not in ('gpt-6-astra', 'gpt-6.1-sol', 'gpt-6.2-astra', 'gpt-6.2-sol'):
                 entry['variants']['off'] = {'reasoningEffort': 'none'}
             entry['modalities'] = {'input': ['text', 'image'], 'output': ['text']}
         if model in VERIFIED_IMAGE_MODELS:

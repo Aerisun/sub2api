@@ -963,7 +963,11 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		}
 		turnStart := time.Now()
 		wroteDownstream := false
-		if err := lease.WriteJSONWithContextTimeout(ctx, json.RawMessage(payload), s.openAIWSWriteTimeout()); err != nil {
+		upstreamPayload, err := rewriteCodexFastUpstreamBody(ctx, account, payload)
+		if err != nil {
+			return nil, fmt.Errorf("rewrite Codex upstream service tier: %w", err)
+		}
+		if err := lease.WriteJSONWithContextTimeout(ctx, json.RawMessage(upstreamPayload), s.openAIWSWriteTimeout()); err != nil {
 			return nil, wrapOpenAIWSIngressTurnError(
 				"write_upstream",
 				fmt.Errorf("write upstream websocket request: %w", err),
@@ -1905,7 +1909,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 				baseAcquireReq.Headers = updatedHeaders
 			}
 		}
-		setOpenAICodexRoutingHint(baseAcquireReq.Headers, account, nextRoutingFields[0].String(), nextRoutingFields[1].String())
+		setOpenAICodexRoutingHint(baseAcquireReq.Headers, account, nextRoutingFields[0].String(), codexUpstreamServiceTier(ctx, account, nextRoutingFields[0].String(), nextRoutingFields[1].String()))
 		if nextPayload.previousResponseID != "" {
 			expectedPrev := strings.TrimSpace(lastTurnResponseID)
 			chainedFromLast := expectedPrev != "" && nextPayload.previousResponseID == expectedPrev
