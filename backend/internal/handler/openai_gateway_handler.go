@@ -949,7 +949,10 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 				upstreamErrorAlreadyCommunicated := openAIForwardErrorAlreadyCommunicated(c, writerSizeBeforeForward, err)
 				wroteFallback := false
 				if !upstreamErrorAlreadyCommunicated {
-					wroteFallback = h.ensureForwardErrorResponse(c, streamStarted)
+					wroteFallback = h.ensureOpenAIStreamReadErrorResponse(c, err, streamStarted)
+					if !wroteFallback {
+						wroteFallback = h.ensureForwardErrorResponse(c, streamStarted)
+					}
 				}
 				fields := []zap.Field{
 					zap.Int64("account_id", account.ID),
@@ -3618,6 +3621,13 @@ func (h *OpenAIGatewayHandler) ensureOpenAIStreamReadErrorResponse(c *gin.Contex
 	}
 	if c.Writer.Written() {
 		streamStarted = true
+	}
+	if streamStarted && inboundIsResponses(c) {
+		// A read failure can leave a partially framed event before this terminal.
+		if _, writeErr := c.Writer.WriteString("\n"); writeErr != nil {
+			_ = c.Error(writeErr)
+			return true
+		}
 	}
 	h.handleStreamingAwareErrorWithCode(
 		c, http.StatusBadGateway, "upstream_error", code, message, streamStarted, true,

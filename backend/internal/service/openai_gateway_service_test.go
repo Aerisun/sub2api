@@ -1678,7 +1678,7 @@ func TestOpenAIStreamingReadErrorBeforeOutputReturnsFailover(t *testing.T) {
 	require.Empty(t, rec.Body.String())
 }
 
-func TestOpenAIStreamingReadErrorAfterOutputUsesResponsesErrorSchema(t *testing.T) {
+func TestOpenAIStreamingReadErrorAfterToolOutputIsClassifiedForTerminalResponse(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	for _, tc := range []struct {
 		name  string
@@ -1694,7 +1694,7 @@ func TestOpenAIStreamingReadErrorAfterOutputUsesResponsesErrorSchema(t *testing.
 			c, _ := gin.CreateTestContext(rec)
 			c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
 			resp := &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: &openAIStreamReadThenErrorCloser{
-				reader: strings.NewReader("event: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"partial\"}\n\n"),
+				reader: strings.NewReader("event: response.function_call_arguments.delta\ndata: {\"type\":\"response.function_call_arguments.delta\",\"delta\":\"partial\"}\n\n"),
 				err:    tc.cause,
 			}}
 			_, err := svc.handleStreamingResponse(c.Request.Context(), resp, c, &Account{ID: 1, Platform: PlatformOpenAI}, time.Now(), "model", "model")
@@ -1705,22 +1705,12 @@ func TestOpenAIStreamingReadErrorAfterOutputUsesResponsesErrorSchema(t *testing.
 			require.NotContains(t, body, "stream ID")
 			require.NotContains(t, body, "response.completed")
 			require.NotContains(t, body, "[DONE]")
-			require.Equal(t, 1, strings.Count(body, "event: error\n"))
-			require.True(t, IsResponseCommitted(c), "the handler must not append another failure")
-			var events []gjson.Result
-			for _, line := range strings.Split(body, "\n") {
-				if strings.HasPrefix(line, "data: ") {
-					event := gjson.Parse(strings.TrimPrefix(line, "data: "))
-					if event.Get("type").String() == "error" {
-						events = append(events, event)
-					}
-				}
-			}
-			require.Len(t, events, 1)
-			require.Equal(t, tc.code, events[0].Get("code").String())
-			require.NotEmpty(t, events[0].Get("message").String())
-			require.False(t, events[0].Get("error").Exists(), "Responses errors have top-level fields")
-			require.True(t, events[0].Get("param").Exists())
+			require.NotContains(t, body, "event: error\n")
+			require.False(t, IsResponseCommitted(c), "the handler emits the terminal failure")
+			code, message, classified := OpenAIUpstreamStreamReadErrorDetails(err)
+			require.True(t, classified)
+			require.Equal(t, tc.code, code)
+			require.NotEmpty(t, message)
 		})
 	}
 }
@@ -2491,6 +2481,9 @@ func TestOpenAIStreamingMissingTerminalEventReturnsIncompleteError(t *testing.T)
 	if err == nil || !strings.Contains(err.Error(), "missing terminal event") {
 		t.Fatalf("expected missing terminal event error, got %v", err)
 	}
+	code, _, classified := OpenAIUpstreamStreamReadErrorDetails(err)
+	require.True(t, classified)
+	require.Equal(t, OpenAIUpstreamStreamTruncatedCode, code)
 }
 
 func TestOpenAIStreamingPassthroughMissingTerminalEventReturnsIncompleteError(t *testing.T) {
@@ -2523,6 +2516,9 @@ func TestOpenAIStreamingPassthroughMissingTerminalEventReturnsIncompleteError(t 
 	if err == nil || !strings.Contains(err.Error(), "missing terminal event") {
 		t.Fatalf("expected missing terminal event error, got %v", err)
 	}
+	code, _, classified := OpenAIUpstreamStreamReadErrorDetails(err)
+	require.True(t, classified)
+	require.Equal(t, OpenAIUpstreamStreamTruncatedCode, code)
 }
 
 func TestOpenAIStreamingPassthroughPostOutputDisconnectQuarantinesSharedProxy(t *testing.T) {

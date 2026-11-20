@@ -468,8 +468,7 @@ func TestOpenAINativeFirstOutputEOFDispatchesTerminalEventWithoutBlankLine(t *te
 	require.Equal(t, 2, result.usage.OutputTokens)
 	require.Contains(t, rec.Body.String(), `"type":"response.completed"`)
 	require.Contains(t, rec.Body.String(), `"id":"resp_eof"`)
-	require.True(t, strings.HasSuffix(rec.Body.String(), "\n"))
-	require.False(t, strings.HasSuffix(rec.Body.String(), "\n\n"), "EOF dispatch must not synthesize a blank line")
+	require.True(t, strings.HasSuffix(rec.Body.String(), "\n\n"), "the terminal frame needs an SSE dispatch boundary")
 	require.Equal(t, "request-eof", rec.Result().Header.Get("X-Request-Id"))
 	require.Equal(t, "17", rec.Result().Header.Get("X-Ratelimit-Remaining-Requests"))
 }

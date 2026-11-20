@@ -158,6 +158,43 @@ func TestOpenAIResponseFlush_SlowEventsFlushOnceAtBoundaries(t *testing.T) {
 	}
 }
 
+func TestOpenAIResponseFlush_ToolOnlyTerminalAtTransportEOF(t *testing.T) {
+	const item = `{"id":"fc_1","type":"function_call","call_id":"call_1","name":"lookup","arguments":"{}","status":"completed"}`
+	toolDone := "event: response.output_item.done\ndata: " +
+		`{"type":"response.output_item.done","output_index":0,"item":` + item + "}\n\n"
+	terminal := "event: response.completed\ndata: " +
+		`{"type":"response.completed","response":{"id":"resp_tool","output":[` + item + `],"usage":{"input_tokens":7,"output_tokens":3}}}`
+
+	for _, test := range []struct {
+		name      string
+		construct func(string) io.ReadCloser
+	}{
+		{"clean EOF", func(payload string) io.ReadCloser { return io.NopCloser(strings.NewReader(payload)) }},
+		{"transport reset", func(payload string) io.ReadCloser {
+			return &openAIResponseFlushReadError{payload: []byte(payload), err: io.ErrUnexpectedEOF}
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			native := newOpenAIResponseFlushRecorder()
+			result, err := runOpenAIResponseFlushTest(native, test.construct(toolDone+terminal), config.GatewayConfig{})
+			require.NoError(t, err)
+			require.Equal(t, 7, result.usage.InputTokens)
+			require.Equal(t, 3, result.usage.OutputTokens)
+			nativeBody, _ := native.snapshot()
+
+			directResult, passthrough, _, err := runPassthroughFlushTest(t, test.construct(toolDone+terminal), -1)
+			require.NoError(t, err)
+			require.Equal(t, 7, directResult.usage.InputTokens)
+			require.Equal(t, 3, directResult.usage.OutputTokens)
+
+			for _, body := range []string{nativeBody, passthrough.Body.String()} {
+				require.True(t, strings.HasSuffix(body, "\n\n"))
+				assertOpenAISSEFrames(t, body, []string{"response.output_item.done", "response.completed"})
+			}
+		})
+	}
+}
+
 func TestOpenAIResponseFlush_DataQueuedButBlankDrainsFlushesOnce(t *testing.T) {
 	first := "data: {\"type\":\"response.output_text.delta\",\"delta\":\"first\"}\n\n"
 	second := "data: {\"type\":\"response.output_text.delta\",\"delta\":\"second\"}\n\n"
@@ -239,11 +276,11 @@ func TestOpenAIResponseFlush_CommentAndEOFOnlyFlushCompleteResidual(t *testing.T
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	gotBody, flushes := recorder.snapshot()
-	require.Equal(t, body, gotBody)
+	require.Equal(t, body+"\n", gotBody)
 	require.Len(t, flushes, 3)
 	require.True(t, strings.HasSuffix(flushes[0], "\n\n"))
 	require.True(t, strings.HasSuffix(flushes[1], "\n\n"))
-	require.True(t, strings.HasSuffix(flushes[2], "data: [DONE]\n"), "EOF must flush only the remaining bytes")
+	require.True(t, strings.HasSuffix(flushes[2], "data: [DONE]\n\n"), "EOF must dispatch the terminal frame")
 }
 
 func TestOpenAIResponseFlush_TerminalReadErrorFlushesResidual(t *testing.T) {
@@ -255,8 +292,8 @@ func TestOpenAIResponseFlush_TerminalReadErrorFlushesResidual(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	gotBody, flushes := recorder.snapshot()
-	require.Equal(t, body, gotBody)
-	require.Equal(t, []string{body}, flushes)
+	require.Equal(t, body+"\n", gotBody)
+	require.Equal(t, []string{body + "\n"}, flushes)
 }
 
 func TestOpenAIResponseFlush_OutputWithoutTerminalFlushesResidualWithoutFailover(t *testing.T) {
@@ -381,7 +418,7 @@ func TestOpenAIResponseFlush_FailedAndErrorEventsFlushAtBoundaries(t *testing.T)
 		require.Equal(t, 3, result.usage.InputTokens)
 		gotBody, flushes := recorder.snapshot()
 		expectedBody := "data: {\"type\":\"response.output_text.delta\",\"delta\":\"a\"}\n\n" +
-			"data: {\"type\":\"response.failed\",\"response\":{\"error\":{\"code\":\"safety_error\",\"message\":\"blocked\"}}}\n"
+			"data: {\"type\":\"response.failed\",\"response\":{\"error\":{\"code\":\"safety_error\",\"message\":\"blocked\"}}}\n\n"
 		require.Equal(t, expectedBody, gotBody)
 		require.Len(t, flushes, 2)
 		require.Contains(t, flushes[1], "response.failed")

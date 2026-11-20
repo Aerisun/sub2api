@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"io"
 	"strings"
+
+	"github.com/tidwall/gjson"
 )
 
 const (
@@ -52,9 +54,12 @@ func splitOpenAIConcatenatedJSONDocuments(payload []byte) ([][]byte, bool) {
 }
 
 type openAISSEJSONDocumentScanner struct {
-	scanner *bufio.Scanner
-	pending []string
-	current string
+	scanner               *bufio.Scanner
+	pending               []string
+	current               string
+	eventType             string
+	terminalNeedsBoundary bool
+	err                   error
 }
 
 func newOpenAISSEJSONDocumentScanner(scanner *bufio.Scanner) *openAISSEJSONDocumentScanner {
@@ -62,30 +67,64 @@ func newOpenAISSEJSONDocumentScanner(scanner *bufio.Scanner) *openAISSEJSONDocum
 }
 
 func (s *openAISSEJSONDocumentScanner) Scan() bool {
+	if s.err != nil {
+		return false
+	}
 	if len(s.pending) > 0 {
 		s.current = s.pending[0]
 		s.pending = s.pending[1:]
 		return true
 	}
 	if s.scanner == nil || !s.scanner.Scan() {
+		if s.terminalNeedsBoundary {
+			// SSE clients dispatch only on a blank line. A disconnect after a
+			// complete terminal JSON document must not drop that document.
+			s.terminalNeedsBoundary = false
+			s.current = ""
+			return true
+		}
 		return false
 	}
 
 	line := s.scanner.Text()
 	data, ok := extractOpenAISSEDataLine(line)
 	if !ok {
+		if line == "" {
+			s.eventType = ""
+			s.terminalNeedsBoundary = false
+		} else if eventType, ok := extractOpenAISSEEventLine(line); ok {
+			s.eventType = eventType
+		}
 		s.current = line
 		return true
 	}
-	if len(data) > maxOpenAIConcatenatedJSONBytes {
-		s.current = line
-		return true
+	var documents [][]byte
+	var repaired bool
+	if len(data) <= maxOpenAIConcatenatedJSONBytes {
+		documents, repaired = splitOpenAIConcatenatedJSONDocuments([]byte(data))
 	}
-	documents, repaired := splitOpenAIConcatenatedJSONDocuments([]byte(data))
 	if !repaired {
+		eventType := strings.TrimSpace(gjson.Get(data, "type").String())
+		if eventType == "" {
+			eventType = s.eventType
+		}
+		s.terminalNeedsBoundary = openAIStreamEventIsTerminalWithType(data, eventType)
+		if s.terminalNeedsBoundary && strings.TrimSpace(data) != "[DONE]" && !gjson.Valid(data) {
+			// A parser can extract type from an incomplete JSON prefix. Never
+			// report that prefix as a successful response.
+			s.terminalNeedsBoundary = false
+			s.err = ErrOpenAIUpstreamStreamTruncated
+			// Discard the incomplete data and end any already copied event
+			// header before the relay writes its failure event.
+			s.current = ""
+			return true
+		}
 		s.current = line
 		return true
 	}
+
+	s.eventType = ""
+	s.terminalNeedsBoundary = false
 
 	expanded := make([]string, 0, len(documents)*3)
 	for i, document := range documents {
@@ -108,6 +147,9 @@ func (s *openAISSEJSONDocumentScanner) Text() string {
 }
 
 func (s *openAISSEJSONDocumentScanner) Err() error {
+	if s.err != nil {
+		return s.err
+	}
 	if s.scanner == nil {
 		return nil
 	}

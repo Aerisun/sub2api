@@ -373,7 +373,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 	}
 	finalizeStream := func() (*openaiStreamingResult, error) {
 		if stageFirstOutput && eventInProgress {
-			// EOF dispatches the final SSE event even without a trailing blank line.
+			// Account for buffered non-terminal output before classifying EOF.
 			completeGuardedEvent(true)
 		}
 		if codexFailureTerminal && sawBareError && !sawResponseFailed && bareErrorAccountSideEffectsPending {
@@ -406,7 +406,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 			if openAIStreamClientOutputStarted(c, clientOutputStarted) && !clientDisconnected {
 				s.recordOpenAIProxyStreamDisconnect(account, errors.New("stream ended before terminal event"), upstreamRequestID)
 			}
-			return resultWithUsage(), fmt.Errorf("stream usage incomplete: missing terminal event")
+			return resultWithUsage(), newOpenAIUpstreamStreamReadError(fmt.Errorf("missing terminal event: %w", ErrOpenAIUpstreamStreamTruncated))
 		}
 		if sawFailedEvent {
 			return resultWithUsage(), fmt.Errorf("upstream response failed: %s", failedMessage)
@@ -469,9 +469,8 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 			return resultWithUsage(), fmt.Errorf("stream usage incomplete after disconnect: %w", scanErr), true
 		}
 		s.recordOpenAIProxyStreamDisconnect(account, scanErr, upstreamRequestID)
-		code, message := classifyOpenAIUpstreamStreamReadError(scanErr)
-		sendErrorEvent(code, message)
-		return resultWithUsage(), fmt.Errorf("stream read error: %w", scanErr), true
+		flushPending("Client disconnected during stream read error")
+		return resultWithUsage(), newOpenAIUpstreamStreamReadError(scanErr), true
 	}
 	processSSELine := func(line string, queueDrained bool) {
 		if streamEarlyErr != nil {
@@ -877,11 +876,6 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 		select {
 		case ev, ok := <-events:
 			if !ok {
-				if stageFirstOutput && eventInProgress {
-					// EOF dispatches the final SSE event even without a trailing blank
-					// line. Do not synthesize extra bytes on the downstream wire.
-					completeGuardedEvent(true)
-				}
 				return finalizeStream()
 			}
 			if result, err, done := handleScanErr(ev.err); done {

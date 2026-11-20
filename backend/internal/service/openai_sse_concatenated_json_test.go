@@ -241,6 +241,18 @@ func TestSplitOpenAIConcatenatedJSONDocumentsRejectsPayloadOverRepairLimit(t *te
 	require.NoError(t, documentScanner.Err())
 }
 
+func TestOpenAISSEJSONDocumentScannerRejectsTruncatedTerminalAtEOF(t *testing.T) {
+	scanner := bufio.NewScanner(strings.NewReader("event: response.completed\n" +
+		`data: {"type":"response.completed","response":{"id":"resp_cut"`))
+	documents := newOpenAISSEJSONDocumentScanner(scanner)
+	require.True(t, documents.Scan())
+	require.Equal(t, "event: response.completed", documents.Text())
+	require.True(t, documents.Scan())
+	require.Empty(t, documents.Text(), "close the event header without emitting incomplete terminal data")
+	require.False(t, documents.Scan())
+	require.ErrorIs(t, documents.Err(), ErrOpenAIUpstreamStreamTruncated)
+}
+
 func TestOpenAIWSv2StreamingBreaksConnectionWhenTerminalHasTrailingDocument(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	completed := `{"type":"response.completed","response":{"id":"resp_terminal_tail","usage":{"input_tokens":2,"output_tokens":1}}}`
