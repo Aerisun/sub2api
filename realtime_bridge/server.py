@@ -20,6 +20,18 @@ MODELS = {'gpt-realtime-2.1', 'gpt-realtime-2.1-mini', 'gpt-realtime-2', 'gpt-re
 UPSTREAM = 'https://chatgpt.com/backend-api/codex/realtime/calls'
 MAX_LINE = 1024 * 1024
 PCM = {'type': 'audio/pcm', 'rate': 24000}
+PCM_CHUNK_BYTES = 24000 * 2 * 60 // 1000
+AUDIO_DRAIN_IDLE_SECONDS = 5
+AUDIO_DRAIN_LIMIT_SECONDS = 180
+AUDIO_RTP_TAIL_SECONDS = .12
+RESPONSE_FIELDS = {'instructions', 'output_modalities', 'max_output_tokens'}
+WEB_SEARCH = {
+    'type': 'function', 'name': 'web_search',
+    'description': 'Search the public web for current factual information when the user asks to search or the answer needs up-to-date sources.',
+    'parameters': {'type': 'object', 'properties': {
+        'query': {'type': 'string', 'description': 'A concise web search query.'}},
+        'required': ['query'], 'additionalProperties': False},
+}
 LOG = logging.getLogger(__name__)
 RETRYABLE_SETUP = (asyncio.TimeoutError, httpx.TimeoutException, httpx.NetworkError, httpx.RemoteProtocolError)
 
@@ -48,7 +60,7 @@ def setup_request(init):
 
 
 class Session:
-    def __init__(self, model, reader, writer):
+    def __init__(self, model, reader, writer, *, browser_tools=False):
         self.model, self.reader, self.writer = model, reader, writer
         self.pc = RTCPeerConnection(RTCConfiguration(iceServers=[]))
         self.pc.addTransceiver('audio', direction='recvonly')
@@ -58,6 +70,11 @@ class Session:
         self.active = self.settling = self.disconnected = False
         self.audio_drained.set()
         self.audio_part, self.audio_done, self.response_done = None, None, None
+        self.pending_pcm = bytearray()
+        self.first_audio_packet = True
+        self.last_voice_activity = 0.0
+        self.browser_tools = browser_tools
+        self.pending_search_calls = set()
         self.input_bytes = 0
         self.tasks = set()
         self.dc.on('message', self.on_event)
@@ -89,19 +106,26 @@ class Session:
                 if typ == 'session.created':
                     self.ready.set()
             elif typ == 'response.content_part.added' and v.get('part', {}).get('type') in ('audio', 'output_audio'):
+                self.flush_audio()
                 self.audio_drained.clear()
                 self.audio_part = {k: v[k] for k in ('response_id', 'item_id', 'output_index', 'content_index') if k in v}
+                self.first_audio_packet = True
             elif typ == 'response.output_audio.done':
                 self.audio_done = v
                 return
             elif typ in ('output_audio_buffer.stopped', 'output_audio_buffer.cleared'):
-                self.audio_drained.set()
+                response_id = (self.audio_part or {}).get('response_id')
+                if not response_id or not v.get('response_id') or response_id == v['response_id']:
+                    self.audio_drained.set()
                 return
             elif typ == 'response.done':
                 if not self.active or self.response_done is not None:
                     self.ended.set()
                     return
                 self.response_done = v
+                self.last_voice_activity = time.monotonic()
+                if self.browser_tools:
+                    self.remember_search_calls(v['response'])
                 self.spawn(self.finish_turn())
                 return
             elif typ == 'error':
@@ -122,26 +146,56 @@ class Session:
             except Exception:
                 return
             for packet in resampler.resample(frame):
-                if self.audio_part is not None:
-                    pcm = bytes(packet.planes[0])[:packet.samples * 2]
-                    self.emit({'type': 'response.output_audio.delta', **self.audio_part,
-                               'delta': base64.b64encode(pcm).decode()})
+                if self.audio_part is not None and not self.disconnected:
+                    pcm = memoryview(packet.planes[0]).cast('B')[:packet.samples * 2]
+                    self.pending_pcm.extend(pcm)
+                    if self.response_done is not None and any(abs(sample) > 64 for sample in pcm.cast('h')[::8]):
+                        self.last_voice_activity = time.monotonic()
+                    if self.first_audio_packet or len(self.pending_pcm) >= PCM_CHUNK_BYTES:
+                        self.flush_audio()
+                        self.first_audio_packet = False
+
+    def flush_audio(self):
+        if self.pending_pcm:
+            self.emit({'type': 'response.output_audio.delta', **self.audio_part,
+                       'delta': base64.b64encode(self.pending_pcm).decode()})
+            self.pending_pcm.clear()
+
+    def remember_search_calls(self, response):
+        self.pending_search_calls.clear()
+        if response.get('status') != 'completed':
+            return
+        for item in response.get('output') or []:
+            if not isinstance(item, dict) or item.get('type') != 'function_call' or item.get('name') != 'web_search':
+                continue
+            call_id = item.get('call_id')
+            if isinstance(call_id, str) and 0 < len(call_id) <= 128 and item.get('status', 'completed') == 'completed':
+                self.pending_search_calls.add(call_id)
+                if len(self.pending_search_calls) == 4:
+                    break
 
     async def finish_turn(self):
         # The data-channel terminal can arrive before the final RTP packets.
         # Keep forwarding media while the output-buffer completion arrives.
-        try:
-            await asyncio.wait_for(self.audio_drained.wait(), timeout=5)
-        except asyncio.TimeoutError:
-            pass
-        if self.audio_part is not None:
-            await asyncio.sleep(.12)
+        if self.audio_part is not None and not self.disconnected:
+            deadline = time.monotonic() + AUDIO_DRAIN_LIMIT_SECONDS
+            while not self.audio_drained.is_set():
+                remaining = min(deadline, self.last_voice_activity + AUDIO_DRAIN_IDLE_SECONDS) - time.monotonic()
+                if remaining <= 0:
+                    break
+                try:
+                    await asyncio.wait_for(self.audio_drained.wait(), timeout=remaining)
+                except asyncio.TimeoutError:
+                    continue
+            if not self.disconnected:
+                await asyncio.sleep(AUDIO_RTP_TAIL_SECONDS)
+        self.flush_audio()
         self.audio_part = None
         if self.audio_done is not None:
             self.emit(self.audio_done)
         self.audio_done = None
         self.settling = True
-        self.emit(self.response_done)
+        await self.events.put(self.response_done)
 
     def send(self, event):
         if self.dc.readyState != 'open' or self.dc.bufferedAmount > 256 * 1024:
@@ -150,12 +204,13 @@ class Session:
         self.dc.send(event_json(event))
 
     async def read_client(self):
-        while not self.ended.is_set():
+        while not self.ended.is_set() or (self.active and self.response_done is not None):
             line = await self.reader.readline()
             v = json.loads(line) if line else {'type': 'bridge.disconnect'}
             typ = v.get('type')
             if typ == 'bridge.disconnect':
                 self.disconnected = True
+                self.audio_drained.set()
                 if self.active and self.response_done is None and self.dc.readyState == 'open':
                     self.send({'type': 'response.cancel'})
                 if not self.active or not line:
@@ -195,9 +250,11 @@ class Session:
             if self.active:
                 raise ValueError('A response is already active.')
             raw = v.get('response') or {}
-            if set(raw) - {'instructions', 'output_modalities', 'max_output_tokens'}:
-                raise ValueError('Only instructions, output_modalities and max_output_tokens are supported.')
-            out = self.response_options(raw)
+            tool_fields = {'tool_choice'} if self.browser_tools else set()
+            if set(raw) - RESPONSE_FIELDS - tool_fields:
+                raise ValueError('Unsupported response field.')
+            out = self.response_options(raw, allow_named_search=self.browser_tools)
+            self.pending_search_calls.clear()
             self.active = True
             self.send({'type': typ, 'response': out})
         elif typ == 'response.cancel':
@@ -205,7 +262,8 @@ class Session:
                 self.send({'type': typ})
         elif typ == 'session.update':
             raw = v.get('session') or {}
-            if set(raw) - {'type', 'model', 'instructions', 'output_modalities', 'max_output_tokens', 'audio'}:
+            tool_fields = {'tools', 'tool_choice'} if self.browser_tools else set()
+            if set(raw) - {'type', 'model', 'audio'} - RESPONSE_FIELDS - tool_fields:
                 raise ValueError('Unsupported session field.')
             if raw.get('type', 'realtime') != 'realtime' or raw.get('model', self.model) != self.model:
                 raise ValueError('The model and session type are fixed for this connection.')
@@ -215,8 +273,17 @@ class Session:
                     or set(audio_out) - {'format', 'voice'} or audio_in.get('turn_detection') is not None
                     or audio_in.get('format', PCM) != PCM or audio_out.get('format', PCM) != PCM):
                 raise ValueError('Use PCM16 mono 24 kHz and manual audio commit (turn_detection=null).')
-            out = self.response_options({k: v for k, v in raw.items() if k in ('instructions','output_modalities','max_output_tokens')})
+            out = self.response_options(raw)
             out.update(type='realtime', audio={'input': {'turn_detection': None}})
+            if 'tools' in raw:
+                tools = raw['tools']
+                if tools == []:
+                    out['tools'] = []
+                elif (isinstance(tools, list) and len(tools) == 1 and isinstance(tools[0], dict)
+                      and tools[0].get('type') == 'function' and tools[0].get('name') == 'web_search'):
+                    out['tools'] = [WEB_SEARCH]
+                else:
+                    raise ValueError('Only the site web search tool is available.')
             if voice := audio_out.get('voice'):
                 if not isinstance(voice, str) or not re.fullmatch(r'[a-z][a-z0-9_-]{0,31}', voice):
                     raise ValueError('Invalid voice name.')
@@ -224,6 +291,16 @@ class Session:
             self.send({'type': typ, 'session': out})
         elif typ == 'conversation.item.create':
             item = v.get('item') or {}
+            if isinstance(item, dict) and item.get('type') == 'function_call_output':
+                call_id, output = item.get('call_id'), item.get('output')
+                if (not self.browser_tools or self.active or not isinstance(call_id, str)
+                        or call_id not in self.pending_search_calls):
+                    raise ValueError('No matching completed web search call.')
+                if not isinstance(output, str) or not 0 < len(output.encode('utf-8')) <= 16384:
+                    raise ValueError('Web search output must contain 1 to 16384 UTF-8 bytes.')
+                self.send({'type': typ, 'item': {'type': 'function_call_output', 'call_id': call_id, 'output': output}})
+                self.pending_search_calls.remove(call_id)
+                return
             content = item.get('content') or []
             if (item.get('type') != 'message' or item.get('role') != 'user'
                     or not 1 <= len(content) <= 4 or any(x.get('type') != 'input_text'
@@ -235,8 +312,13 @@ class Session:
             raise ValueError('Unsupported realtime event.')
 
     @staticmethod
-    def response_options(raw):
+    def response_options(raw, *, allow_named_search=False):
         options = {'max_output_tokens': raw.get('max_output_tokens', 256)}
+        if 'tool_choice' in raw:
+            choice = raw['tool_choice']
+            if choice not in ('auto', 'none') and not (allow_named_search and choice == {'type': 'function', 'name': 'web_search'}):
+                raise ValueError('Unsupported tool choice.')
+            options['tool_choice'] = choice
         if type(options['max_output_tokens']) is not int or not 1 <= options['max_output_tokens'] <= 2048:
             raise ValueError('max_output_tokens must be between 1 and 2048.')
         if 'instructions' in raw:
@@ -278,12 +360,22 @@ class Session:
         return True
 
     async def run(self):
-        tasks = [self.spawn(self.flush()), self.spawn(self.read_client()), self.spawn(self.ended.wait())]
-        completed, _ = await asyncio.wait(tasks, timeout=600, return_when=asyncio.FIRST_COMPLETED)
+        outgoing = self.spawn(self.flush())
+        incoming = self.spawn(self.read_client())
+        peer_closed = self.spawn(self.ended.wait())
+        completed, _ = await asyncio.wait((outgoing, incoming, peer_closed), timeout=600,
+                                          return_when=asyncio.FIRST_COMPLETED)
         for task in completed:
             task.result()
-        if not completed and self.active and self.response_done is None:
-            self.send({'type': 'response.cancel'})
+        # If the peer closes just after sending the terminal, it has already
+        # reported billable usage. Let the local gateway finish settlement.
+        if not self.active or outgoing.done() or incoming.done():
+            return
+        if not completed or self.response_done is not None:
+            self.disconnected = True
+            self.audio_drained.set()
+            if self.response_done is None:
+                self.send({'type': 'response.cancel'})
             async def settle():
                 while self.active:
                     await asyncio.sleep(.05)
@@ -325,7 +417,7 @@ async def serve(path):
                     timeout=httpx.Timeout(12,connect=5))
             started = time.monotonic()
             for attempt in range(2):
-                session = Session(model, reader, writer)
+                session = Session(model, reader, writer, browser_tools=init.get('browser_tools') is True)
                 try:
                     remaining = 30 - (time.monotonic() - started)
                     ready = await asyncio.wait_for(session.prepare(clients[proxy], headers), timeout=min(16, remaining))

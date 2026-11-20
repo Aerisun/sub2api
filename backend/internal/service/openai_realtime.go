@@ -120,7 +120,7 @@ func ParseOpenAIRealtimeUsage(event []byte, model string) (*OpenAIForwardResult,
 
 // OpenStandardRealtimeBridge sends credentials only to the owner-only local
 // Unix socket. The worker connects to the fixed, verified ChatGPT WebRTC URL.
-func (s *OpenAIGatewayService) OpenStandardRealtimeBridge(ctx context.Context, account *Account, model string) (net.Conn, error) {
+func (s *OpenAIGatewayService) OpenStandardRealtimeBridge(ctx context.Context, account *Account, model string, browserTools bool) (net.Conn, error) {
 	if account == nil || !account.IsOpenAIOAuth() || !IsStandardOpenAIRealtimeModel(model) || account.GetMappedModel(model) != model {
 		return nil, ErrLiveUnavailable
 	}
@@ -147,7 +147,7 @@ func (s *OpenAIGatewayService) OpenStandardRealtimeBridge(ctx context.Context, a
 	}
 	_ = conn.SetWriteDeadline(time.Now().Add(time.Second))
 	err = json.NewEncoder(conn).Encode(map[string]any{
-		"model": model, "proxy": resolveAccountProxyURL(account), "headers": headers,
+		"model": model, "proxy": resolveAccountProxyURL(account), "headers": headers, "browser_tools": browserTools,
 	})
 	if err != nil {
 		_ = conn.Close()

@@ -107,3 +107,16 @@
 }
 
 .realtime-stop { background: var(--voice-muted); color: var(--voice-foreground); }
+
+.realtime-compose {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 4px;
+  padding: 4px; border: 1px solid var(--voice-border); border-radius: 10px;
+}
+.realtime-compose input { width: 100%; min-width: 0; padding: 6px; background: transparent; color: inherit; font-size: 14px; }
+.realtime-compose button { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 7px; }
+.realtime-compose button:hover, .realtime-compose button[aria-pressed="true"] { background: var(--voice-muted); color: var(--voice-accent); }
+.realtime-compose button:disabled { opacity: .45; }
+.realtime-compose small { grid-column: 1 / -1; padding-inline: 6px; color: var(--voice-secondary); }
+.realtime-sent { justify-self: end; max-width: 90%; max-height: 80px; overflow: auto; padding: 6px 10px; border-radius: 10px; background: var(--voice-muted); font-size: 13px; overflow-wrap: anywhere; }
+.realtime-sources { display: grid; gap: 4px; max-height: 100px; overflow: auto; }
+.realtime-sources a { font-size: 13px; color: var(--voice-foreground); text-decoration: underline; overflow-wrap: anywhere; }

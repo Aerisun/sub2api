@@ -41,7 +41,7 @@ func (h *OpenAIGatewayHandler) BrowserRealtimeModels(c *gin.Context) {
 	if realtimeAPIKeyGroupEnabled(key) {
 		models = key.Group.ModelAllowlist.FilterForListing(service.StandardOpenAIRealtimeModels())
 	}
-	c.JSON(http.StatusOK, gin.H{"models": models})
+	c.JSON(http.StatusOK, gin.H{"models": models, "web_search": browserVoiceSearchModel(key) != ""})
 }
 
 // OpenAIRealtime exposes the standard realtime event protocol. The worker
@@ -104,7 +104,8 @@ func (h *OpenAIGatewayHandler) OpenAIRealtime(c *gin.Context) {
 		return
 	}
 	account := selection.Account
-	bridge, err := h.gatewayService.OpenStandardRealtimeBridge(ctx, account, model)
+	browserTools := c.GetBool("internal_chat_authenticated")
+	bridge, err := h.gatewayService.OpenStandardRealtimeBridge(ctx, account, model, browserTools)
 	if err != nil {
 		h.errorResponse(c, http.StatusServiceUnavailable, "api_error", "Realtime bridge unavailable")
 		return
@@ -139,16 +140,30 @@ func (h *OpenAIGatewayHandler) OpenAIRealtime(c *gin.Context) {
 		return ws.Write(wctx, coderws.MessageText, msg)
 	}
 	var responseStarted atomic.Pointer[time.Time]
+	var searching, searchAllowed atomic.Bool
+	searchCtx, cancelSearch := context.WithCancel(ctx)
+	defer cancelSearch()
 	readDone := make(chan struct{})
 	go func() {
 		defer close(readDone)
+		defer cancelSearch()
 		defer func() { _ = send([]byte(`{"type":"bridge.disconnect"}`)) }()
 		for {
 			kind, msg, err := ws.Read(session)
 			if err != nil || kind != coderws.MessageText || !json.Valid(msg) {
 				return
 			}
-			switch gjson.GetBytes(msg, "type").String() {
+			typ := gjson.GetBytes(msg, "type").String()
+			if browserTools {
+				if searching.Load() || (typ == "conversation.item.create" && gjson.GetBytes(msg, "item.type").String() == "function_call_output") {
+					_ = write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"Wait for the active search to finish."}}`))
+					continue
+				}
+				if typ == "input_audio_buffer.commit" || (typ == "conversation.item.create" && gjson.GetBytes(msg, "item.type").String() == "message") {
+					searchAllowed.Store(true)
+				}
+			}
+			switch typ {
 			case "session.update", "conversation.item.create", "input_audio_buffer.append",
 				"input_audio_buffer.commit", "input_audio_buffer.clear", "response.cancel":
 			case "response.create":
@@ -180,6 +195,7 @@ func (h *OpenAIGatewayHandler) OpenAIRealtime(c *gin.Context) {
 readBridge:
 	for scanner.Scan() {
 		msg := scanner.Bytes()
+		var calls []realtimeSearchCall
 		switch gjson.GetBytes(msg, "type").String() {
 		case "bridge.create_rejected":
 			msg = []byte(gjson.GetBytes(msg, "event").Raw)
@@ -215,6 +231,10 @@ readBridge:
 			if send([]byte(`{"type":"bridge.settled"}`)) != nil {
 				break readBridge
 			}
+			if browserTools {
+				calls = browserRealtimeSearchCalls(msg)
+				searching.Store(len(calls) > 0)
+			}
 			responseStarted.Store(nil)
 			firstOutputMs = nil
 		}
@@ -224,6 +244,13 @@ readBridge:
 		default:
 			if write(msg) != nil {
 				_ = ws.CloseNow()
+			} else if len(calls) > 0 {
+				// The upstream terminal and its billing acknowledgement precede every tool result.
+				result := h.runBrowserSearchCalls(searchCtx, c, account.ID, calls, searchAllowed.Swap(false), send)
+				searching.Store(false)
+				if result == nil || write(result) != nil {
+					break readBridge
+				}
 			}
 		}
 	}

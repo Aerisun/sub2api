@@ -226,6 +226,9 @@ func RegisterGatewayRoutes(
 				c.Request.URL.Path = "/v1/chat/completions"
 			}
 			originalAuth := c.Request.Header.Get("Authorization")
+			if c.FullPath() == "/api/v1/chat/realtime" {
+				handler.BindBrowserRealtimeSearch(c, r, originalAuth)
+			}
 			c.Request.Header.Set("Authorization", "Bearer "+credential)
 			c.Request.Header.Del("x-api-key")
 			c.Request.Header.Del("x-goog-api-key")
