@@ -479,7 +479,7 @@ func TestOpenAIResponseFlush_FailedAndErrorEventsFlushAtBoundaries(t *testing.T)
 	})
 }
 
-func TestOpenAIResponseFlush_CyberPolicyIdentifiesUpstream(t *testing.T) {
+func TestOpenAIResponseFlush_CyberPolicyPreservesUpstreamMessage(t *testing.T) {
 	const original = "This content was flagged for possible cybersecurity risk."
 	const detail = `{"code":"cyber_policy","type":"invalid_request","message":"` + original + `"}`
 	for name, body := range map[string]string{
@@ -495,9 +495,7 @@ func TestOpenAIResponseFlush_CyberPolicyIdentifiesUpstream(t *testing.T) {
 					data, ok := extractOpenAISSEDataLine(line)
 					if ok && gjson.Get(data, "type").String() == "response.failed" {
 						require.Equal(t, "cyber_policy", gjson.Get(data, "response.error.code").String())
-						message := gjson.Get(data, "response.error.message").String()
-						require.True(t, strings.HasPrefix(message, "请求已到达上游服务商"))
-						require.True(t, strings.HasSuffix(message, original))
+						require.Equal(t, original, gjson.Get(data, "response.error.message").String())
 					}
 				}
 			}
