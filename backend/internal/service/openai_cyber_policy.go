@@ -87,6 +87,14 @@ func detectOpenAICyberPolicy(payload []byte) (bool, string, string) {
 	return true, "cyber_policy", strings.TrimSpace(msg)
 }
 
+func openAICyberPolicyClientMessage(upstreamMessage string) string {
+	const notice = "请求已到达上游服务商，因其网络安全策略被拒绝。The upstream provider rejected this request under its cybersecurity policy."
+	if upstreamMessage == "" {
+		return notice
+	}
+	return notice + "\n\n" + upstreamMessage
+}
+
 func markOpenAICyberPolicyEvent(c *gin.Context, payload []byte, upstreamStatus int, usage *OpenAIUsage) bool {
 	hit, code, message := detectOpenAICyberPolicy(payload)
 	if !hit {

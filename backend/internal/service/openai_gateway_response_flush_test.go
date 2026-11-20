@@ -15,6 +15,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
 
 type openAIResponseFlushRecorder struct {
@@ -476,6 +477,40 @@ func TestOpenAIResponseFlush_FailedAndErrorEventsFlushAtBoundaries(t *testing.T)
 		require.Equal(t, 1, strings.Count(gotBody, `"type":"response.failed"`))
 		require.Len(t, flushes, 1)
 	})
+}
+
+func TestOpenAIResponseFlush_CyberPolicyIdentifiesUpstream(t *testing.T) {
+	const original = "This content was flagged for possible cybersecurity risk."
+	const detail = `{"code":"cyber_policy","type":"invalid_request","message":"` + original + `"}`
+	for name, body := range map[string]string{
+		"bare upstream error": `data: {"type":"error","error":` + detail + `}` + "\n\n",
+		"upstream terminal":   `data: {"type":"response.failed","response":{"error":` + detail + `}}` + "\n\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			check := func(body string, err error) {
+				require.ErrorContains(t, err, original)
+				require.Equal(t, 1, strings.Count(body, `"type":"response.failed"`))
+				require.True(t, strings.HasSuffix(body, "\n\n"))
+				for _, line := range strings.Split(body, "\n") {
+					data, ok := extractOpenAISSEDataLine(line)
+					if ok && gjson.Get(data, "type").String() == "response.failed" {
+						require.Equal(t, "cyber_policy", gjson.Get(data, "response.error.code").String())
+						message := gjson.Get(data, "response.error.message").String()
+						require.True(t, strings.HasPrefix(message, "请求已到达上游服务商"))
+						require.True(t, strings.HasSuffix(message, original))
+					}
+				}
+			}
+
+			recorder := newOpenAIResponseFlushRecorder()
+			_, err := runOpenAIResponseFlushTest(recorder, io.NopCloser(strings.NewReader(body)), config.GatewayConfig{})
+			downstream, _ := recorder.snapshot()
+			check(downstream, err)
+
+			_, raw, _, err := runPassthroughFlushTest(t, io.NopCloser(strings.NewReader(body)), -1)
+			check(raw.Body.String(), err)
+		})
+	}
 }
 
 func TestOpenAIResponseFlush_BareErrorFollowedByCompletedUsesCompletedTerminal(t *testing.T) {
